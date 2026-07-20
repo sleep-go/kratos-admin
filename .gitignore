@@ -1,0 +1,23 @@
+.DS_Store
+.idea/
+.vscode/
+.superpowers/
+.env
+*.local
+
+# Go
+backend/bin/
+backend/coverage.out
+backend/tmp/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+
+# Runtime data
+data/
+deploy/data/
+
