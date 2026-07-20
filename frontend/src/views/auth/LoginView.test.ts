@@ -1,14 +1,19 @@
 import { mount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import { vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import LoginView from './LoginView.vue'
 
 describe('LoginView', () => {
   it('展示三标识登录和安全提示', () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
     const wrapper = mount(LoginView, {
       global: {
-        plugins: [createTestingPinia({ createSpy: vi.fn })]
+        plugins: [createTestingPinia({ createSpy: vi.fn }), router]
       }
     })
 

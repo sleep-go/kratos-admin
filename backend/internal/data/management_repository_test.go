@@ -1,0 +1,84 @@
+package data
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/sleep-go/kratos-admin/backend/internal/service"
+)
+
+func TestResourceRegistryRejectsUnknownAndTenantOverride(t *testing.T) {
+	definition, ok := managementResources["departments"]
+	if !ok || !definition.tenantScoped {
+		t.Fatal("departments must be a registered tenant-scoped resource")
+	}
+	values, err := sanitizeResourceWrite(definition, map[string]any{
+		"name": "研发部", "code": "rd", "tenant_id": float64(999), "unknown": "value",
+	})
+	if err != nil {
+		t.Fatalf("sanitizeResourceWrite() error = %v", err)
+	}
+	if _, exists := values["tenant_id"]; exists {
+		t.Fatal("tenant_id must never be accepted from request data")
+	}
+	if _, exists := values["unknown"]; exists {
+		t.Fatal("unknown field must not be written")
+	}
+	if values["name"] != "研发部" || values["code"] != "rd" {
+		t.Fatalf("values = %+v", values)
+	}
+}
+
+func TestReadOnlyResourceRejectsWrites(t *testing.T) {
+	if _, err := sanitizeResourceWrite(managementResources["audit-logs"], map[string]any{"summary": "伪造"}); err == nil {
+		t.Fatal("audit logs must be read-only")
+	}
+}
+
+func TestSensitiveSettingsNeverReturnStoredValue(t *testing.T) {
+	rows := []map[string]any{
+		{"setting_key": "smtp_password", "setting_value": "ciphertext", "is_secret": uint8(1)},
+		{"setting_key": "site_name", "setting_value": "管理后台", "is_secret": uint8(0)},
+	}
+
+	redactManagementRows("settings", rows)
+
+	if _, exists := rows[0]["setting_value"]; exists {
+		t.Fatal("敏感配置不得返回保存值")
+	}
+	if rows[0]["configured"] != true {
+		t.Fatalf("configured = %#v", rows[0]["configured"])
+	}
+	if rows[1]["setting_value"] != "管理后台" {
+		t.Fatalf("非敏感配置不应被隐藏: %#v", rows[1])
+	}
+}
+
+func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	repository := &ManagementRepository{db: tx}
+
+	id, err := repository.Create(context.Background(), service.ResourceScope{UserID: 1, PlatformAdmin: true}, "tenants", map[string]any{
+		"code": "integration-id", "name": "自增主键测试", "status": float64(1),
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if id == 0 {
+		t.Fatal("Create() must return MySQL auto-increment ID")
+	}
+	ids, err := (&AuditRepository{db: tx}).PendingEventIDs(context.Background(), 10)
+	if err != nil || len(ids) == 0 {
+		t.Fatalf("PendingEventIDs() = %+v, err %v", ids, err)
+	}
+}

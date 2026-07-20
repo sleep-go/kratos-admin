@@ -179,6 +179,7 @@ CREATE TABLE auth_sessions (
     user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
     tenant_id BIGINT UNSIGNED NOT NULL COMMENT '当前租户ID，0表示平台域',
     member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前租户成员ID，平台域为0',
+    permission_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '会话最近一次签发时的权限版本号',
     refresh_jti_hash CHAR(64) NOT NULL COMMENT 'Refresh JWT jti的SHA256摘要',
     device_name VARCHAR(128) NOT NULL DEFAULT '' COMMENT '设备名称',
     user_agent VARCHAR(512) NOT NULL DEFAULT '' COMMENT '登录User-Agent',

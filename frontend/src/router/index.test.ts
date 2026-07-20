@@ -4,6 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAppRouter } from './index'
 import { useAuthStore } from '@/stores/auth'
 
+vi.mock('@/api/auth', () => ({
+  login: vi.fn(),
+  logout: vi.fn(),
+  refresh: vi.fn().mockRejectedValue(new Error('unauthorized'))
+}))
+
 describe('路由鉴权', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

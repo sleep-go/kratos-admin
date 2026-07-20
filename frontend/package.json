@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "api:generate": "openapi-ts -i ../docs/openapi/openapi.yaml -o src/api/generated -c @hey-api/client-fetch",
     "typecheck": "vue-tsc -b --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@hey-api/openapi-ts": "^0.99.0",
     "@pinia/testing": "^2.0.1",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.3",

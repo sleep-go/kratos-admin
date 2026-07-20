@@ -479,6 +479,9 @@ type RefreshResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
 	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	User          *CurrentUser           `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	Tenants       []*TenantSummary       `protobuf:"bytes,4,rep,name=tenants,proto3" json:"tenants,omitempty"`
+	CurrentTenant *TenantSummary         `protobuf:"bytes,5,opt,name=current_tenant,json=currentTenant,proto3" json:"current_tenant,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -523,6 +526,27 @@ func (x *RefreshResponse) GetAccessToken() string {
 func (x *RefreshResponse) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *RefreshResponse) GetUser() *CurrentUser {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+func (x *RefreshResponse) GetTenants() []*TenantSummary {
+	if x != nil {
+		return x.Tenants
+	}
+	return nil
+}
+
+func (x *RefreshResponse) GetCurrentTenant() *TenantSummary {
+	if x != nil {
+		return x.CurrentTenant
 	}
 	return nil
 }
@@ -1206,11 +1230,14 @@ const file_admin_v1_auth_proto_rawDesc = "" +
 	"\x04user\x18\x03 \x01(\v2\x15.admin.v1.CurrentUserR\x04user\x121\n" +
 	"\atenants\x18\x04 \x03(\v2\x17.admin.v1.TenantSummaryR\atenants\x12>\n" +
 	"\x0ecurrent_tenant\x18\x05 \x01(\v2\x17.admin.v1.TenantSummaryR\rcurrentTenant\"\x10\n" +
-	"\x0eRefreshRequest\"o\n" +
+	"\x0eRefreshRequest\"\x8d\x02\n" +
 	"\x0fRefreshResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x0f\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12)\n" +
+	"\x04user\x18\x03 \x01(\v2\x15.admin.v1.CurrentUserR\x04user\x121\n" +
+	"\atenants\x18\x04 \x03(\v2\x17.admin.v1.TenantSummaryR\atenants\x12>\n" +
+	"\x0ecurrent_tenant\x18\x05 \x01(\v2\x17.admin.v1.TenantSummaryR\rcurrentTenant\"\x0f\n" +
 	"\rLogoutRequest\"\x10\n" +
 	"\x0eLogoutResponse\"2\n" +
 	"\x13SwitchTenantRequest\x12\x1b\n" +
@@ -1312,35 +1339,38 @@ var file_admin_v1_auth_proto_depIdxs = []int32{
 	0,  // 6: admin.v1.VerifyMfaResponse.tenants:type_name -> admin.v1.TenantSummary
 	0,  // 7: admin.v1.VerifyMfaResponse.current_tenant:type_name -> admin.v1.TenantSummary
 	21, // 8: admin.v1.RefreshResponse.expires_at:type_name -> google.protobuf.Timestamp
-	21, // 9: admin.v1.SwitchTenantResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0,  // 10: admin.v1.SwitchTenantResponse.current_tenant:type_name -> admin.v1.TenantSummary
-	21, // 11: admin.v1.ForgotPasswordResponse.expires_at:type_name -> google.protobuf.Timestamp
-	21, // 12: admin.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	21, // 13: admin.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	16, // 14: admin.v1.ListSessionsResponse.items:type_name -> admin.v1.Session
-	2,  // 15: admin.v1.AuthService.Login:input_type -> admin.v1.LoginRequest
-	4,  // 16: admin.v1.AuthService.VerifyMfa:input_type -> admin.v1.VerifyMfaRequest
-	6,  // 17: admin.v1.AuthService.Refresh:input_type -> admin.v1.RefreshRequest
-	8,  // 18: admin.v1.AuthService.Logout:input_type -> admin.v1.LogoutRequest
-	10, // 19: admin.v1.AuthService.SwitchTenant:input_type -> admin.v1.SwitchTenantRequest
-	12, // 20: admin.v1.AuthService.ForgotPassword:input_type -> admin.v1.ForgotPasswordRequest
-	14, // 21: admin.v1.AuthService.ResetPassword:input_type -> admin.v1.ResetPasswordRequest
-	17, // 22: admin.v1.AuthService.ListSessions:input_type -> admin.v1.ListSessionsRequest
-	19, // 23: admin.v1.AuthService.RevokeSession:input_type -> admin.v1.RevokeSessionRequest
-	3,  // 24: admin.v1.AuthService.Login:output_type -> admin.v1.LoginResponse
-	5,  // 25: admin.v1.AuthService.VerifyMfa:output_type -> admin.v1.VerifyMfaResponse
-	7,  // 26: admin.v1.AuthService.Refresh:output_type -> admin.v1.RefreshResponse
-	9,  // 27: admin.v1.AuthService.Logout:output_type -> admin.v1.LogoutResponse
-	11, // 28: admin.v1.AuthService.SwitchTenant:output_type -> admin.v1.SwitchTenantResponse
-	13, // 29: admin.v1.AuthService.ForgotPassword:output_type -> admin.v1.ForgotPasswordResponse
-	15, // 30: admin.v1.AuthService.ResetPassword:output_type -> admin.v1.ResetPasswordResponse
-	18, // 31: admin.v1.AuthService.ListSessions:output_type -> admin.v1.ListSessionsResponse
-	20, // 32: admin.v1.AuthService.RevokeSession:output_type -> admin.v1.RevokeSessionResponse
-	24, // [24:33] is the sub-list for method output_type
-	15, // [15:24] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	1,  // 9: admin.v1.RefreshResponse.user:type_name -> admin.v1.CurrentUser
+	0,  // 10: admin.v1.RefreshResponse.tenants:type_name -> admin.v1.TenantSummary
+	0,  // 11: admin.v1.RefreshResponse.current_tenant:type_name -> admin.v1.TenantSummary
+	21, // 12: admin.v1.SwitchTenantResponse.expires_at:type_name -> google.protobuf.Timestamp
+	0,  // 13: admin.v1.SwitchTenantResponse.current_tenant:type_name -> admin.v1.TenantSummary
+	21, // 14: admin.v1.ForgotPasswordResponse.expires_at:type_name -> google.protobuf.Timestamp
+	21, // 15: admin.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	21, // 16: admin.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	16, // 17: admin.v1.ListSessionsResponse.items:type_name -> admin.v1.Session
+	2,  // 18: admin.v1.AuthService.Login:input_type -> admin.v1.LoginRequest
+	4,  // 19: admin.v1.AuthService.VerifyMfa:input_type -> admin.v1.VerifyMfaRequest
+	6,  // 20: admin.v1.AuthService.Refresh:input_type -> admin.v1.RefreshRequest
+	8,  // 21: admin.v1.AuthService.Logout:input_type -> admin.v1.LogoutRequest
+	10, // 22: admin.v1.AuthService.SwitchTenant:input_type -> admin.v1.SwitchTenantRequest
+	12, // 23: admin.v1.AuthService.ForgotPassword:input_type -> admin.v1.ForgotPasswordRequest
+	14, // 24: admin.v1.AuthService.ResetPassword:input_type -> admin.v1.ResetPasswordRequest
+	17, // 25: admin.v1.AuthService.ListSessions:input_type -> admin.v1.ListSessionsRequest
+	19, // 26: admin.v1.AuthService.RevokeSession:input_type -> admin.v1.RevokeSessionRequest
+	3,  // 27: admin.v1.AuthService.Login:output_type -> admin.v1.LoginResponse
+	5,  // 28: admin.v1.AuthService.VerifyMfa:output_type -> admin.v1.VerifyMfaResponse
+	7,  // 29: admin.v1.AuthService.Refresh:output_type -> admin.v1.RefreshResponse
+	9,  // 30: admin.v1.AuthService.Logout:output_type -> admin.v1.LogoutResponse
+	11, // 31: admin.v1.AuthService.SwitchTenant:output_type -> admin.v1.SwitchTenantResponse
+	13, // 32: admin.v1.AuthService.ForgotPassword:output_type -> admin.v1.ForgotPasswordResponse
+	15, // 33: admin.v1.AuthService.ResetPassword:output_type -> admin.v1.ResetPasswordResponse
+	18, // 34: admin.v1.AuthService.ListSessions:output_type -> admin.v1.ListSessionsResponse
+	20, // 35: admin.v1.AuthService.RevokeSession:output_type -> admin.v1.RevokeSessionResponse
+	27, // [27:36] is the sub-list for method output_type
+	18, // [18:27] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_admin_v1_auth_proto_init() }

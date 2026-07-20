@@ -162,13 +162,13 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
-    /api/v1/auth/sessions/{session_id}:
+    /api/v1/auth/sessions/{sessionId}:
         delete:
             tags:
                 - AuthService
             operationId: AuthService_RevokeSession
             parameters:
-                - name: session_id
+                - name: sessionId
                   in: path
                   required: true
                   schema:
@@ -229,6 +229,140 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/management/{resource}:
+        get:
+            tags:
+                - ManagementService
+            operationId: ManagementService_ListResources
+            parameters:
+                - name: resource
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: page
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: uint32
+                - name: keyword
+                  in: query
+                  schema:
+                    type: string
+                - name: sort
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.ListResourcesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+        post:
+            tags:
+                - ManagementService
+            operationId: ManagementService_CreateResource
+            parameters:
+                - name: resource
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.CreateResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/management/{resource}/{id}:
+        put:
+            tags:
+                - ManagementService
+            operationId: ManagementService_UpdateResource
+            parameters:
+                - name: resource
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.UpdateResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+        delete:
+            tags:
+                - ManagementService
+            operationId: ManagementService_DeleteResource
+            parameters:
+                - name: resource
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.DeleteResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
 components:
     schemas:
         admin.v1.CheckResponse:
@@ -238,17 +372,27 @@ components:
                     type: string
                 service:
                     type: string
+        admin.v1.CreateResourceResponse:
+            type: object
+            properties:
+                id:
+                    type: string
         admin.v1.CurrentUser:
             type: object
             properties:
                 id:
                     type: string
-                display_name:
+                displayName:
                     type: string
-                avatar_url:
+                avatarUrl:
                     type: string
-                platform_admin:
+                platformAdmin:
                     type: boolean
+        admin.v1.DeleteResourceResponse:
+            type: object
+            properties:
+                id:
+                    type: string
         admin.v1.ForgotPasswordRequest:
             type: object
             properties:
@@ -259,11 +403,26 @@ components:
         admin.v1.ForgotPasswordResponse:
             type: object
             properties:
-                challenge_id:
+                challengeId:
                     type: string
-                expires_at:
+                expiresAt:
                     type: string
                     format: date-time
+        admin.v1.ListResourcesResponse:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        type: object
+                total:
+                    type: string
+                page:
+                    type: integer
+                    format: uint32
+                pageSize:
+                    type: integer
+                    format: uint32
         admin.v1.ListSessionsResponse:
             type: object
             properties:
@@ -278,18 +437,18 @@ components:
                     type: string
                 password:
                     type: string
-                captcha_id:
+                captchaId:
                     type: string
-                captcha_code:
+                captchaCode:
                     type: string
-                device_name:
+                deviceName:
                     type: string
         admin.v1.LoginResponse:
             type: object
             properties:
-                access_token:
+                accessToken:
                     type: string
-                expires_at:
+                expiresAt:
                     type: string
                     format: date-time
                 user:
@@ -298,11 +457,11 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/admin.v1.TenantSummary'
-                current_tenant:
+                currentTenant:
                     $ref: '#/components/schemas/admin.v1.TenantSummary'
-                mfa_challenge_id:
+                mfaChallengeId:
                     type: string
-                mfa_required:
+                mfaRequired:
                     type: boolean
         admin.v1.LogoutResponse:
             type: object
@@ -313,19 +472,27 @@ components:
         admin.v1.RefreshResponse:
             type: object
             properties:
-                access_token:
+                accessToken:
                     type: string
-                expires_at:
+                expiresAt:
                     type: string
                     format: date-time
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
+                tenants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.TenantSummary'
+                currentTenant:
+                    $ref: '#/components/schemas/admin.v1.TenantSummary'
         admin.v1.ResetPasswordRequest:
             type: object
             properties:
-                challenge_id:
+                challengeId:
                     type: string
                 code:
                     type: string
-                new_password:
+                newPassword:
                     type: string
         admin.v1.ResetPasswordResponse:
             type: object
@@ -338,18 +505,18 @@ components:
             properties:
                 id:
                     type: string
-                tenant_id:
+                tenantId:
                     type: string
-                device_name:
+                deviceName:
                     type: string
                 ip:
                     type: string
-                user_agent:
+                userAgent:
                     type: string
-                created_at:
+                createdAt:
                     type: string
                     format: date-time
-                expires_at:
+                expiresAt:
                     type: string
                     format: date-time
                 current:
@@ -357,17 +524,17 @@ components:
         admin.v1.SwitchTenantRequest:
             type: object
             properties:
-                tenant_id:
+                tenantId:
                     type: string
         admin.v1.SwitchTenantResponse:
             type: object
             properties:
-                access_token:
+                accessToken:
                     type: string
-                expires_at:
+                expiresAt:
                     type: string
                     format: date-time
-                current_tenant:
+                currentTenant:
                     $ref: '#/components/schemas/admin.v1.TenantSummary'
         admin.v1.TenantSummary:
             type: object
@@ -376,19 +543,24 @@ components:
                     type: string
                 name:
                     type: string
+        admin.v1.UpdateResourceResponse:
+            type: object
+            properties:
+                id:
+                    type: string
         admin.v1.VerifyMfaRequest:
             type: object
             properties:
-                challenge_id:
+                challengeId:
                     type: string
                 code:
                     type: string
         admin.v1.VerifyMfaResponse:
             type: object
             properties:
-                access_token:
+                accessToken:
                     type: string
-                expires_at:
+                expiresAt:
                     type: string
                     format: date-time
                 user:
@@ -397,7 +569,7 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/admin.v1.TenantSummary'
-                current_tenant:
+                currentTenant:
                     $ref: '#/components/schemas/admin.v1.TenantSummary'
         google.protobuf.Any:
             type: object
@@ -428,3 +600,5 @@ tags:
       description: AuthService 提供登录、MFA、令牌轮换与会话治理接口。
     - name: HealthService
       description: Health 服务提供部署探针使用的健康检查接口。
+    - name: ManagementService
+      description: ManagementService 提供白名单后台资源的统一分页与维护接口。

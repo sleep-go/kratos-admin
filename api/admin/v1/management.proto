@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package admin.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/sleep-go/kratos-admin/api/admin/v1;v1";
+
+// ManagementService 提供白名单后台资源的统一分页与维护接口。
+service ManagementService {
+  rpc ListResources(ListResourcesRequest) returns (ListResourcesResponse) {
+    option (google.api.http) = {get: "/api/v1/management/{resource}"};
+  }
+  rpc CreateResource(CreateResourceRequest) returns (CreateResourceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/management/{resource}"
+      body: "data"
+    };
+  }
+  rpc UpdateResource(UpdateResourceRequest) returns (UpdateResourceResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/management/{resource}/{id}"
+      body: "data"
+    };
+  }
+  rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse) {
+    option (google.api.http) = {delete: "/api/v1/management/{resource}/{id}"};
+  }
+}
+
+message ListResourcesRequest {
+  string resource = 1;
+  uint32 page = 2;
+  uint32 page_size = 3;
+  string keyword = 4;
+  string sort = 5;
+  map<string, string> filters = 6;
+}
+
+message ListResourcesResponse {
+  repeated google.protobuf.Struct items = 1;
+  uint64 total = 2;
+  uint32 page = 3;
+  uint32 page_size = 4;
+}
+
+message CreateResourceRequest {
+  string resource = 1;
+  google.protobuf.Struct data = 2;
+}
+
+message UpdateResourceRequest {
+  string resource = 1;
+  uint64 id = 2;
+  google.protobuf.Struct data = 3;
+}
+
+message DeleteResourceRequest {
+  string resource = 1;
+  uint64 id = 2;
+}
+
+message CreateResourceResponse {
+  uint64 id = 1;
+}
+
+message UpdateResourceResponse {
+  uint64 id = 1;
+}
+
+message DeleteResourceResponse {
+  uint64 id = 1;
+}

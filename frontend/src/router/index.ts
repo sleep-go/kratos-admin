@@ -8,6 +8,25 @@ import {
 
 import { useAuthStore } from '@/stores/auth'
 
+const managementRoutes: Array<[string, string, string]> = [
+  ['platform/tenants', 'tenant-management', 'tenants'],
+  ['organization/users', 'member-management', 'members'],
+  ['organization/departments', 'department-management', 'departments'],
+  ['organization/positions', 'position-management', 'positions'],
+  ['permission/roles', 'role-management', 'roles'],
+  ['permission/resources', 'resource-management', 'resources'],
+  ['permission/tenant-features', 'tenant-resource-management', 'tenant-resources'],
+  ['permission/policies', 'policy-management', 'casbin-rules'],
+  ['logs/login', 'login-logs', 'login-logs'],
+  ['logs/audit', 'audit-logs', 'audit-logs'],
+  ['logs/api', 'api-logs', 'api-logs'],
+  ['files', 'file-management', 'files'],
+  ['settings/dictionaries', 'dictionary-types', 'dictionary-types'],
+  ['settings/dictionary-items', 'dictionary-items', 'dictionary-items'],
+  ['settings/providers', 'provider-management', 'providers'],
+  ['settings', 'system-settings', 'settings']
+]
+
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -24,7 +43,13 @@ const routes: RouteRecordRaw[] = [
         path: '',
         name: 'dashboard',
         component: () => import('@/views/dashboard/DashboardView.vue')
-      }
+      },
+      ...managementRoutes.map(([path, name, resourceKey]) => ({
+        path,
+        name,
+        component: () => import('@/views/management/ResourceListView.vue'),
+        props: { resourceKey }
+      }))
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/' }
@@ -34,8 +59,11 @@ export function createAppRouter(mode: 'web' | 'memory' = 'web') {
   const history: RouterHistory = mode === 'memory' ? createMemoryHistory() : createWebHistory()
   const router = createRouter({ history, routes })
 
-  router.beforeEach((to) => {
+  router.beforeEach(async (to) => {
     const authStore = useAuthStore()
+    if (!authStore.isAuthenticated && !authStore.sessionRestored) {
+      await authStore.restoreSession()
+    }
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
       return { name: 'login', query: { redirect: to.fullPath } }
     }

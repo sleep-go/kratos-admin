@@ -104,6 +104,9 @@ message RefreshRequest {}
 message RefreshResponse {
   string access_token = 1;
   google.protobuf.Timestamp expires_at = 2;
+  CurrentUser user = 3;
+  repeated TenantSummary tenants = 4;
+  TenantSummary current_tenant = 5;
 }
 
 message LogoutRequest {}

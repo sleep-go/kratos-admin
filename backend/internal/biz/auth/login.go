@@ -64,15 +64,16 @@ type Membership struct {
 
 // Session 表示服务端持久化的 refresh 会话。
 type Session struct {
-	ID             string
-	UserID         uint64
-	TenantID       uint64
-	MemberID       uint64
-	RefreshJTIHash string
-	DeviceName     string
-	IP             string
-	UserAgent      string
-	ExpiresAt      time.Time
+	ID                string
+	UserID            uint64
+	TenantID          uint64
+	MemberID          uint64
+	PermissionVersion uint64
+	RefreshJTIHash    string
+	DeviceName        string
+	IP                string
+	UserAgent         string
+	ExpiresAt         time.Time
 }
 
 // UserRepository 定义登录流程需要的用户与成员数据访问接口。
@@ -184,15 +185,16 @@ func (u *LoginUsecase) Login(ctx context.Context, input LoginInput) (LoginResult
 		return LoginResult{}, err
 	}
 	if err := u.sessions.Create(ctx, Session{
-		ID:             sessionID,
-		UserID:         user.ID,
-		TenantID:       selected.TenantID,
-		MemberID:       selected.ID,
-		RefreshJTIHash: HashJTI(tokens.RefreshJTI),
-		DeviceName:     input.DeviceName,
-		IP:             input.IP,
-		UserAgent:      input.UserAgent,
-		ExpiresAt:      tokens.RefreshExpiresAt,
+		ID:                sessionID,
+		UserID:            user.ID,
+		TenantID:          selected.TenantID,
+		MemberID:          selected.ID,
+		PermissionVersion: selected.PermissionVersion,
+		RefreshJTIHash:    HashJTI(tokens.RefreshJTI),
+		DeviceName:        input.DeviceName,
+		IP:                input.IP,
+		UserAgent:         input.UserAgent,
+		ExpiresAt:         tokens.RefreshExpiresAt,
 	}); err != nil {
 		return LoginResult{}, fmt.Errorf("创建认证会话失败: %w", err)
 	}

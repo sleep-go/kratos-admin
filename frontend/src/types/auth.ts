@@ -1,25 +1,13 @@
-export interface TenantSummary {
-  id: string
-  name: string
-}
+import type {
+  AdminV1CurrentUser,
+  AdminV1LoginRequest,
+  AdminV1LoginResponse,
+  AdminV1RefreshResponse,
+  AdminV1TenantSummary
+} from '@/api/generated'
 
-export interface CurrentUser {
-  id: string
-  displayName: string
-  avatarUrl?: string
-  platformAdmin: boolean
-}
-
-export interface LoginRequest {
-  identifier: string
-  password: string
-}
-
-export interface LoginResponse {
-  accessToken: string
-  expiresAt: string
-  user: CurrentUser
-  tenants: TenantSummary[]
-  currentTenant?: TenantSummary
-  mfaChallengeId?: string
-}
+export type TenantSummary = AdminV1TenantSummary
+export type CurrentUser = AdminV1CurrentUser
+export type LoginRequest = AdminV1LoginRequest
+export type LoginResponse = AdminV1LoginResponse
+export type RefreshResponse = AdminV1RefreshResponse

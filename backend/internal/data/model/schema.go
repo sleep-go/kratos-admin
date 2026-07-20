@@ -195,18 +195,19 @@ func (RoleScopeDepartment) TableName() string { return "role_scope_departments" 
 
 // AuthSession 表示服务端可撤销的 refresh 会话。
 type AuthSession struct {
-	ID             string    `gorm:"type:char(36);primaryKey"`
-	UserID         uint64    `gorm:"not null"`
-	TenantID       uint64    `gorm:"not null"`
-	MemberID       uint64    `gorm:"not null"`
-	RefreshJTIHash string    `gorm:"type:char(64);not null"`
-	DeviceName     string    `gorm:"size:128;not null"`
-	UserAgent      string    `gorm:"size:512;not null"`
-	IP             string    `gorm:"size:64;not null"`
-	ExpiresAt      time.Time `gorm:"not null"`
-	RevokedAt      *time.Time
-	CreatedAt      time.Time `gorm:"not null"`
-	UpdatedAt      time.Time `gorm:"not null"`
+	ID                string    `gorm:"type:char(36);primaryKey"`
+	UserID            uint64    `gorm:"not null"`
+	TenantID          uint64    `gorm:"not null"`
+	MemberID          uint64    `gorm:"not null"`
+	PermissionVersion uint64    `gorm:"not null"`
+	RefreshJTIHash    string    `gorm:"type:char(64);not null"`
+	DeviceName        string    `gorm:"size:128;not null"`
+	UserAgent         string    `gorm:"size:512;not null"`
+	IP                string    `gorm:"size:64;not null"`
+	ExpiresAt         time.Time `gorm:"not null"`
+	RevokedAt         *time.Time
+	CreatedAt         time.Time `gorm:"not null"`
+	UpdatedAt         time.Time `gorm:"not null"`
 }
 
 // TableName 返回认证会话表名。

@@ -15,6 +15,39 @@ type fakeLoginHandler struct {
 	input  bizauth.LoginInput
 }
 
+type fakeSessionHandler struct {
+	sessions []bizauth.DeviceSession
+	revoked  string
+}
+
+func (h *fakeSessionHandler) Refresh(context.Context, string) (bizauth.RefreshResult, error) {
+	return bizauth.RefreshResult{
+		Tokens: bizauth.TokenPair{AccessToken: "renewed"},
+		Profile: bizauth.SessionProfile{
+			User:          bizauth.UserProfile{ID: 8, DisplayName: "恢复用户", PlatformAdmin: true},
+			CurrentTenant: bizauth.TenantOption{Name: "平台管理"},
+		},
+	}, nil
+}
+func (h *fakeSessionHandler) Profile(context.Context, uint64, uint64) (bizauth.SessionProfile, error) {
+	return bizauth.SessionProfile{
+		User:          bizauth.UserProfile{ID: 8, DisplayName: "恢复用户", PlatformAdmin: true},
+		CurrentTenant: bizauth.TenantOption{ID: 0, Name: "平台管理"},
+		Tenants:       []bizauth.TenantOption{{ID: 11, Name: "租户甲"}},
+	}, nil
+}
+func (h *fakeSessionHandler) SwitchTenant(context.Context, string, uint64) (bizauth.SwitchTenantResult, error) {
+	return bizauth.SwitchTenantResult{}, nil
+}
+func (h *fakeSessionHandler) Logout(context.Context, string) error { return nil }
+func (h *fakeSessionHandler) List(context.Context, uint64, string) ([]bizauth.DeviceSession, error) {
+	return h.sessions, nil
+}
+func (h *fakeSessionHandler) Revoke(_ context.Context, sessionID string, _ uint64) error {
+	h.revoked = sessionID
+	return nil
+}
+
 func (h *fakeLoginHandler) Login(_ context.Context, input bizauth.LoginInput) (bizauth.LoginResult, error) {
 	h.input = input
 	return h.result, nil
@@ -51,5 +84,23 @@ func TestRefreshCookieIsHttpOnlyAndScoped(t *testing.T) {
 		if !strings.Contains(cookie, part) {
 			t.Fatalf("cookie %q must contain %q", cookie, part)
 		}
+	}
+}
+
+func TestListAndRevokeSessionUseAuthenticatedUser(t *testing.T) {
+	handler := &fakeSessionHandler{sessions: []bizauth.DeviceSession{{ID: "device-1", DeviceName: "Chrome", Current: true}}}
+	service := NewAuthService(&fakeLoginHandler{}, false, handler)
+	claims := &bizauth.TokenClaims{UserID: 8, SessionID: "device-1"}
+	ctx := bizauth.NewClaimsContext(context.Background(), claims)
+
+	reply, err := service.ListSessions(ctx, &v1.ListSessionsRequest{})
+	if err != nil || len(reply.Items) != 1 || !reply.Items[0].Current {
+		t.Fatalf("ListSessions() = %+v, err %v", reply, err)
+	}
+	if _, err := service.RevokeSession(ctx, &v1.RevokeSessionRequest{SessionId: "device-2"}); err != nil {
+		t.Fatalf("RevokeSession() error = %v", err)
+	}
+	if handler.revoked != "device-2" {
+		t.Fatalf("revoked = %q", handler.revoked)
 	}
 }

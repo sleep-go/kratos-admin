@@ -25,7 +25,7 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("初始化 API 依赖失败: %w", err)
 	}
 	defer resources.Data.Close()
-	if err := app.NewAPIApp(cfg, resources.AuthService).Run(); err != nil {
+	if err := app.NewFullAPIApp(cfg, resources).Run(); err != nil {
 		return fmt.Errorf("API 进程退出: %w", err)
 	}
 	return nil

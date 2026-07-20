@@ -12,5 +12,5 @@ plugins:
   - local: protoc-gen-openapi
     out: docs/openapi
     opt:
-      - naming=proto
+      - naming=json
       - fq_schema_naming=true

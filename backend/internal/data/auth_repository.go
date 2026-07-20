@@ -38,21 +38,29 @@ func (r *AuthRepository) FindByIdentifier(ctx context.Context, identifier string
 		}
 		return nil, fmt.Errorf("查询登录用户失败: %w", err)
 	}
+	return mapAuthUser(row), nil
+}
+
+// FindUser 按用户 ID 重新加载当前有效的全局用户资料。
+func (r *AuthRepository) FindUser(ctx context.Context, userID uint64) (bizauth.User, error) {
+	u := r.q.User
+	row, err := u.WithContext(ctx).Where(u.ID.Eq(userID)).First()
+	if err != nil {
+		return bizauth.User{}, err
+	}
+	return *mapAuthUser(row), nil
+}
+
+func mapAuthUser(row *model.User) *bizauth.User {
 	avatarURL := ""
 	if row.AvatarURL != nil {
 		avatarURL = *row.AvatarURL
 	}
 	return &bizauth.User{
-		ID:               row.ID,
-		Username:         row.Username,
-		DisplayName:      row.DisplayName,
-		AvatarURL:        avatarURL,
-		PlatformAdmin:    row.IsPlatformAdmin,
-		PasswordHash:     row.PasswordHash,
-		Status:           bizauth.UserStatus(row.Status),
-		FailedLoginCount: row.FailedLoginCount,
-		LockedUntil:      row.LockedUntil,
-	}, nil
+		ID: row.ID, Username: row.Username, DisplayName: row.DisplayName, AvatarURL: avatarURL,
+		PlatformAdmin: row.IsPlatformAdmin, PasswordHash: row.PasswordHash,
+		Status: bizauth.UserStatus(row.Status), FailedLoginCount: row.FailedLoginCount, LockedUntil: row.LockedUntil,
+	}
 }
 
 // ListMemberships 返回用户在所有启用租户中的可用成员身份。
@@ -108,11 +116,103 @@ func (r *AuthRepository) ResetLoginFailures(ctx context.Context, userID uint64) 
 func (r *AuthRepository) Create(ctx context.Context, session bizauth.Session) error {
 	return r.q.AuthSession.WithContext(ctx).Create(&model.AuthSession{
 		ID: session.ID, UserID: session.UserID, TenantID: session.TenantID,
-		MemberID: session.MemberID, RefreshJTIHash: session.RefreshJTIHash,
+		MemberID: session.MemberID, PermissionVersion: session.PermissionVersion, RefreshJTIHash: session.RefreshJTIHash,
 		DeviceName: session.DeviceName, UserAgent: session.UserAgent, IP: session.IP,
 		ExpiresAt: session.ExpiresAt,
 	})
 }
 
+// Find 查询有效会话，并重新加载当前租户的权限版本和成员状态。
+func (r *AuthRepository) Find(ctx context.Context, sessionID string) (bizauth.SessionRecord, error) {
+	s := r.q.AuthSession
+	row, err := s.WithContext(ctx).Where(s.ID.Eq(sessionID)).First()
+	if err != nil {
+		return bizauth.SessionRecord{}, err
+	}
+	permissionVersion := uint64(0)
+	if row.TenantID == 0 {
+		u := r.q.User
+		user, userErr := u.WithContext(ctx).
+			Where(u.ID.Eq(row.UserID), u.Status.Eq(uint8(bizauth.UserStatusEnabled)), u.IsPlatformAdmin.Is(true)).
+			First()
+		if userErr != nil || !user.IsPlatformAdmin {
+			return bizauth.SessionRecord{}, bizauth.ErrInvalidRefresh
+		}
+	} else {
+		membership, memberErr := r.FindMembership(ctx, row.UserID, row.TenantID)
+		if memberErr != nil {
+			return bizauth.SessionRecord{}, memberErr
+		}
+		permissionVersion = membership.PermissionVersion
+	}
+	return bizauth.SessionRecord{
+		ID: row.ID, UserID: row.UserID, TenantID: row.TenantID, MemberID: row.MemberID,
+		RefreshJTIHash: row.RefreshJTIHash, PermissionVersion: permissionVersion,
+		ExpiresAt: row.ExpiresAt, RevokedAt: row.RevokedAt,
+	}, nil
+}
+
+// Rotate 使用旧 jti 摘要作为并发条件，原子轮换 refresh 会话。
+func (r *AuthRepository) Rotate(ctx context.Context, sessionID, expectedHash, nextHash string, expiresAt time.Time, tenantID, memberID, permissionVersion uint64) (bool, error) {
+	s := r.q.AuthSession
+	result, err := s.WithContext(ctx).
+		Where(s.ID.Eq(sessionID), s.RefreshJTIHash.Eq(expectedHash), s.RevokedAt.IsNull()).
+		Updates(map[string]any{
+			"refresh_jti_hash":   nextHash,
+			"expires_at":         expiresAt,
+			"tenant_id":          tenantID,
+			"member_id":          memberID,
+			"permission_version": permissionVersion,
+		})
+	if err != nil {
+		return false, err
+	}
+	return result.RowsAffected == 1, nil
+}
+
+// Revoke 撤销指定用户拥有的单个设备会话。
+func (r *AuthRepository) Revoke(ctx context.Context, sessionID string, userID uint64) error {
+	s := r.q.AuthSession
+	_, err := s.WithContext(ctx).
+		Where(s.ID.Eq(sessionID), s.UserID.Eq(userID), s.RevokedAt.IsNull()).
+		Update(s.RevokedAt, time.Now().UTC())
+	return err
+}
+
+// FindMembership 查询用户在目标启用租户中的有效成员身份。
+func (r *AuthRepository) FindMembership(ctx context.Context, userID, tenantID uint64) (bizauth.Membership, error) {
+	memberships, err := r.ListMemberships(ctx, userID)
+	if err != nil {
+		return bizauth.Membership{}, err
+	}
+	for _, membership := range memberships {
+		if membership.TenantID == tenantID && membership.Status == bizauth.MembershipStatusEnabled {
+			return membership, nil
+		}
+	}
+	return bizauth.Membership{}, bizauth.ErrNoTenantMembership
+}
+
+// List 返回用户当前有效的全部设备会话。
+func (r *AuthRepository) List(ctx context.Context, userID uint64) ([]bizauth.DeviceSession, error) {
+	s := r.q.AuthSession
+	rows, err := s.WithContext(ctx).
+		Where(s.UserID.Eq(userID), s.RevokedAt.IsNull(), s.ExpiresAt.Gt(time.Now().UTC())).
+		Order(s.CreatedAt.Desc()).
+		Find()
+	if err != nil {
+		return nil, err
+	}
+	items := make([]bizauth.DeviceSession, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, bizauth.DeviceSession{
+			ID: row.ID, TenantID: row.TenantID, DeviceName: row.DeviceName,
+			IP: row.IP, UserAgent: row.UserAgent, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt,
+		})
+	}
+	return items, nil
+}
+
 var _ bizauth.UserRepository = (*AuthRepository)(nil)
 var _ bizauth.SessionRepository = (*AuthRepository)(nil)
+var _ bizauth.SessionManagerRepository = (*AuthRepository)(nil)

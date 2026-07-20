@@ -32,6 +32,7 @@ func newAuthSession(db *gorm.DB, opts ...gen.DOOption) authSession {
 	_authSession.UserID = field.NewUint64(tableName, "user_id")
 	_authSession.TenantID = field.NewUint64(tableName, "tenant_id")
 	_authSession.MemberID = field.NewUint64(tableName, "member_id")
+	_authSession.PermissionVersion = field.NewUint64(tableName, "permission_version")
 	_authSession.RefreshJTIHash = field.NewString(tableName, "refresh_jti_hash")
 	_authSession.DeviceName = field.NewString(tableName, "device_name")
 	_authSession.UserAgent = field.NewString(tableName, "user_agent")
@@ -49,19 +50,20 @@ func newAuthSession(db *gorm.DB, opts ...gen.DOOption) authSession {
 type authSession struct {
 	authSessionDo authSessionDo
 
-	ALL            field.Asterisk
-	ID             field.String
-	UserID         field.Uint64
-	TenantID       field.Uint64
-	MemberID       field.Uint64
-	RefreshJTIHash field.String
-	DeviceName     field.String
-	UserAgent      field.String
-	IP             field.String
-	ExpiresAt      field.Time
-	RevokedAt      field.Time
-	CreatedAt      field.Time
-	UpdatedAt      field.Time
+	ALL               field.Asterisk
+	ID                field.String
+	UserID            field.Uint64
+	TenantID          field.Uint64
+	MemberID          field.Uint64
+	PermissionVersion field.Uint64
+	RefreshJTIHash    field.String
+	DeviceName        field.String
+	UserAgent         field.String
+	IP                field.String
+	ExpiresAt         field.Time
+	RevokedAt         field.Time
+	CreatedAt         field.Time
+	UpdatedAt         field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -82,6 +84,7 @@ func (a *authSession) updateTableName(table string) *authSession {
 	a.UserID = field.NewUint64(table, "user_id")
 	a.TenantID = field.NewUint64(table, "tenant_id")
 	a.MemberID = field.NewUint64(table, "member_id")
+	a.PermissionVersion = field.NewUint64(table, "permission_version")
 	a.RefreshJTIHash = field.NewString(table, "refresh_jti_hash")
 	a.DeviceName = field.NewString(table, "device_name")
 	a.UserAgent = field.NewString(table, "user_agent")
@@ -116,11 +119,12 @@ func (a *authSession) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *authSession) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 12)
+	a.fieldMap = make(map[string]field.Expr, 13)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["user_id"] = a.UserID
 	a.fieldMap["tenant_id"] = a.TenantID
 	a.fieldMap["member_id"] = a.MemberID
+	a.fieldMap["permission_version"] = a.PermissionVersion
 	a.fieldMap["refresh_jti_hash"] = a.RefreshJTIHash
 	a.fieldMap["device_name"] = a.DeviceName
 	a.fieldMap["user_agent"] = a.UserAgent

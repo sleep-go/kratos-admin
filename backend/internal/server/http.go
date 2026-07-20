@@ -2,6 +2,7 @@
 package server
 
 import (
+	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
@@ -11,9 +12,13 @@ import (
 
 // NewHTTPServer 创建并注册全部 HTTP API。
 func NewHTTPServer(cfg conf.Server, healthService *service.HealthService, authServices ...*service.AuthService) *khttp.Server {
+	middlewares := []middleware.Middleware{recovery.Recovery()}
+	if len(authServices) > 0 && authServices[0] != nil {
+		middlewares = append(middlewares, authServices[0].AccessMiddleware())
+	}
 	server := khttp.NewServer(
 		khttp.Address(cfg.HTTPAddr),
-		khttp.Middleware(recovery.Recovery()),
+		khttp.Middleware(middlewares...),
 	)
 	v1.RegisterHealthServiceHTTPServer(server, healthService)
 	for _, authService := range authServices {
@@ -22,4 +27,11 @@ func NewHTTPServer(cfg conf.Server, healthService *service.HealthService, authSe
 		}
 	}
 	return server
+}
+
+// RegisterManagementHTTP 注册后台资源管理 HTTP API。
+func RegisterManagementHTTP(server *khttp.Server, managementService *service.ManagementService) {
+	if managementService != nil {
+		v1.RegisterManagementServiceHTTPServer(server, managementService)
+	}
 }

@@ -39,7 +39,12 @@ const userName = computed(() => currentUser.value?.displayName ?? '超级管理�
       :aria-hidden="!mobileOpen"
       data-testid="mobile-navigation"
     >
-      <button class="mobile-close" type="button" aria-label="关闭导航菜单" @click="mobileOpen = false">
+      <button
+        class="mobile-close"
+        type="button"
+        aria-label="关闭导航菜单"
+        @click="mobileOpen = false"
+      >
         ×
       </button>
       <div class="mobile-account">

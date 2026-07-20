@@ -4,4 +4,3 @@ config.global.stubs = {
   transition: false,
   'transition-group': false
 }
-

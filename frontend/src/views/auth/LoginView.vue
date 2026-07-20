@@ -1,15 +1,23 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
+const router = useRouter()
+const route = useRoute()
 const { loading } = storeToRefs(authStore)
 const form = reactive({ identifier: '', password: '' })
 
 async function submit() {
-  await authStore.login({ ...form })
+  const response = await authStore.login({ ...form })
+  if (response.mfaRequired) {
+    await router.push({ name: 'mfa', query: { challenge: response.mfaChallengeId } })
+    return
+  }
+  await router.replace(typeof route.query.redirect === 'string' ? route.query.redirect : '/')
 }
 </script>
 
@@ -63,7 +71,9 @@ async function submit() {
           </button>
         </form>
 
-        <p class="security-note"><span aria-hidden="true">◆</span> 登录行为受安全策略和审计日志保护</p>
+        <p class="security-note">
+          <span aria-hidden="true">◆</span> 登录行为受安全策略和审计日志保护
+        </p>
       </div>
     </section>
   </main>
@@ -206,7 +216,9 @@ async function submit() {
     border-radius: 2px;
     padding: 0 14px;
     outline: none;
-    transition: border 150ms ease, box-shadow 150ms ease;
+    transition:
+      border 150ms ease,
+      box-shadow 150ms ease;
 
     &:focus {
       border-color: var(--ka-accent);
@@ -256,8 +268,14 @@ async function submit() {
 }
 
 @keyframes card-in {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 900px) {

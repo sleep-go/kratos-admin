@@ -14,6 +14,7 @@ import (
 	"github.com/sleep-go/kratos-admin/backend/internal/data"
 	"github.com/sleep-go/kratos-admin/backend/internal/server"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	workerServer "github.com/sleep-go/kratos-admin/backend/internal/worker"
 )
 
 const version = "0.1.0"
@@ -35,8 +36,9 @@ func NewAPIApp(cfg conf.Config, authServices ...*service.AuthService) *kratos.Ap
 
 // APIResources 持有 API 进程需要在退出时释放的依赖。
 type APIResources struct {
-	Data        *data.Data
-	AuthService *service.AuthService
+	Data              *data.Data
+	AuthService       *service.AuthService
+	ManagementService *service.ManagementService
 }
 
 // NewAPIResources 连接基础设施并组装真实认证服务。
@@ -51,17 +53,36 @@ func NewAPIResources(ctx context.Context, cfg conf.Config) (*APIResources, error
 		return nil, err
 	}
 	repository := data.NewAuthRepository(dataResources)
+	tokenManager := bizauth.NewTokenManager(privateKey, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL, nil)
 	loginUsecase := bizauth.NewLoginUsecase(
 		repository,
 		repository,
 		bizauth.NewPasswordHasher(bizauth.DefaultPasswordParams()),
-		bizauth.NewTokenManager(privateKey, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL, nil),
+		tokenManager,
 		nil,
 	)
+	sessionUsecase := bizauth.NewSessionUsecase(repository, tokenManager, nil)
+	authService := service.NewAuthService(loginUsecase, cfg.Environment == "production", sessionUsecase)
+	authService.ConfigureAccessSecurity(tokenManager, sessionUsecase)
 	return &APIResources{
-		Data:        dataResources,
-		AuthService: service.NewAuthService(loginUsecase, cfg.Environment == "production"),
+		Data:              dataResources,
+		AuthService:       authService,
+		ManagementService: service.NewManagementService(data.NewManagementRepository(dataResources)),
 	}, nil
+}
+
+// NewFullAPIApp 创建并注册认证、管理与健康检查的完整 API 应用。
+func NewFullAPIApp(cfg conf.Config, resources *APIResources) *kratos.App {
+	logger := newLogger("api")
+	healthService := service.NewHealthService("kratos-admin-api")
+	httpServer := server.NewHTTPServer(cfg.Server, healthService, resources.AuthService)
+	grpcServer := server.NewGRPCServer(cfg.Server, healthService, resources.AuthService)
+	server.RegisterManagementHTTP(httpServer, resources.ManagementService)
+	server.RegisterManagementGRPC(grpcServer, resources.ManagementService)
+	return kratos.New(
+		kratos.Name("kratos-admin-api"), kratos.Version(version), kratos.Logger(logger),
+		kratos.Server(httpServer, grpcServer),
+	)
 }
 
 func buildPrivateKey(cfg conf.Config) (ed25519.PrivateKey, error) {
@@ -85,6 +106,16 @@ func NewWorkerApp(_ conf.Config) *kratos.App {
 		kratos.Name("kratos-admin-worker"),
 		kratos.Version(version),
 		kratos.Logger(logger),
+	)
+}
+
+// NewFullWorkerApp 创建连接真实 MySQL、Redis 和 Asynq 的 Worker 应用。
+func NewFullWorkerApp(cfg conf.Config, resources *data.Data) *kratos.App {
+	logger := newLogger("worker")
+	asyncServer := workerServer.NewServer(cfg.Data, resources, logger)
+	return kratos.New(
+		kratos.Name("kratos-admin-worker"), kratos.Version(version), kratos.Logger(logger),
+		kratos.Server(asyncServer),
 	)
 }
 
