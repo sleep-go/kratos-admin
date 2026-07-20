@@ -81,10 +81,10 @@ type RefreshResult struct {
 	Profile SessionProfile
 }
 
-// SwitchTenantResult 描述租户切换后轮换的令牌和当前租户。
+// SwitchTenantResult 描述租户切换后轮换的令牌和完整权限上下文。
 type SwitchTenantResult struct {
-	Tokens TokenPair
-	Tenant TenantOption
+	Tokens  TokenPair
+	Profile SessionProfile
 }
 
 // SessionUsecase 负责一次性 refresh 轮换、会话撤销和租户切换。
@@ -201,13 +201,17 @@ func (u *SessionUsecase) SwitchTenant(ctx context.Context, refreshToken string, 
 		if userErr != nil || user.Status != UserStatusEnabled || !user.PlatformAdmin {
 			return SwitchTenantResult{}, ErrNoTenantMembership
 		}
+		profile, profileErr := u.Profile(ctx, claims.UserID, tenantID)
+		if profileErr != nil {
+			return SwitchTenantResult{}, profileErr
+		}
 		pair, rotateErr := u.rotate(ctx, claims, session, TokenSubject{
 			UserID: claims.UserID, PlatformAdmin: true, SessionID: session.ID,
 		})
 		if rotateErr != nil {
 			return SwitchTenantResult{}, rotateErr
 		}
-		return SwitchTenantResult{Tokens: pair, Tenant: TenantOption{Name: "平台管理"}}, nil
+		return SwitchTenantResult{Tokens: pair, Profile: profile}, nil
 	}
 	membership, err := u.repository.FindMembership(ctx, claims.UserID, tenantID)
 	if err != nil || membership.Status != MembershipStatusEnabled {
@@ -217,6 +221,10 @@ func (u *SessionUsecase) SwitchTenant(ctx context.Context, refreshToken string, 
 	if err != nil || user.Status != UserStatusEnabled {
 		return SwitchTenantResult{}, ErrAccountDisabled
 	}
+	profile, err := u.Profile(ctx, claims.UserID, tenantID)
+	if err != nil {
+		return SwitchTenantResult{}, err
+	}
 	pair, err := u.rotate(ctx, claims, session, TokenSubject{
 		UserID: claims.UserID, TenantID: membership.TenantID, MemberID: membership.ID,
 		PlatformAdmin: user.PlatformAdmin, SessionID: session.ID, PermissionVersion: membership.PermissionVersion,
@@ -224,7 +232,7 @@ func (u *SessionUsecase) SwitchTenant(ctx context.Context, refreshToken string, 
 	if err != nil {
 		return SwitchTenantResult{}, err
 	}
-	return SwitchTenantResult{Tokens: pair, Tenant: TenantOption{ID: membership.TenantID, Name: membership.TenantName}}, nil
+	return SwitchTenantResult{Tokens: pair, Profile: profile}, nil
 }
 
 // Revoke 撤销属于指定用户的会话。

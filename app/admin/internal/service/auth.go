@@ -262,7 +262,9 @@ func (s *AuthService) SwitchTenant(ctx context.Context, request *v1.SwitchTenant
 	return &v1.SwitchTenantResponse{
 		AccessToken:   result.Tokens.AccessToken,
 		ExpiresAt:     timestamppb.New(result.Tokens.AccessExpiresAt),
-		CurrentTenant: &v1.TenantSummary{Id: result.Tenant.ID, Name: result.Tenant.Name},
+		CurrentTenant: mapTenantOption(result.Profile.CurrentTenant),
+		User:          mapCurrentUser(result.Profile.User),
+		Tenants:       mapTenantOptions(result.Profile.Tenants),
 	}, nil
 }
 

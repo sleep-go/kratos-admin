@@ -1150,6 +1150,12 @@ components:
                     format: date-time
                 currentTenant:
                     $ref: '#/components/schemas/admin.v1.TenantSummary'
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
+                tenants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.TenantSummary'
         admin.v1.TenantSummary:
             type: object
             properties:

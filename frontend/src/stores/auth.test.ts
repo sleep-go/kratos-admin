@@ -19,13 +19,9 @@ describe('认证状态恢复', () => {
     vi.clearAllMocks()
   })
 
-  it('切换租户后再次刷新服务端权限上下文', async () => {
+  it('切换租户时直接采用服务端返回的新权限上下文', async () => {
     vi.mocked(authApi.switchTenant).mockResolvedValue({
       accessToken: 'switched-token',
-      currentTenant: { id: '11', name: '租户甲' }
-    })
-    vi.mocked(authApi.refresh).mockResolvedValue({
-      accessToken: 'tenant-token',
       user: {
         id: '8',
         displayName: '租户管理员',
@@ -41,6 +37,7 @@ describe('认证状态恢复', () => {
 
     expect(store.currentTenant?.id).toBe('11')
     expect(store.currentUser?.permissions).toEqual(['files:*'])
+    expect(authApi.refresh).not.toHaveBeenCalled()
   })
 
   it('使用 HttpOnly refresh cookie 恢复用户与租户上下文', async () => {

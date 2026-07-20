@@ -246,6 +246,8 @@ export type AdminV1SwitchTenantResponse = {
     accessToken?: string;
     expiresAt?: string;
     currentTenant?: AdminV1TenantSummary;
+    user?: AdminV1CurrentUser;
+    tenants?: Array<AdminV1TenantSummary>;
 };
 
 export type AdminV1TenantSummary = {

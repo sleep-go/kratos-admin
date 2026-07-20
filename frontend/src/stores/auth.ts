@@ -101,18 +101,14 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const switched = await authApi.switchTenant(tenantId)
-      if (!switched.accessToken) throw new Error('租户切换响应缺少访问令牌')
-      accessToken.value = switched.accessToken
-      setAccessToken(switched.accessToken)
-      const response = await authApi.refresh()
-      if (!response.accessToken || !response.user) {
-        throw new Error('切换后刷新响应缺少身份上下文')
+      if (!switched.accessToken || !switched.user) {
+        throw new Error('租户切换响应缺少身份上下文')
       }
-      accessToken.value = response.accessToken
-      currentUser.value = response.user
-      tenants.value = response.tenants ?? []
-      currentTenant.value = response.currentTenant ?? switched.currentTenant ?? null
-      setAccessToken(response.accessToken)
+      accessToken.value = switched.accessToken
+      currentUser.value = switched.user
+      tenants.value = switched.tenants ?? []
+      currentTenant.value = switched.currentTenant ?? null
+      setAccessToken(switched.accessToken)
       await loadNavigation()
     } catch (error) {
       clearSession()

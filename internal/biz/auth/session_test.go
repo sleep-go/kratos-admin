@@ -182,6 +182,9 @@ func TestSwitchTenantRevalidatesMembershipAndRotatesToken(t *testing.T) {
 	if err != nil || claims.TenantID != 11 || claims.MemberID != 21 || claims.PermissionVersion != 8 {
 		t.Fatalf("access claims = %+v, err %v", claims, err)
 	}
+	if result.Profile.CurrentTenant.ID != 11 || len(result.Profile.User.Permissions) != 1 || result.Profile.User.Permissions[0] != "roles:list" {
+		t.Fatalf("switch profile = %+v", result.Profile)
+	}
 }
 
 func TestPlatformAdminCanSwitchBackToPlatformContext(t *testing.T) {
@@ -194,7 +197,7 @@ func TestPlatformAdminCanSwitchBackToPlatformContext(t *testing.T) {
 		t.Fatalf("SwitchTenant(platform) error = %v", err)
 	}
 	claims, err := manager.Parse(result.Tokens.AccessToken, TokenTypeAccess)
-	if err != nil || claims.TenantID != 0 || claims.MemberID != 0 || result.Tenant.Name != "平台管理" {
+	if err != nil || claims.TenantID != 0 || claims.MemberID != 0 || result.Profile.CurrentTenant.Name != "平台管理" {
 		t.Fatalf("platform result = %+v, claims = %+v, err = %v", result, claims, err)
 	}
 }

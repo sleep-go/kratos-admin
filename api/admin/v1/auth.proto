@@ -147,6 +147,8 @@ message SwitchTenantResponse {
   string access_token = 1;
   google.protobuf.Timestamp expires_at = 2;
   TenantSummary current_tenant = 3;
+  CurrentUser user = 4;
+  repeated TenantSummary tenants = 5;
 }
 
 message ForgotPasswordRequest {
