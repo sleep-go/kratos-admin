@@ -12,24 +12,37 @@ import (
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/service"
 	"github.com/sleep-go/kratos-admin/internal/conf"
+	"github.com/sleep-go/kratos-admin/internal/provider"
 )
 
 // NewHTTPServer 创建并注册全部 HTTP API。
-func NewHTTPServer(cfg conf.Server, healthService *service.HealthService, authServices ...*service.AuthService) *khttp.Server {
+func NewHTTPServer(cfg conf.Config, services *service.Services, providers *provider.AdminSet) *khttp.Server {
 	middlewares := []middleware.Middleware{recovery.Recovery()}
-	if len(authServices) > 0 && authServices[0] != nil {
-		middlewares = append(middlewares, authServices[0].AccessMiddleware())
+	if services.Auth != nil {
+		middlewares = append(middlewares, services.Auth.AccessMiddleware())
 	}
 	server := khttp.NewServer(
-		khttp.Address(cfg.HTTPAddr),
+		khttp.Address(cfg.Server.HTTPAddr),
 		khttp.Middleware(middlewares...),
 		khttp.ErrorEncoder(encodeError),
 	)
-	v1.RegisterHealthServiceHTTPServer(server, healthService)
-	for _, authService := range authServices {
-		if authService != nil {
-			v1.RegisterAuthServiceHTTPServer(server, authService)
-		}
+	if services.Health != nil {
+		v1.RegisterHealthServiceHTTPServer(server, services.Health)
+	}
+	if services.Auth != nil {
+		v1.RegisterAuthServiceHTTPServer(server, services.Auth)
+	}
+	if services.Management != nil {
+		v1.RegisterManagementServiceHTTPServer(server, services.Management)
+	}
+	if services.File != nil {
+		v1.RegisterFileServiceHTTPServer(server, services.File)
+	}
+	if services.Log != nil {
+		v1.RegisterLogServiceHTTPServer(server, services.Log)
+	}
+	if providers.LocalStorage != nil {
+		server.Handle("/api/v1/files/local/content", providers.LocalStorage)
 	}
 	return server
 }
@@ -42,25 +55,4 @@ func encodeError(response http.ResponseWriter, _ *http.Request, err error) {
 		"code": serviceError.Code, "reason": serviceError.Reason, "message": serviceError.Message,
 		"request_id": response.Header().Get("X-Request-ID"),
 	})
-}
-
-// RegisterManagementHTTP 注册后台资源管理 HTTP API。
-func RegisterManagementHTTP(server *khttp.Server, managementService *service.ManagementService) {
-	if managementService != nil {
-		v1.RegisterManagementServiceHTTPServer(server, managementService)
-	}
-}
-
-// RegisterFileHTTP 注册租户文件 HTTP API。
-func RegisterFileHTTP(server *khttp.Server, fileService *service.FileService) {
-	if fileService != nil {
-		v1.RegisterFileServiceHTTPServer(server, fileService)
-	}
-}
-
-// RegisterLogHTTP 注册日志异步导出 HTTP API。
-func RegisterLogHTTP(server *khttp.Server, logService *service.LogService) {
-	if logService != nil {
-		v1.RegisterLogServiceHTTPServer(server, logService)
-	}
 }

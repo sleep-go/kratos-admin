@@ -10,11 +10,16 @@ import (
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/service"
 	"github.com/sleep-go/kratos-admin/internal/conf"
+	"github.com/sleep-go/kratos-admin/internal/provider"
 )
 
 func TestHTTPServerServesHealthCheck(t *testing.T) {
 	healthService := service.NewHealthService("kratos-admin-api")
-	httpServer := NewHTTPServer(conf.Server{HTTPAddr: ":0"}, healthService)
+	httpServer := NewHTTPServer(
+		conf.Config{Server: conf.Server{HTTPAddr: ":0"}},
+		&service.Services{Health: healthService},
+		&provider.AdminSet{},
+	)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 

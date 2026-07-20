@@ -9,7 +9,10 @@ import (
 
 func TestGRPCServerRegistersHealthService(t *testing.T) {
 	healthService := service.NewHealthService("kratos-admin-api")
-	grpcServer := NewGRPCServer(conf.Server{GRPCAddr: ":0"}, healthService)
+	grpcServer := NewGRPCServer(
+		conf.Config{Server: conf.Server{GRPCAddr: ":0"}},
+		&service.Services{Health: healthService},
+	)
 
 	services := grpcServer.GetServiceInfo()
 	if _, ok := services["admin.v1.HealthService"]; !ok {
