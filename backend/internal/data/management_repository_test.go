@@ -5,7 +5,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/sleep-go/kratos-admin/backend/internal/biz/providerconfig"
 	"github.com/sleep-go/kratos-admin/backend/internal/data/model"
+	"github.com/sleep-go/kratos-admin/backend/internal/provider/secret"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
 )
 
@@ -31,6 +33,93 @@ func TestResourceRegistryRejectsUnknownAndTenantOverride(t *testing.T) {
 	}
 }
 
+func TestSettingsAndProviderConfigsAreEncryptedAndResolvedInMySQL(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	cipher, err := secret.NewCipher([]byte("01234567890123456789012345678901"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository := &ManagementRepository{db: tx, providerCodec: providerconfig.NewCodec(cipher)}
+	tenant := &model.Tenant{Code: "config-encryption", Name: "配置加密测试", Status: 1, PermissionVersion: 1}
+	if err := tx.Create(tenant).Error; err != nil {
+		t.Fatal(err)
+	}
+	platformScope := service.ResourceScope{UserID: 1, PlatformAdmin: true}
+	if _, err := repository.Create(context.Background(), platformScope, "settings", map[string]any{
+		"category": "security", "setting_key": "integration_secret", "value_type": "string",
+		"setting_value": "platform-secret", "allow_tenant_override": true, "is_secret": true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(context.Background(), platformScope, "settings", map[string]any{
+		"category": "platform", "setting_key": "site_name", "value_type": "string",
+		"setting_value": "平台标题", "allow_tenant_override": true, "is_secret": false,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	tenantScope := service.ResourceScope{TenantID: tenant.ID, UserID: 1, MemberID: 1}
+	if _, err := repository.Create(context.Background(), tenantScope, "settings", map[string]any{
+		"category": "platform", "setting_key": "site_name", "value_type": "string", "setting_value": "租户标题",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := repository.EffectiveSettings(context.Background(), tenantScope, "platform")
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundTenantValue := false
+	for _, row := range rows {
+		if row["setting_key"] == "site_name" && row["setting_value"] == "租户标题" && row["source"] == "tenant" {
+			foundTenantValue = true
+		}
+	}
+	if !foundTenantValue {
+		t.Fatalf("effective settings = %#v", rows)
+	}
+	var storedValue string
+	if err := tx.Table("system_settings").Where("tenant_id = 0 AND setting_key = ?", "integration_secret").Pluck("setting_value", &storedValue).Error; err != nil {
+		t.Fatal(err)
+	}
+	if storedValue == "platform-secret" || storedValue == `"platform-secret"` {
+		t.Fatalf("secret leaked to database: %q", storedValue)
+	}
+
+	providerID, err := repository.Create(context.Background(), platformScope, "providers", map[string]any{
+		"provider_type": "email", "provider_name": "smtp", "display_name": "集成测试 SMTP", "status": 1,
+		"config": map[string]any{"address": "smtp.example.com:587", "host": "smtp.example.com", "from": "noreply@example.com", "password": "provider-secret"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var encrypted string
+	if err := tx.Table("provider_configs").Where("id = ?", providerID).Pluck("encrypted_config", &encrypted).Error; err != nil {
+		t.Fatal(err)
+	}
+	if encrypted == "" || encrypted == "provider-secret" {
+		t.Fatalf("encrypted_config = %q", encrypted)
+	}
+	providerRows, _, err := repository.List(context.Background(), platformScope, "providers", service.PageQuery{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(providerRows) != 1 || providerRows[0]["configured"] != true {
+		t.Fatalf("provider rows = %#v", providerRows)
+	}
+	config := providerRows[0]["config"].(map[string]any)
+	if _, exists := config["password"]; exists || config["password_configured"] != true {
+		t.Fatalf("redacted config = %#v", config)
+	}
+}
+
 func TestReadOnlyResourceRejectsWrites(t *testing.T) {
 	if _, err := sanitizeResourceWrite(managementResources["audit-logs"], map[string]any{"summary": "伪造"}); err == nil {
 		t.Fatal("audit logs must be read-only")
@@ -53,6 +142,12 @@ func TestSensitiveSettingsNeverReturnStoredValue(t *testing.T) {
 	}
 	if rows[1]["setting_value"] != "管理后台" {
 		t.Fatalf("非敏感配置不应被隐藏: %#v", rows[1])
+	}
+}
+
+func TestMissingOptionalProviderConfigRemainsEmpty(t *testing.T) {
+	if value := textConfig(map[string]any{}, "endpoint"); value != "" {
+		t.Fatalf("textConfig() = %q, want empty", value)
 	}
 }
 

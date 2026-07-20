@@ -421,6 +421,30 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/management/providers/{id}/connection-test:
+        post:
+            tags:
+                - ManagementService
+            operationId: ManagementService_TestProviderConnection
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.TestProviderConnectionResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/v1/management/{resource}:
         get:
             tags:
@@ -549,6 +573,29 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/admin.v1.DeleteResourceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/settings/effective:
+        get:
+            tags:
+                - ManagementService
+            operationId: ManagementService_GetEffectiveSettings
+            parameters:
+                - name: category
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.GetEffectiveSettingsResponse'
                 default:
                     description: Default error response
                     content:
@@ -688,6 +735,13 @@ components:
             properties:
                 download:
                     $ref: '#/components/schemas/admin.v1.SignedFileRequest'
+        admin.v1.GetEffectiveSettingsResponse:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        type: object
         admin.v1.GetExportDownloadURLResponse:
             type: object
             properties:
@@ -875,6 +929,13 @@ components:
                 id:
                     type: string
                 name:
+                    type: string
+        admin.v1.TestProviderConnectionResponse:
+            type: object
+            properties:
+                success:
+                    type: boolean
+                message:
                     type: string
         admin.v1.UpdateResourceResponse:
             type: object

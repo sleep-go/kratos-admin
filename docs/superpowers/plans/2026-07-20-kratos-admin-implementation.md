@@ -19,13 +19,13 @@
 
 ## Tasks
 
-- [ ] Task 1：初始化单仓、Kratos API/Worker、Protobuf、配置、MySQL、Redis、代码生成和健康检查。
-- [ ] Task 2：通过 Goose 建立身份、租户、组织、权限、日志、配置、任务和文件数据结构。
-- [ ] Task 3：实现密码、验证码、MFA、JWT 双令牌、会话撤销和租户切换。
-- [ ] Task 4：实现租户、成员、部门、岗位管理和平台治理接口。
+- [x] Task 1：初始化单仓、Kratos API/Worker、Protobuf、配置、MySQL、Redis、代码生成和健康检查。
+- [x] Task 2：通过 Goose 建立身份、租户、组织、权限、日志、配置、任务和文件数据结构。
+- [x] Task 3：实现密码、验证码、MFA、JWT 双令牌、会话撤销和租户切换。
+- [x] Task 4：实现租户、成员、部门、岗位管理和平台治理接口。
 - [ ] Task 5：实现 Casbin domain RBAC、菜单资源、租户功能授权和五类数据范围。
-- [ ] Task 6：实现 outbox、Asynq Worker、三类日志、保留策略和异步导出。
-- [ ] Task 7：实现三级配置、字典、邮件/短信 Provider 和敏感配置加密。
+- [x] Task 6：实现 outbox、Asynq Worker、三类日志、保留策略和异步导出。
+- [x] Task 7：实现三级配置、字典、邮件/短信 Provider 和敏感配置加密。
 - [ ] Task 8：实现本地/OSS 文件上传、校验、下载、引用与异步清理。
 - [ ] Task 9：实现 Vue 3 登录、工作台、平台管理、组织、权限、日志、文件、设置和个人中心页面。
 - [ ] Task 10：完善响应式适配、Vitest、Playwright、Docker Compose、初始化命令和运维文档。
@@ -38,4 +38,3 @@
 - 令牌轮换、MFA、菜单、数据范围、审计、异步任务和文件权限符合设计。
 - 所有页面使用真实 API，不以 Mock 数据作为最终交付。
 - 核心测试、静态检查和容器构建通过。
-

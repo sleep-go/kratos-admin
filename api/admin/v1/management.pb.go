@@ -471,6 +471,190 @@ func (x *DeleteResourceResponse) GetId() uint64 {
 	return 0
 }
 
+type GetEffectiveSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Category      string                 `protobuf:"bytes,1,opt,name=category,proto3" json:"category,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetEffectiveSettingsRequest) Reset() {
+	*x = GetEffectiveSettingsRequest{}
+	mi := &file_admin_v1_management_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetEffectiveSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetEffectiveSettingsRequest) ProtoMessage() {}
+
+func (x *GetEffectiveSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetEffectiveSettingsRequest.ProtoReflect.Descriptor instead.
+func (*GetEffectiveSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetEffectiveSettingsRequest) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+type GetEffectiveSettingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*structpb.Struct     `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetEffectiveSettingsResponse) Reset() {
+	*x = GetEffectiveSettingsResponse{}
+	mi := &file_admin_v1_management_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetEffectiveSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetEffectiveSettingsResponse) ProtoMessage() {}
+
+func (x *GetEffectiveSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetEffectiveSettingsResponse.ProtoReflect.Descriptor instead.
+func (*GetEffectiveSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetEffectiveSettingsResponse) GetItems() []*structpb.Struct {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type TestProviderConnectionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestProviderConnectionRequest) Reset() {
+	*x = TestProviderConnectionRequest{}
+	mi := &file_admin_v1_management_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestProviderConnectionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestProviderConnectionRequest) ProtoMessage() {}
+
+func (x *TestProviderConnectionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestProviderConnectionRequest.ProtoReflect.Descriptor instead.
+func (*TestProviderConnectionRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *TestProviderConnectionRequest) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+type TestProviderConnectionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestProviderConnectionResponse) Reset() {
+	*x = TestProviderConnectionResponse{}
+	mi := &file_admin_v1_management_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestProviderConnectionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestProviderConnectionResponse) ProtoMessage() {}
+
+func (x *TestProviderConnectionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestProviderConnectionResponse.ProtoReflect.Descriptor instead.
+func (*TestProviderConnectionResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *TestProviderConnectionResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *TestProviderConnectionResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_admin_v1_management_proto protoreflect.FileDescriptor
 
 const file_admin_v1_management_proto_rawDesc = "" +
@@ -506,12 +690,23 @@ const file_admin_v1_management_proto_rawDesc = "" +
 	"\x16UpdateResourceResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\"(\n" +
 	"\x16DeleteResourceResponse\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\x04R\x02id2\x98\x04\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\"9\n" +
+	"\x1bGetEffectiveSettingsRequest\x12\x1a\n" +
+	"\bcategory\x18\x01 \x01(\tR\bcategory\"M\n" +
+	"\x1cGetEffectiveSettingsResponse\x12-\n" +
+	"\x05items\x18\x01 \x03(\v2\x17.google.protobuf.StructR\x05items\"/\n" +
+	"\x1dTestProviderConnectionRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\"T\n" +
+	"\x1eTestProviderConnectionResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xcd\x06\n" +
 	"\x11ManagementService\x12w\n" +
 	"\rListResources\x12\x1e.admin.v1.ListResourcesRequest\x1a\x1f.admin.v1.ListResourcesResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/management/{resource}\x12\x80\x01\n" +
 	"\x0eCreateResource\x12\x1f.admin.v1.CreateResourceRequest\x1a .admin.v1.CreateResourceResponse\"+\x82\xd3\xe4\x93\x02%:\x04data\"\x1d/api/v1/management/{resource}\x12\x85\x01\n" +
 	"\x0eUpdateResource\x12\x1f.admin.v1.UpdateResourceRequest\x1a .admin.v1.UpdateResourceResponse\"0\x82\xd3\xe4\x93\x02*:\x04data\x1a\"/api/v1/management/{resource}/{id}\x12\x7f\n" +
-	"\x0eDeleteResource\x12\x1f.admin.v1.DeleteResourceRequest\x1a .admin.v1.DeleteResourceResponse\"*\x82\xd3\xe4\x93\x02$*\"/api/v1/management/{resource}/{id}B2Z0github.com/sleep-go/kratos-admin/api/admin/v1;v1b\x06proto3"
+	"\x0eDeleteResource\x12\x1f.admin.v1.DeleteResourceRequest\x1a .admin.v1.DeleteResourceResponse\"*\x82\xd3\xe4\x93\x02$*\"/api/v1/management/{resource}/{id}\x12\x89\x01\n" +
+	"\x14GetEffectiveSettings\x12%.admin.v1.GetEffectiveSettingsRequest\x1a&.admin.v1.GetEffectiveSettingsResponse\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/settings/effective\x12\xa6\x01\n" +
+	"\x16TestProviderConnection\x12'.admin.v1.TestProviderConnectionRequest\x1a(.admin.v1.TestProviderConnectionResponse\"9\x82\xd3\xe4\x93\x023\"1/api/v1/management/providers/{id}/connection-testB2Z0github.com/sleep-go/kratos-admin/api/admin/v1;v1b\x06proto3"
 
 var (
 	file_admin_v1_management_proto_rawDescOnce sync.Once
@@ -525,37 +720,46 @@ func file_admin_v1_management_proto_rawDescGZIP() []byte {
 	return file_admin_v1_management_proto_rawDescData
 }
 
-var file_admin_v1_management_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_admin_v1_management_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_admin_v1_management_proto_goTypes = []any{
-	(*ListResourcesRequest)(nil),   // 0: admin.v1.ListResourcesRequest
-	(*ListResourcesResponse)(nil),  // 1: admin.v1.ListResourcesResponse
-	(*CreateResourceRequest)(nil),  // 2: admin.v1.CreateResourceRequest
-	(*UpdateResourceRequest)(nil),  // 3: admin.v1.UpdateResourceRequest
-	(*DeleteResourceRequest)(nil),  // 4: admin.v1.DeleteResourceRequest
-	(*CreateResourceResponse)(nil), // 5: admin.v1.CreateResourceResponse
-	(*UpdateResourceResponse)(nil), // 6: admin.v1.UpdateResourceResponse
-	(*DeleteResourceResponse)(nil), // 7: admin.v1.DeleteResourceResponse
-	nil,                            // 8: admin.v1.ListResourcesRequest.FiltersEntry
-	(*structpb.Struct)(nil),        // 9: google.protobuf.Struct
+	(*ListResourcesRequest)(nil),           // 0: admin.v1.ListResourcesRequest
+	(*ListResourcesResponse)(nil),          // 1: admin.v1.ListResourcesResponse
+	(*CreateResourceRequest)(nil),          // 2: admin.v1.CreateResourceRequest
+	(*UpdateResourceRequest)(nil),          // 3: admin.v1.UpdateResourceRequest
+	(*DeleteResourceRequest)(nil),          // 4: admin.v1.DeleteResourceRequest
+	(*CreateResourceResponse)(nil),         // 5: admin.v1.CreateResourceResponse
+	(*UpdateResourceResponse)(nil),         // 6: admin.v1.UpdateResourceResponse
+	(*DeleteResourceResponse)(nil),         // 7: admin.v1.DeleteResourceResponse
+	(*GetEffectiveSettingsRequest)(nil),    // 8: admin.v1.GetEffectiveSettingsRequest
+	(*GetEffectiveSettingsResponse)(nil),   // 9: admin.v1.GetEffectiveSettingsResponse
+	(*TestProviderConnectionRequest)(nil),  // 10: admin.v1.TestProviderConnectionRequest
+	(*TestProviderConnectionResponse)(nil), // 11: admin.v1.TestProviderConnectionResponse
+	nil,                                    // 12: admin.v1.ListResourcesRequest.FiltersEntry
+	(*structpb.Struct)(nil),                // 13: google.protobuf.Struct
 }
 var file_admin_v1_management_proto_depIdxs = []int32{
-	8, // 0: admin.v1.ListResourcesRequest.filters:type_name -> admin.v1.ListResourcesRequest.FiltersEntry
-	9, // 1: admin.v1.ListResourcesResponse.items:type_name -> google.protobuf.Struct
-	9, // 2: admin.v1.CreateResourceRequest.data:type_name -> google.protobuf.Struct
-	9, // 3: admin.v1.UpdateResourceRequest.data:type_name -> google.protobuf.Struct
-	0, // 4: admin.v1.ManagementService.ListResources:input_type -> admin.v1.ListResourcesRequest
-	2, // 5: admin.v1.ManagementService.CreateResource:input_type -> admin.v1.CreateResourceRequest
-	3, // 6: admin.v1.ManagementService.UpdateResource:input_type -> admin.v1.UpdateResourceRequest
-	4, // 7: admin.v1.ManagementService.DeleteResource:input_type -> admin.v1.DeleteResourceRequest
-	1, // 8: admin.v1.ManagementService.ListResources:output_type -> admin.v1.ListResourcesResponse
-	5, // 9: admin.v1.ManagementService.CreateResource:output_type -> admin.v1.CreateResourceResponse
-	6, // 10: admin.v1.ManagementService.UpdateResource:output_type -> admin.v1.UpdateResourceResponse
-	7, // 11: admin.v1.ManagementService.DeleteResource:output_type -> admin.v1.DeleteResourceResponse
-	8, // [8:12] is the sub-list for method output_type
-	4, // [4:8] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	12, // 0: admin.v1.ListResourcesRequest.filters:type_name -> admin.v1.ListResourcesRequest.FiltersEntry
+	13, // 1: admin.v1.ListResourcesResponse.items:type_name -> google.protobuf.Struct
+	13, // 2: admin.v1.CreateResourceRequest.data:type_name -> google.protobuf.Struct
+	13, // 3: admin.v1.UpdateResourceRequest.data:type_name -> google.protobuf.Struct
+	13, // 4: admin.v1.GetEffectiveSettingsResponse.items:type_name -> google.protobuf.Struct
+	0,  // 5: admin.v1.ManagementService.ListResources:input_type -> admin.v1.ListResourcesRequest
+	2,  // 6: admin.v1.ManagementService.CreateResource:input_type -> admin.v1.CreateResourceRequest
+	3,  // 7: admin.v1.ManagementService.UpdateResource:input_type -> admin.v1.UpdateResourceRequest
+	4,  // 8: admin.v1.ManagementService.DeleteResource:input_type -> admin.v1.DeleteResourceRequest
+	8,  // 9: admin.v1.ManagementService.GetEffectiveSettings:input_type -> admin.v1.GetEffectiveSettingsRequest
+	10, // 10: admin.v1.ManagementService.TestProviderConnection:input_type -> admin.v1.TestProviderConnectionRequest
+	1,  // 11: admin.v1.ManagementService.ListResources:output_type -> admin.v1.ListResourcesResponse
+	5,  // 12: admin.v1.ManagementService.CreateResource:output_type -> admin.v1.CreateResourceResponse
+	6,  // 13: admin.v1.ManagementService.UpdateResource:output_type -> admin.v1.UpdateResourceResponse
+	7,  // 14: admin.v1.ManagementService.DeleteResource:output_type -> admin.v1.DeleteResourceResponse
+	9,  // 15: admin.v1.ManagementService.GetEffectiveSettings:output_type -> admin.v1.GetEffectiveSettingsResponse
+	11, // 16: admin.v1.ManagementService.TestProviderConnection:output_type -> admin.v1.TestProviderConnectionResponse
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_admin_v1_management_proto_init() }
@@ -569,7 +773,7 @@ func file_admin_v1_management_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_admin_v1_management_proto_rawDesc), len(file_admin_v1_management_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

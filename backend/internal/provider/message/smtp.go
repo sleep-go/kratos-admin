@@ -37,31 +37,12 @@ func (s *SMTPSender) Channel() string { return "email" }
 
 // SendCode 通过 SMTP 投递验证码，正文不进入应用日志。
 func (s *SMTPSender) SendCode(ctx context.Context, message CodeMessage) error {
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(10 * time.Second)
-	}
-	dialer := net.Dialer{Deadline: deadline}
-	connection, err := dialer.DialContext(ctx, "tcp", s.config.Address)
+	client, connection, err := s.connect(ctx)
 	if err != nil {
 		return err
 	}
 	defer connection.Close()
-	client, err := smtp.NewClient(connection, s.config.Host)
-	if err != nil {
-		return err
-	}
 	defer client.Close()
-	if s.config.UseTLS {
-		if err := client.StartTLS(&tls.Config{ServerName: s.config.Host, MinVersion: tls.VersionTLS12}); err != nil {
-			return err
-		}
-	}
-	if s.config.Username != "" {
-		if err := client.Auth(smtp.PlainAuth("", s.config.Username, s.config.Password, s.config.Host)); err != nil {
-			return err
-		}
-	}
 	if err := client.Mail(s.config.From); err != nil {
 		return err
 	}
@@ -83,6 +64,49 @@ func (s *SMTPSender) SendCode(ctx context.Context, message CodeMessage) error {
 		return err
 	}
 	return writer.Close()
+}
+
+// TestConnection 建立 SMTP 会话并完成认证，但不发送邮件。
+func (s *SMTPSender) TestConnection(ctx context.Context) error {
+	client, connection, err := s.connect(ctx)
+	if err != nil {
+		return err
+	}
+	defer connection.Close()
+	defer client.Close()
+	return client.Noop()
+}
+
+func (s *SMTPSender) connect(ctx context.Context) (*smtp.Client, net.Conn, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(10 * time.Second)
+	}
+	dialer := net.Dialer{Deadline: deadline}
+	connection, err := dialer.DialContext(ctx, "tcp", s.config.Address)
+	if err != nil {
+		return nil, nil, err
+	}
+	client, err := smtp.NewClient(connection, s.config.Host)
+	if err != nil {
+		_ = connection.Close()
+		return nil, nil, err
+	}
+	if s.config.UseTLS {
+		if err := client.StartTLS(&tls.Config{ServerName: s.config.Host, MinVersion: tls.VersionTLS12}); err != nil {
+			_ = client.Close()
+			_ = connection.Close()
+			return nil, nil, err
+		}
+	}
+	if s.config.Username != "" {
+		if err := client.Auth(smtp.PlainAuth("", s.config.Username, s.config.Password, s.config.Host)); err != nil {
+			_ = client.Close()
+			_ = connection.Close()
+			return nil, nil, err
+		}
+	}
+	return client, connection, nil
 }
 
 var _ Sender = (*SMTPSender)(nil)

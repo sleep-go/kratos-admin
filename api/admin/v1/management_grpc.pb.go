@@ -19,10 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ManagementService_ListResources_FullMethodName  = "/admin.v1.ManagementService/ListResources"
-	ManagementService_CreateResource_FullMethodName = "/admin.v1.ManagementService/CreateResource"
-	ManagementService_UpdateResource_FullMethodName = "/admin.v1.ManagementService/UpdateResource"
-	ManagementService_DeleteResource_FullMethodName = "/admin.v1.ManagementService/DeleteResource"
+	ManagementService_ListResources_FullMethodName          = "/admin.v1.ManagementService/ListResources"
+	ManagementService_CreateResource_FullMethodName         = "/admin.v1.ManagementService/CreateResource"
+	ManagementService_UpdateResource_FullMethodName         = "/admin.v1.ManagementService/UpdateResource"
+	ManagementService_DeleteResource_FullMethodName         = "/admin.v1.ManagementService/DeleteResource"
+	ManagementService_GetEffectiveSettings_FullMethodName   = "/admin.v1.ManagementService/GetEffectiveSettings"
+	ManagementService_TestProviderConnection_FullMethodName = "/admin.v1.ManagementService/TestProviderConnection"
 )
 
 // ManagementServiceClient is the client API for ManagementService service.
@@ -35,6 +37,8 @@ type ManagementServiceClient interface {
 	CreateResource(ctx context.Context, in *CreateResourceRequest, opts ...grpc.CallOption) (*CreateResourceResponse, error)
 	UpdateResource(ctx context.Context, in *UpdateResourceRequest, opts ...grpc.CallOption) (*UpdateResourceResponse, error)
 	DeleteResource(ctx context.Context, in *DeleteResourceRequest, opts ...grpc.CallOption) (*DeleteResourceResponse, error)
+	GetEffectiveSettings(ctx context.Context, in *GetEffectiveSettingsRequest, opts ...grpc.CallOption) (*GetEffectiveSettingsResponse, error)
+	TestProviderConnection(ctx context.Context, in *TestProviderConnectionRequest, opts ...grpc.CallOption) (*TestProviderConnectionResponse, error)
 }
 
 type managementServiceClient struct {
@@ -85,6 +89,26 @@ func (c *managementServiceClient) DeleteResource(ctx context.Context, in *Delete
 	return out, nil
 }
 
+func (c *managementServiceClient) GetEffectiveSettings(ctx context.Context, in *GetEffectiveSettingsRequest, opts ...grpc.CallOption) (*GetEffectiveSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetEffectiveSettingsResponse)
+	err := c.cc.Invoke(ctx, ManagementService_GetEffectiveSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *managementServiceClient) TestProviderConnection(ctx context.Context, in *TestProviderConnectionRequest, opts ...grpc.CallOption) (*TestProviderConnectionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TestProviderConnectionResponse)
+	err := c.cc.Invoke(ctx, ManagementService_TestProviderConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ManagementServiceServer is the server API for ManagementService service.
 // All implementations must embed UnimplementedManagementServiceServer
 // for forward compatibility.
@@ -95,6 +119,8 @@ type ManagementServiceServer interface {
 	CreateResource(context.Context, *CreateResourceRequest) (*CreateResourceResponse, error)
 	UpdateResource(context.Context, *UpdateResourceRequest) (*UpdateResourceResponse, error)
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	GetEffectiveSettings(context.Context, *GetEffectiveSettingsRequest) (*GetEffectiveSettingsResponse, error)
+	TestProviderConnection(context.Context, *TestProviderConnectionRequest) (*TestProviderConnectionResponse, error)
 	mustEmbedUnimplementedManagementServiceServer()
 }
 
@@ -116,6 +142,12 @@ func (UnimplementedManagementServiceServer) UpdateResource(context.Context, *Upd
 }
 func (UnimplementedManagementServiceServer) DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteResource not implemented")
+}
+func (UnimplementedManagementServiceServer) GetEffectiveSettings(context.Context, *GetEffectiveSettingsRequest) (*GetEffectiveSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetEffectiveSettings not implemented")
+}
+func (UnimplementedManagementServiceServer) TestProviderConnection(context.Context, *TestProviderConnectionRequest) (*TestProviderConnectionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TestProviderConnection not implemented")
 }
 func (UnimplementedManagementServiceServer) mustEmbedUnimplementedManagementServiceServer() {}
 func (UnimplementedManagementServiceServer) testEmbeddedByValue()                           {}
@@ -210,6 +242,42 @@ func _ManagementService_DeleteResource_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ManagementService_GetEffectiveSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetEffectiveSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagementServiceServer).GetEffectiveSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ManagementService_GetEffectiveSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagementServiceServer).GetEffectiveSettings(ctx, req.(*GetEffectiveSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ManagementService_TestProviderConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TestProviderConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagementServiceServer).TestProviderConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ManagementService_TestProviderConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagementServiceServer).TestProviderConnection(ctx, req.(*TestProviderConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ManagementService_ServiceDesc is the grpc.ServiceDesc for ManagementService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -232,6 +300,14 @@ var ManagementService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteResource",
 			Handler:    _ManagementService_DeleteResource_Handler,
+		},
+		{
+			MethodName: "GetEffectiveSettings",
+			Handler:    _ManagementService_GetEffectiveSettings_Handler,
+		},
+		{
+			MethodName: "TestProviderConnection",
+			Handler:    _ManagementService_TestProviderConnection_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -9,8 +9,10 @@ import (
 )
 
 type fakeManagementRepository struct {
-	scope   ResourceScope
-	filters map[string]string
+	scope          ResourceScope
+	filters        map[string]string
+	effectiveRows  []map[string]any
+	providerTested uint64
 }
 
 type fakePermissionChecker struct{ allowed bool }
@@ -30,6 +32,18 @@ func (r *fakeManagementRepository) Update(context.Context, ResourceScope, string
 	return nil
 }
 func (r *fakeManagementRepository) Delete(context.Context, ResourceScope, string, uint64) error {
+	return nil
+}
+
+func (r *fakeManagementRepository) EffectiveSettings(_ context.Context, scope ResourceScope, category string) ([]map[string]any, error) {
+	r.scope = scope
+	r.filters = map[string]string{"category": category}
+	return r.effectiveRows, nil
+}
+
+func (r *fakeManagementRepository) TestProviderConnection(_ context.Context, scope ResourceScope, id uint64) error {
+	r.scope = scope
+	r.providerTested = id
 	return nil
 }
 
@@ -83,5 +97,31 @@ func TestManagementServiceRejectsMissingCasbinPermission(t *testing.T) {
 
 	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "departments"}); err == nil {
 		t.Fatal("missing list permission must be rejected")
+	}
+}
+
+func TestGetEffectiveSettingsUsesAuthenticatedTenant(t *testing.T) {
+	repository := &fakeManagementRepository{effectiveRows: []map[string]any{{"key": "site_name", "source": "tenant"}}}
+	service := NewManagementService(repository)
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+
+	reply, err := service.GetEffectiveSettings(ctx, &v1.GetEffectiveSettingsRequest{Category: "platform"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository.scope.TenantID != 8 || repository.filters["category"] != "platform" || len(reply.Items) != 1 {
+		t.Fatalf("scope = %+v, filters = %+v, reply = %+v", repository.scope, repository.filters, reply)
+	}
+}
+
+func TestProviderConnectionTestRequiresUpdatePermission(t *testing.T) {
+	repository := &fakeManagementRepository{}
+	service := NewManagementService(repository, fakePermissionChecker{allowed: false})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+	if _, err := service.TestProviderConnection(ctx, &v1.TestProviderConnectionRequest{Id: 7}); err == nil {
+		t.Fatal("connection test must require provider update permission")
+	}
+	if repository.providerTested != 0 {
+		t.Fatalf("providerTested = %d", repository.providerTested)
 	}
 }

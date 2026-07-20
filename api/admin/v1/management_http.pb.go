@@ -21,13 +21,17 @@ const _ = http.SupportPackageIsVersion1
 
 const OperationManagementServiceCreateResource = "/admin.v1.ManagementService/CreateResource"
 const OperationManagementServiceDeleteResource = "/admin.v1.ManagementService/DeleteResource"
+const OperationManagementServiceGetEffectiveSettings = "/admin.v1.ManagementService/GetEffectiveSettings"
 const OperationManagementServiceListResources = "/admin.v1.ManagementService/ListResources"
+const OperationManagementServiceTestProviderConnection = "/admin.v1.ManagementService/TestProviderConnection"
 const OperationManagementServiceUpdateResource = "/admin.v1.ManagementService/UpdateResource"
 
 type ManagementServiceHTTPServer interface {
 	CreateResource(context.Context, *CreateResourceRequest) (*CreateResourceResponse, error)
 	DeleteResource(context.Context, *DeleteResourceRequest) (*DeleteResourceResponse, error)
+	GetEffectiveSettings(context.Context, *GetEffectiveSettingsRequest) (*GetEffectiveSettingsResponse, error)
 	ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error)
+	TestProviderConnection(context.Context, *TestProviderConnectionRequest) (*TestProviderConnectionResponse, error)
 	UpdateResource(context.Context, *UpdateResourceRequest) (*UpdateResourceResponse, error)
 }
 
@@ -37,6 +41,8 @@ func RegisterManagementServiceHTTPServer(s *http.Server, srv ManagementServiceHT
 	r.POST("/api/v1/management/{resource}", _ManagementService_CreateResource0_HTTP_Handler(srv))
 	r.PUT("/api/v1/management/{resource}/{id}", _ManagementService_UpdateResource0_HTTP_Handler(srv))
 	r.DELETE("/api/v1/management/{resource}/{id}", _ManagementService_DeleteResource0_HTTP_Handler(srv))
+	r.GET("/api/v1/settings/effective", _ManagementService_GetEffectiveSettings0_HTTP_Handler(srv))
+	r.POST("/api/v1/management/providers/{id}/connection-test", _ManagementService_TestProviderConnection0_HTTP_Handler(srv))
 }
 
 func _ManagementService_ListResources0_HTTP_Handler(srv ManagementServiceHTTPServer) func(ctx http.Context) error {
@@ -133,10 +139,53 @@ func _ManagementService_DeleteResource0_HTTP_Handler(srv ManagementServiceHTTPSe
 	}
 }
 
+func _ManagementService_GetEffectiveSettings0_HTTP_Handler(srv ManagementServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetEffectiveSettingsRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationManagementServiceGetEffectiveSettings)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetEffectiveSettings(ctx, req.(*GetEffectiveSettingsRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*GetEffectiveSettingsResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _ManagementService_TestProviderConnection0_HTTP_Handler(srv ManagementServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in TestProviderConnectionRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationManagementServiceTestProviderConnection)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.TestProviderConnection(ctx, req.(*TestProviderConnectionRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*TestProviderConnectionResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type ManagementServiceHTTPClient interface {
 	CreateResource(ctx context.Context, req *CreateResourceRequest, opts ...http.CallOption) (rsp *CreateResourceResponse, err error)
 	DeleteResource(ctx context.Context, req *DeleteResourceRequest, opts ...http.CallOption) (rsp *DeleteResourceResponse, err error)
+	GetEffectiveSettings(ctx context.Context, req *GetEffectiveSettingsRequest, opts ...http.CallOption) (rsp *GetEffectiveSettingsResponse, err error)
 	ListResources(ctx context.Context, req *ListResourcesRequest, opts ...http.CallOption) (rsp *ListResourcesResponse, err error)
+	TestProviderConnection(ctx context.Context, req *TestProviderConnectionRequest, opts ...http.CallOption) (rsp *TestProviderConnectionResponse, err error)
 	UpdateResource(ctx context.Context, req *UpdateResourceRequest, opts ...http.CallOption) (rsp *UpdateResourceResponse, err error)
 }
 
@@ -174,6 +223,19 @@ func (c *ManagementServiceHTTPClientImpl) DeleteResource(ctx context.Context, in
 	return &out, nil
 }
 
+func (c *ManagementServiceHTTPClientImpl) GetEffectiveSettings(ctx context.Context, in *GetEffectiveSettingsRequest, opts ...http.CallOption) (*GetEffectiveSettingsResponse, error) {
+	var out GetEffectiveSettingsResponse
+	pattern := "/api/v1/settings/effective"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationManagementServiceGetEffectiveSettings))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 func (c *ManagementServiceHTTPClientImpl) ListResources(ctx context.Context, in *ListResourcesRequest, opts ...http.CallOption) (*ListResourcesResponse, error) {
 	var out ListResourcesResponse
 	pattern := "/api/v1/management/{resource}"
@@ -181,6 +243,19 @@ func (c *ManagementServiceHTTPClientImpl) ListResources(ctx context.Context, in 
 	opts = append(opts, http.Operation(OperationManagementServiceListResources))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *ManagementServiceHTTPClientImpl) TestProviderConnection(ctx context.Context, in *TestProviderConnectionRequest, opts ...http.CallOption) (*TestProviderConnectionResponse, error) {
+	var out TestProviderConnectionResponse
+	pattern := "/api/v1/management/providers/{id}/connection-test"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationManagementServiceTestProviderConnection))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, nil, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

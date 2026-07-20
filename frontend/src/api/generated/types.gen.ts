@@ -91,6 +91,12 @@ export type AdminV1GetDownloadUrlResponse = {
     download?: AdminV1SignedFileRequest;
 };
 
+export type AdminV1GetEffectiveSettingsResponse = {
+    items?: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
 export type AdminV1GetExportDownloadUrlResponse = {
     url?: string;
     expiresAt?: string;
@@ -206,6 +212,11 @@ export type AdminV1SwitchTenantResponse = {
 export type AdminV1TenantSummary = {
     id?: string;
     name?: string;
+};
+
+export type AdminV1TestProviderConnectionResponse = {
+    success?: boolean;
+    message?: string;
 };
 
 export type AdminV1UpdateResourceResponse = {
@@ -716,6 +727,33 @@ export type LogServiceGetExportDownloadUrlResponses = {
 
 export type LogServiceGetExportDownloadUrlResponse = LogServiceGetExportDownloadUrlResponses[keyof LogServiceGetExportDownloadUrlResponses];
 
+export type ManagementServiceTestProviderConnectionData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/v1/management/providers/{id}/connection-test';
+};
+
+export type ManagementServiceTestProviderConnectionErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type ManagementServiceTestProviderConnectionError = ManagementServiceTestProviderConnectionErrors[keyof ManagementServiceTestProviderConnectionErrors];
+
+export type ManagementServiceTestProviderConnectionResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1TestProviderConnectionResponse;
+};
+
+export type ManagementServiceTestProviderConnectionResponse = ManagementServiceTestProviderConnectionResponses[keyof ManagementServiceTestProviderConnectionResponses];
+
 export type ManagementServiceListResourcesData = {
     body?: never;
     path: {
@@ -834,3 +872,30 @@ export type ManagementServiceUpdateResourceResponses = {
 };
 
 export type ManagementServiceUpdateResourceResponse = ManagementServiceUpdateResourceResponses[keyof ManagementServiceUpdateResourceResponses];
+
+export type ManagementServiceGetEffectiveSettingsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        category?: string;
+    };
+    url: '/api/v1/settings/effective';
+};
+
+export type ManagementServiceGetEffectiveSettingsErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type ManagementServiceGetEffectiveSettingsError = ManagementServiceGetEffectiveSettingsErrors[keyof ManagementServiceGetEffectiveSettingsErrors];
+
+export type ManagementServiceGetEffectiveSettingsResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1GetEffectiveSettingsResponse;
+};
+
+export type ManagementServiceGetEffectiveSettingsResponse = ManagementServiceGetEffectiveSettingsResponses[keyof ManagementServiceGetEffectiveSettingsResponses];

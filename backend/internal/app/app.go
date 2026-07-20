@@ -15,9 +15,11 @@ import (
 	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
 	filebiz "github.com/sleep-go/kratos-admin/backend/internal/biz/file"
 	"github.com/sleep-go/kratos-admin/backend/internal/biz/logexport"
+	"github.com/sleep-go/kratos-admin/backend/internal/biz/providerconfig"
 	"github.com/sleep-go/kratos-admin/backend/internal/conf"
 	"github.com/sleep-go/kratos-admin/backend/internal/data"
 	"github.com/sleep-go/kratos-admin/backend/internal/provider/message"
+	"github.com/sleep-go/kratos-admin/backend/internal/provider/secret"
 	"github.com/sleep-go/kratos-admin/backend/internal/provider/storage"
 	"github.com/sleep-go/kratos-admin/backend/internal/server"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
@@ -93,7 +95,13 @@ func NewAPIResources(ctx context.Context, cfg conf.Config) (*APIResources, error
 	}
 	loginUsecase.ConfigureVerification(verificationUsecase)
 	authService.ConfigureVerification(verificationUsecase)
-	managementRepository := data.NewManagementRepository(dataResources)
+	configKey := sha256.Sum256([]byte(cfg.Auth.SecretKey + ":provider-config"))
+	configCipher, err := secret.NewCipher(configKey[:])
+	if err != nil {
+		_ = dataResources.Close()
+		return nil, err
+	}
+	managementRepository := data.NewManagementRepository(dataResources, providerconfig.NewCodec(configCipher))
 	storageProvider, localHandler, err := buildStorageProvider(cfg)
 	if err != nil {
 		_ = dataResources.Close()
@@ -124,7 +132,19 @@ func buildMessageSenders(cfg conf.Config) ([]message.Sender, error) {
 		}
 		emailSender = smtpSender
 	}
-	return []message.Sender{emailSender, message.NewLocalSender("sms")}, nil
+	smsSender := message.Sender(message.NewLocalSender("sms"))
+	if cfg.Messaging.AliyunSMSAccessKeyID != "" {
+		aliyunSender, err := message.NewAliyunSMSSender(message.AliyunSMSConfig{
+			Region: cfg.Messaging.AliyunSMSRegion, Endpoint: cfg.Messaging.AliyunSMSEndpoint,
+			AccessKeyID: cfg.Messaging.AliyunSMSAccessKeyID, AccessKeySecret: cfg.Messaging.AliyunSMSAccessKeySecret,
+			SignName: cfg.Messaging.AliyunSMSSignName, TemplateCode: cfg.Messaging.AliyunSMSTemplateCode,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("初始化阿里云短信 Provider 失败: %w", err)
+		}
+		smsSender = aliyunSender
+	}
+	return []message.Sender{emailSender, smsSender}, nil
 }
 
 // NewFullAPIApp 创建并注册认证、管理与健康检查的完整 API 应用。

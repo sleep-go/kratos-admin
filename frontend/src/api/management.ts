@@ -1,5 +1,9 @@
 import { http } from './http'
-import type { AdminV1ListResourcesResponse } from './generated'
+import type {
+  AdminV1GetEffectiveSettingsResponse,
+  AdminV1ListResourcesResponse,
+  AdminV1TestProviderConnectionResponse
+} from './generated'
 
 export type ResourceRow = Record<string, unknown>
 
@@ -21,4 +25,18 @@ export async function updateResource(resource: string, id: string, data: Resourc
 
 export async function deleteResource(resource: string, id: string) {
   await http.delete(`/management/${resource}/${id}`)
+}
+
+export async function getEffectiveSettings(category = '') {
+  const response = await http.get<AdminV1GetEffectiveSettingsResponse>('/settings/effective', {
+    params: { category }
+  })
+  return response.data
+}
+
+export async function testProviderConnection(id: string) {
+  const response = await http.post<AdminV1TestProviderConnectionResponse>(
+    `/management/providers/${id}/connection-test`
+  )
+  return response.data
 }

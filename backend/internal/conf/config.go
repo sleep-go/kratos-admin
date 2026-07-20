@@ -25,12 +25,18 @@ type Config struct {
 
 // Messaging 描述验证码邮件与短信 Provider 配置。
 type Messaging struct {
-	SMTPAddress  string
-	SMTPHost     string
-	SMTPUsername string
-	SMTPPassword string
-	SMTPFrom     string
-	SMTPUseTLS   bool
+	SMTPAddress              string
+	SMTPHost                 string
+	SMTPUsername             string
+	SMTPPassword             string
+	SMTPFrom                 string
+	SMTPUseTLS               bool
+	AliyunSMSRegion          string
+	AliyunSMSEndpoint        string
+	AliyunSMSAccessKeyID     string
+	AliyunSMSAccessKeySecret string
+	AliyunSMSSignName        string
+	AliyunSMSTemplateCode    string
 }
 
 // Server 描述 HTTP 与 gRPC 服务监听配置。
@@ -101,6 +107,12 @@ func LoadFromEnv() (Config, error) {
 			SMTPAddress: os.Getenv("KRATOS_ADMIN_SMTP_ADDRESS"), SMTPHost: os.Getenv("KRATOS_ADMIN_SMTP_HOST"),
 			SMTPUsername: os.Getenv("KRATOS_ADMIN_SMTP_USERNAME"), SMTPPassword: os.Getenv("KRATOS_ADMIN_SMTP_PASSWORD"),
 			SMTPFrom: os.Getenv("KRATOS_ADMIN_SMTP_FROM"), SMTPUseTLS: boolValueOrDefault("KRATOS_ADMIN_SMTP_USE_TLS", false),
+			AliyunSMSRegion:          valueOrDefault("KRATOS_ADMIN_ALIYUN_SMS_REGION", "cn-hangzhou"),
+			AliyunSMSEndpoint:        valueOrDefault("KRATOS_ADMIN_ALIYUN_SMS_ENDPOINT", "dysmsapi.aliyuncs.com"),
+			AliyunSMSAccessKeyID:     os.Getenv("KRATOS_ADMIN_ALIYUN_SMS_ACCESS_KEY_ID"),
+			AliyunSMSAccessKeySecret: os.Getenv("KRATOS_ADMIN_ALIYUN_SMS_ACCESS_KEY_SECRET"),
+			AliyunSMSSignName:        os.Getenv("KRATOS_ADMIN_ALIYUN_SMS_SIGN_NAME"),
+			AliyunSMSTemplateCode:    os.Getenv("KRATOS_ADMIN_ALIYUN_SMS_TEMPLATE_CODE"),
 		},
 	}
 

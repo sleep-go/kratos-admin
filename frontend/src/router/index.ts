@@ -23,9 +23,7 @@ const managementRoutes: Array<[string, string, string]> = [
   ['logs/api', 'api-logs', 'api-logs'],
   ['logs/exports', 'log-exports', 'log-exports'],
   ['settings/dictionaries', 'dictionary-types', 'dictionary-types'],
-  ['settings/dictionary-items', 'dictionary-items', 'dictionary-items'],
-  ['settings/providers', 'provider-management', 'providers'],
-  ['settings', 'system-settings', 'settings']
+  ['settings/dictionary-items', 'dictionary-items', 'dictionary-items']
 ]
 
 const routes: RouteRecordRaw[] = [
@@ -61,6 +59,16 @@ const routes: RouteRecordRaw[] = [
         path: 'files',
         name: 'file-management',
         component: () => import('@/views/files/FileManagementView.vue')
+      },
+      {
+        path: 'settings/providers',
+        name: 'provider-management',
+        component: () => import('@/views/settings/ProviderManagementView.vue')
+      },
+      {
+        path: 'settings',
+        name: 'system-settings',
+        component: () => import('@/views/settings/SystemSettingsView.vue')
       },
       ...managementRoutes.map(([path, name, resourceKey]) => ({
         path,

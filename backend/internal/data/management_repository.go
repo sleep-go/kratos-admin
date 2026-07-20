@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +16,11 @@ import (
 	"gorm.io/gorm"
 
 	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
+	"github.com/sleep-go/kratos-admin/backend/internal/biz/providerconfig"
+	settingbiz "github.com/sleep-go/kratos-admin/backend/internal/biz/setting"
 	"github.com/sleep-go/kratos-admin/backend/internal/data/model"
+	"github.com/sleep-go/kratos-admin/backend/internal/provider/message"
+	"github.com/sleep-go/kratos-admin/backend/internal/provider/storage"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
 )
 
@@ -58,16 +63,23 @@ var managementResources = map[string]resourceDefinition{
 	"settings":               {table: "system_settings", columns: []string{"id", "tenant_id", "category", "setting_key", "value_type", "setting_value", "allow_tenant_override", "is_secret", "version", "updated_by", "created_at", "updated_at"}, writeFields: fieldSet("category", "setting_key", "value_type", "setting_value", "allow_tenant_override", "is_secret"), filterFields: fieldSet("category", "value_type"), keywordFields: []string{"category", "setting_key"}, tenantScoped: true, tenantColumn: "tenant_id"},
 	"dictionary-types":       {table: "dictionary_types", columns: []string{"id", "tenant_id", "code", "name", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("status"), keywordFields: []string{"code", "name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"dictionary-items":       {table: "dictionary_items", columns: []string{"id", "tenant_id", "type_id", "item_value", "label", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("type_id", "item_value", "label", "sort_order", "status"), filterFields: fieldSet("type_id", "status"), keywordFields: []string{"item_value", "label"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
-	"providers":              {table: "provider_configs", columns: []string{"id", "tenant_id", "provider_type", "provider_name", "display_name", "status", "is_default", "updated_by", "created_at", "updated_at"}, filterFields: fieldSet("provider_type", "status", "is_default"), keywordFields: []string{"provider_name", "display_name"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
+	"providers":              {table: "provider_configs", columns: []string{"id", "tenant_id", "provider_type", "provider_name", "display_name", "encrypted_config", "status", "is_default", "updated_by", "created_at", "updated_at"}, writeFields: fieldSet("provider_type", "provider_name", "display_name", "config", "status", "is_default"), filterFields: fieldSet("provider_type", "status", "is_default"), keywordFields: []string{"provider_name", "display_name"}, tenantScoped: true, tenantColumn: "tenant_id"},
 	"files":                  {table: "files", columns: []string{"id", "tenant_id", "uploader_member_id", "provider_name", "object_key", "original_name", "content_type", "size_bytes", "sha256", "status", "created_at"}, filterFields: fieldSet("provider_name", "content_type", "status"), keywordFields: []string{"original_name", "object_key", "sha256"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
 }
 
 // ManagementRepository 使用编译期白名单访问后台资源。
-type ManagementRepository struct{ db *gorm.DB }
+type ManagementRepository struct {
+	db            *gorm.DB
+	providerCodec *providerconfig.Codec
+}
 
 // NewManagementRepository 创建统一后台资源仓储。
-func NewManagementRepository(data *Data) *ManagementRepository {
-	return &ManagementRepository{db: data.DB}
+func NewManagementRepository(data *Data, codecs ...*providerconfig.Codec) *ManagementRepository {
+	repository := &ManagementRepository{db: data.DB}
+	if len(codecs) > 0 {
+		repository.providerCodec = codecs[0]
+	}
+	return repository
 }
 
 // Allowed 按 tenant、member、role 的 Casbin domain 关系校验资源动作，并限制在租户功能授权集合内。
@@ -106,7 +118,7 @@ func (r *ManagementRepository) List(ctx context.Context, scope service.ResourceS
 		return nil, 0, errors.New("资源类型不存在")
 	}
 	query := r.db.WithContext(ctx).Table(definition.table)
-	if definition.tenantScoped && !scope.PlatformAdmin {
+	if definition.tenantScoped && (!scope.PlatformAdmin || resource == "settings" || resource == "providers") {
 		query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
 	}
 	if definition.softDelete {
@@ -134,8 +146,31 @@ func (r *ManagementRepository) List(ctx context.Context, scope service.ResourceS
 	var rows []map[string]any
 	err := query.Select(strings.Join(definition.columns, ",")).Order(order).
 		Offset(int((page.Page - 1) * page.PageSize)).Limit(int(page.PageSize)).Find(&rows).Error
-	redactManagementRows(resource, rows)
+	r.redactManagementRows(resource, rows)
 	return rows, uint64(total), err
+}
+
+func (r *ManagementRepository) redactManagementRows(resource string, rows []map[string]any) {
+	redactManagementRows(resource, rows)
+	if resource != "providers" {
+		return
+	}
+	for _, row := range rows {
+		encrypted := fmt.Sprint(row["encrypted_config"])
+		delete(row, "encrypted_config")
+		if encrypted == "" || r.providerCodec == nil {
+			row["configured"] = false
+			continue
+		}
+		config, err := r.providerCodec.Decode(encrypted)
+		if err != nil {
+			row["configured"] = false
+			row["config_error"] = "配置密文无法解密"
+			continue
+		}
+		row["configured"] = true
+		row["config"] = providerconfig.Redact(config)
+	}
 }
 
 func redactManagementRows(resource string, rows []map[string]any) {
@@ -144,11 +179,29 @@ func redactManagementRows(resource string, rows []map[string]any) {
 	}
 	for _, row := range rows {
 		if !truthyDatabaseValue(row["is_secret"]) {
+			row["setting_value"] = decodeJSONDatabaseValue(row["setting_value"])
 			continue
 		}
 		row["configured"] = nonEmptyDatabaseValue(row["setting_value"])
 		delete(row, "setting_value")
 	}
+}
+
+func decodeJSONDatabaseValue(value any) any {
+	var raw []byte
+	switch typed := value.(type) {
+	case []byte:
+		raw = typed
+	case string:
+		raw = []byte(typed)
+	default:
+		return typed
+	}
+	var decoded any
+	if json.Unmarshal(raw, &decoded) == nil {
+		return decoded
+	}
+	return value
 }
 
 func truthyDatabaseValue(value any) bool {
@@ -194,7 +247,10 @@ func (r *ManagementRepository) Create(ctx context.Context, scope service.Resourc
 		return 0, err
 	}
 	if definition.tenantScoped {
-		values[definition.tenantColumn] = scope.TenantID
+		values[definition.tenantColumn] = targetTenantID(scope, data)
+	}
+	if err := r.prepareCreateValues(resource, values, scope); err != nil {
+		return 0, err
 	}
 	if resource == "tenant-resources" {
 		values["created_by"] = scope.UserID
@@ -213,6 +269,9 @@ func (r *ManagementRepository) Create(ctx context.Context, scope service.Resourc
 	}
 	var id uint64
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := validateSettingOverride(tx, resource, values); err != nil {
+			return err
+		}
 		result := tx.Table(definition.table).Create(&values)
 		if result.Error != nil {
 			return result.Error
@@ -263,6 +322,9 @@ func (r *ManagementRepository) Update(ctx context.Context, scope service.Resourc
 		if definition.tenantScoped && !scope.PlatformAdmin {
 			query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
 		}
+		if err := r.prepareUpdateValues(tx, query, resource, values, scope); err != nil {
+			return err
+		}
 		result := query.Updates(values)
 		if result.Error != nil {
 			return result.Error
@@ -275,6 +337,163 @@ func (r *ManagementRepository) Update(ctx context.Context, scope service.Resourc
 		}
 		return writeAuditOutbox(tx, scope, "update", resource, fmt.Sprint(id), values)
 	})
+}
+
+func targetTenantID(scope service.ResourceScope, data map[string]any) uint64 {
+	if scope.PlatformAdmin {
+		return numericID(data["target_tenant_id"])
+	}
+	return scope.TenantID
+}
+
+func (r *ManagementRepository) prepareCreateValues(resource string, values map[string]any, scope service.ResourceScope) error {
+	switch resource {
+	case "settings":
+		values["updated_by"] = scope.UserID
+		values["version"] = 1
+		return r.encryptSettingValue(values, truthyDatabaseValue(values["is_secret"]))
+	case "providers":
+		values["updated_by"] = scope.UserID
+		return r.encryptProviderConfig(values, nil)
+	default:
+		return nil
+	}
+}
+
+func (r *ManagementRepository) prepareUpdateValues(tx *gorm.DB, query *gorm.DB, resource string, values map[string]any, scope service.ResourceScope) error {
+	switch resource {
+	case "settings":
+		var current model.SystemSetting
+		if err := query.Take(&current).Error; err != nil {
+			return errors.New("资源不存在或无权访问")
+		}
+		isSecret := current.IsSecret
+		if value, exists := values["is_secret"]; exists {
+			isSecret = truthyDatabaseValue(value)
+		}
+		if err := r.encryptSettingValue(values, isSecret); err != nil {
+			return err
+		}
+		values["updated_by"] = scope.UserID
+		values["version"] = gorm.Expr("version + 1")
+		merged := map[string]any{"tenant_id": current.TenantID, "category": current.Category, "setting_key": current.SettingKey}
+		for key, value := range values {
+			merged[key] = value
+		}
+		return validateSettingOverride(tx, resource, merged)
+	case "providers":
+		var current model.ProviderConfig
+		if err := query.Take(&current).Error; err != nil {
+			return errors.New("资源不存在或无权访问")
+		}
+		var existing map[string]any
+		if r.providerCodec != nil && current.EncryptedConfig != "" {
+			existing, _ = r.providerCodec.Decode(current.EncryptedConfig)
+		}
+		if _, exists := values["provider_type"]; !exists {
+			values["provider_type"] = current.ProviderType
+		}
+		if _, exists := values["provider_name"]; !exists {
+			values["provider_name"] = current.ProviderName
+		}
+		values["updated_by"] = scope.UserID
+		return r.encryptProviderConfig(values, existing)
+	default:
+		return nil
+	}
+}
+
+func (r *ManagementRepository) encryptSettingValue(values map[string]any, isSecret bool) error {
+	value, exists := values["setting_value"]
+	if !exists {
+		return nil
+	}
+	if isSecret {
+		if r.providerCodec == nil {
+			return errors.New("敏感配置加密器未初始化")
+		}
+		encrypted, err := r.providerCodec.EncryptValue(value)
+		if err != nil {
+			return err
+		}
+		value = encrypted
+	}
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return errors.New("系统配置值不是有效 JSON")
+	}
+	values["setting_value"] = datatypes.JSON(raw)
+	return nil
+}
+
+func (r *ManagementRepository) encryptProviderConfig(values map[string]any, existing map[string]any) error {
+	configValue, exists := values["config"]
+	if !exists {
+		if existing != nil {
+			delete(values, "config")
+			return nil
+		}
+		return errors.New("Provider 配置不能为空")
+	}
+	config, ok := configValue.(map[string]any)
+	if !ok {
+		return errors.New("Provider 配置格式无效")
+	}
+	merged := make(map[string]any, len(existing)+len(config))
+	for key, value := range existing {
+		merged[key] = value
+	}
+	for key, value := range config {
+		if strings.HasSuffix(key, "_configured") {
+			continue
+		}
+		if text, isString := value.(string); isString && text == "" && isProviderSecretKey(key) {
+			continue
+		}
+		merged[key] = value
+	}
+	providerType := fmt.Sprint(values["provider_type"])
+	providerName := fmt.Sprint(values["provider_name"])
+	if err := providerconfig.Validate(providerType, providerName, merged); err != nil {
+		return err
+	}
+	if r.providerCodec == nil {
+		return errors.New("Provider 配置加密器未初始化")
+	}
+	encrypted, err := r.providerCodec.Encode(merged)
+	if err != nil {
+		return err
+	}
+	delete(values, "config")
+	values["encrypted_config"] = encrypted
+	return nil
+}
+
+func isProviderSecretKey(key string) bool {
+	switch strings.ToLower(key) {
+	case "password", "access_key_secret", "security_token", "secret", "token":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateSettingOverride(tx *gorm.DB, resource string, values map[string]any) error {
+	if resource != "settings" || numericID(values["tenant_id"]) == 0 {
+		return nil
+	}
+	var count int64
+	err := tx.Table("system_settings").Where(
+		"tenant_id = 0 AND category = ? AND setting_key = ? AND allow_tenant_override = 1",
+		fmt.Sprint(values["category"]), fmt.Sprint(values["setting_key"]),
+	).Count(&count).Error
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return errors.New("平台未允许租户覆盖该配置")
+	}
+	return nil
 }
 
 // Delete 在可信作用域内逻辑删除资源并写入审计 Outbox。
@@ -418,6 +637,177 @@ func randomEventID() (string, error) {
 	hexValue := hex.EncodeToString(raw)
 	return strings.Join([]string{hexValue[:8], hexValue[8:12], hexValue[12:16], hexValue[16:20], hexValue[20:]}, "-"), nil
 }
+
+type defaultSetting struct {
+	Category  string
+	Key       string
+	ValueType string
+	Value     any
+}
+
+var codeDefaultSettings = []defaultSetting{
+	{Category: "platform", Key: "site_name", ValueType: "string", Value: "Kratos Admin"},
+	{Category: "security", Key: "access_token_minutes", ValueType: "number", Value: 15},
+	{Category: "security", Key: "refresh_token_days", ValueType: "number", Value: 7},
+	{Category: "security", Key: "login_failure_limit", ValueType: "number", Value: 5},
+	{Category: "security", Key: "login_lock_minutes", ValueType: "number", Value: 15},
+	{Category: "log", Key: "audit_retention_days", ValueType: "number", Value: 365},
+	{Category: "log", Key: "login_retention_days", ValueType: "number", Value: 180},
+	{Category: "log", Key: "api_retention_days", ValueType: "number", Value: 30},
+	{Category: "file", Key: "max_upload_mb", ValueType: "number", Value: 100},
+}
+
+// EffectiveSettings 返回代码默认、平台默认与租户覆盖合并后的配置，不回传敏感值。
+func (r *ManagementRepository) EffectiveSettings(ctx context.Context, scope service.ResourceScope, category string) ([]map[string]any, error) {
+	query := r.db.WithContext(ctx).Where("tenant_id IN ?", []uint64{0, scope.TenantID})
+	if category != "" {
+		query = query.Where("category = ?", category)
+	}
+	var stored []model.SystemSetting
+	if err := query.Find(&stored).Error; err != nil {
+		return nil, err
+	}
+	platform := make(map[string]*model.SystemSetting)
+	tenant := make(map[string]*model.SystemSetting)
+	keys := make(map[string]defaultSetting)
+	for _, item := range codeDefaultSettings {
+		if category == "" || item.Category == category {
+			keys[item.Category+"\x00"+item.Key] = item
+		}
+	}
+	for index := range stored {
+		item := &stored[index]
+		key := item.Category + "\x00" + item.SettingKey
+		if _, exists := keys[key]; !exists {
+			keys[key] = defaultSetting{Category: item.Category, Key: item.SettingKey, ValueType: item.ValueType}
+		}
+		if item.TenantID == 0 {
+			platform[key] = item
+		} else if item.TenantID == scope.TenantID {
+			tenant[key] = item
+		}
+	}
+	ordered := make([]string, 0, len(keys))
+	for key := range keys {
+		ordered = append(ordered, key)
+	}
+	sort.Strings(ordered)
+	result := make([]map[string]any, 0, len(ordered))
+	for _, key := range ordered {
+		definition := keys[key]
+		codeRaw, _ := json.Marshal(definition.Value)
+		platformValue, err := settingValue(platform[key])
+		if err != nil {
+			return nil, err
+		}
+		tenantValue, err := settingValue(tenant[key])
+		if err != nil {
+			return nil, err
+		}
+		resolved := settingbiz.Resolve(codeRaw, platformValue, tenantValue)
+		selected := platform[key]
+		if resolved.Source == settingbiz.SourceTenant {
+			selected = tenant[key]
+		}
+		row := map[string]any{"category": definition.Category, "setting_key": definition.Key, "value_type": definition.ValueType, "source": string(resolved.Source)}
+		if selected != nil {
+			row["value_type"] = selected.ValueType
+			row["allow_tenant_override"] = selected.AllowTenantOverride
+			row["version"] = selected.Version
+		}
+		if selected != nil && selected.IsSecret {
+			row["configured"] = len(selected.SettingValue) > 0
+			row["is_secret"] = true
+		} else {
+			var value any
+			if len(resolved.Raw) > 0 && json.Unmarshal(resolved.Raw, &value) != nil {
+				return nil, errors.New("系统配置值格式无效")
+			}
+			row["setting_value"] = value
+			row["is_secret"] = false
+		}
+		result = append(result, row)
+	}
+	return result, nil
+}
+
+func settingValue(item *model.SystemSetting) (*settingbiz.Value, error) {
+	if item == nil {
+		return nil, nil
+	}
+	if item.IsSecret {
+		return &settingbiz.Value{Raw: json.RawMessage(`null`), AllowTenantOverride: item.AllowTenantOverride}, nil
+	}
+	if !json.Valid(item.SettingValue) {
+		return nil, errors.New("系统配置值格式无效")
+	}
+	return &settingbiz.Value{Raw: json.RawMessage(item.SettingValue), AllowTenantOverride: item.AllowTenantOverride}, nil
+}
+
+// TestProviderConnection 解密已保存配置并调用对应 Provider 的连接检查。
+func (r *ManagementRepository) TestProviderConnection(ctx context.Context, scope service.ResourceScope, id uint64) error {
+	query := r.db.WithContext(ctx).Where("id = ?", id)
+	if !scope.PlatformAdmin {
+		query = query.Where("tenant_id = ?", scope.TenantID)
+	}
+	var record model.ProviderConfig
+	if err := query.Take(&record).Error; err != nil {
+		return errors.New("Provider 不存在或无权访问")
+	}
+	if r.providerCodec == nil {
+		return errors.New("Provider 配置加密器未初始化")
+	}
+	config, err := r.providerCodec.Decode(record.EncryptedConfig)
+	if err != nil {
+		return err
+	}
+	if err := providerconfig.Validate(record.ProviderType, record.ProviderName, config); err != nil {
+		return err
+	}
+	switch record.ProviderType + ":" + record.ProviderName {
+	case "email:local", "sms:local", "storage:local":
+		return nil
+	case "email:smtp":
+		provider, err := message.NewSMTPSender(message.SMTPConfig{
+			Address: textConfig(config, "address"), Host: textConfig(config, "host"), Username: textConfig(config, "username"),
+			Password: textConfig(config, "password"), From: textConfig(config, "from"), UseTLS: boolConfig(config, "use_tls"),
+		})
+		if err != nil {
+			return err
+		}
+		return provider.TestConnection(ctx)
+	case "sms:aliyun-sms":
+		provider, err := message.NewAliyunSMSSender(message.AliyunSMSConfig{
+			Region: textConfig(config, "region"), Endpoint: textConfig(config, "endpoint"), AccessKeyID: textConfig(config, "access_key_id"),
+			AccessKeySecret: textConfig(config, "access_key_secret"), SignName: textConfig(config, "sign_name"), TemplateCode: textConfig(config, "template_code"),
+		})
+		if err != nil {
+			return err
+		}
+		return provider.TestConnection(ctx)
+	case "storage:aliyun-oss":
+		provider, err := storage.NewOSSProvider(storage.OSSConfig{
+			Region: textConfig(config, "region"), Endpoint: textConfig(config, "endpoint"), Bucket: textConfig(config, "bucket"),
+			AccessKeyID: textConfig(config, "access_key_id"), AccessKeySecret: textConfig(config, "access_key_secret"), SecurityToken: textConfig(config, "security_token"),
+		})
+		if err != nil {
+			return err
+		}
+		return provider.TestConnection(ctx)
+	default:
+		return errors.New("不支持连接测试的 Provider")
+	}
+}
+
+func textConfig(config map[string]any, key string) string {
+	value := config[key]
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprint(value)
+}
+
+func boolConfig(config map[string]any, key string) bool { return truthyDatabaseValue(config[key]) }
 
 var _ service.ManagementRepository = (*ManagementRepository)(nil)
 var _ service.ManagementPermissionChecker = (*ManagementRepository)(nil)

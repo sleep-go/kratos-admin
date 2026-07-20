@@ -35,6 +35,50 @@ type ManagementRepository interface {
 	Create(ctx context.Context, scope ResourceScope, resource string, data map[string]any) (uint64, error)
 	Update(ctx context.Context, scope ResourceScope, resource string, id uint64, data map[string]any) error
 	Delete(ctx context.Context, scope ResourceScope, resource string, id uint64) error
+	EffectiveSettings(ctx context.Context, scope ResourceScope, category string) ([]map[string]any, error)
+	TestProviderConnection(ctx context.Context, scope ResourceScope, id uint64) error
+}
+
+// GetEffectiveSettings 返回按代码默认、平台默认和租户覆盖解析后的有效设置。
+func (s *ManagementService) GetEffectiveSettings(ctx context.Context, request *v1.GetEffectiveSettingsRequest) (*v1.GetEffectiveSettingsResponse, error) {
+	scope, err := managementScope(ctx, "settings")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, scope, "settings", "list"); err != nil {
+		return nil, err
+	}
+	rows, err := s.repository.EffectiveSettings(ctx, scope, request.GetCategory())
+	if err != nil {
+		return nil, mapManagementError(err)
+	}
+	items := make([]*structpb.Struct, 0, len(rows))
+	for _, row := range rows {
+		item, conversionErr := structpb.NewStruct(normalizeStructValues(row))
+		if conversionErr != nil {
+			return nil, kratoserrors.InternalServer("MANAGEMENT_ENCODE_FAILED", "有效配置响应编码失败")
+		}
+		items = append(items, item)
+	}
+	return &v1.GetEffectiveSettingsResponse{Items: items}, nil
+}
+
+// TestProviderConnection 使用已保存的加密配置验证 Provider 连接。
+func (s *ManagementService) TestProviderConnection(ctx context.Context, request *v1.TestProviderConnectionRequest) (*v1.TestProviderConnectionResponse, error) {
+	scope, err := managementScope(ctx, "providers")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, scope, "providers", "update"); err != nil {
+		return nil, err
+	}
+	if request.GetId() == 0 {
+		return nil, kratoserrors.BadRequest("MANAGEMENT_ID_REQUIRED", "Provider ID不能为空")
+	}
+	if err := s.repository.TestProviderConnection(ctx, scope, request.GetId()); err != nil {
+		return nil, kratoserrors.BadRequest("PROVIDER_CONNECTION_FAILED", err.Error())
+	}
+	return &v1.TestProviderConnectionResponse{Success: true, Message: "连接测试成功"}, nil
 }
 
 // ManagementPermissionChecker 定义后台资源动作的 Casbin 权限检查能力。

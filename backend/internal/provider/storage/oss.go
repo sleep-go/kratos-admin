@@ -110,4 +110,10 @@ func (p *OSSProvider) Delete(ctx context.Context, objectKey string) error {
 	return err
 }
 
+// TestConnection 读取 Bucket 信息以验证地址、凭证与访问权限。
+func (p *OSSProvider) TestConnection(ctx context.Context) error {
+	_, err := p.client.GetBucketInfo(ctx, &oss.GetBucketInfoRequest{Bucket: &p.bucket})
+	return err
+}
+
 var _ Provider = (*OSSProvider)(nil)
