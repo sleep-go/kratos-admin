@@ -148,21 +148,21 @@ internal/data + internal/provider
 
 ## 命令行与进程
 
-保留四个独立二进制：
+现行实现保留一个 `kratos-admin` 二进制：
 
-| 二进制 | 源码入口 | 职责 |
+| 子命令 | 源码入口 | 职责 |
 | --- | --- | --- |
-| `admin-server` | `app/admin/cmd/server` | Kratos HTTP/gRPC API |
-| `admin-initadmin` | `app/admin/cmd/initadmin` | 幂等初始化平台管理员 |
-| `admin-gormgen` | `app/admin/cmd/gormgen` | 生成 GORM Gen 查询代码 |
-| `worker` | `app/worker/cmd/worker` | Asynq、审计、导出与文件清理 |
+| `server` | `app/admin/cmd/kratos-admin` | Kratos HTTP/gRPC API |
+| `init-admin` | `app/admin/cmd/kratos-admin` | 幂等初始化平台管理员 |
+| `gorm-gen` | `app/admin/cmd/kratos-admin` | 生成 GORM Gen 查询代码 |
+| `worker` | `app/admin/cmd/kratos-admin` | Asynq、审计、导出与文件清理 |
 
-四个入口都使用 `github.com/spf13/cobra`：
+统一入口使用 `github.com/spf13/cobra`：
 
 - `main` 只调用根命令并设置退出码。
 - 业务执行使用 `RunE` 返回带中文上下文的错误。
-- `admin-initadmin` 保留用户名、显示名称、邮箱、手机号参数，密码只从 `KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD` 读取。
-- `admin-gormgen` 默认输出到 `internal/data/query`，允许通过参数覆盖输出目录。
+- `init-admin` 保留用户名、显示名称、邮箱、手机号参数，密码只从 `KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD` 读取。
+- `gorm-gen` 默认输出到 `internal/data/query`，允许通过参数覆盖输出目录。
 - Server 和 Worker 保留信号处理与优雅停机。
 
 ## Wire 依赖注入

@@ -99,3 +99,13 @@ func TestGORMGenCommandParsesOutputPath(t *testing.T) {
 		t.Fatalf("OutPath = %q", got.OutPath)
 	}
 }
+
+func TestSubcommandsRejectPositionalArguments(t *testing.T) {
+	cmd := newRootCommand(commandRunners{
+		server: func(context.Context, string) error { return nil },
+	})
+	cmd.SetArgs([]string{"server", "unexpected"})
+	if err := cmd.ExecuteContext(context.Background()); err == nil {
+		t.Fatal("ExecuteContext() error = nil, want positional argument error")
+	}
+}

@@ -35,6 +35,7 @@ func newServerCommand(run func(context.Context, string) error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "启动 Admin HTTP/gRPC 服务",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := run(cmd.Context(), confPath); err != nil {
 				return fmt.Errorf("Admin Server 启动失败: %w", err)
@@ -51,6 +52,7 @@ func newWorkerCommand(run func(context.Context, string) error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "worker",
 		Short: "启动异步任务 Worker",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := run(cmd.Context(), confPath); err != nil {
 				return fmt.Errorf("Worker 启动失败: %w", err)
@@ -67,6 +69,7 @@ func newInitAdminCommand(run func(context.Context, initAdminOptions) error) *cob
 	cmd := &cobra.Command{
 		Use:   "init-admin",
 		Short: "幂等初始化平台超级管理员",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), options)
 		},
@@ -84,6 +87,7 @@ func newGORMGenCommand(run func(context.Context, genOptions) error) *cobra.Comma
 	cmd := &cobra.Command{
 		Use:   "gorm-gen",
 		Short: "生成 GORM Gen 类型安全查询代码",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return run(cmd.Context(), options)
 		},
