@@ -16,6 +16,7 @@ import (
 )
 
 type initAdminOptions struct {
+	Conf        string
 	Username    string
 	DisplayName string
 	Email       string
@@ -30,7 +31,7 @@ func main() {
 }
 
 func newRootCommand(run func(context.Context, initAdminOptions) error) *cobra.Command {
-	options := initAdminOptions{Username: "admin", DisplayName: "超级管理员"}
+	options := initAdminOptions{Conf: "./configs/admin.yaml", Username: "admin", DisplayName: "超级管理员"}
 	cmd := &cobra.Command{
 		Use:           "admin-initadmin",
 		Short:         "幂等初始化平台超级管理员",
@@ -40,6 +41,7 @@ func newRootCommand(run func(context.Context, initAdminOptions) error) *cobra.Co
 			return run(cmd.Context(), options)
 		},
 	}
+	cmd.Flags().StringVarP(&options.Conf, "conf", "c", options.Conf, "Admin YAML 配置文件路径")
 	cmd.Flags().StringVar(&options.Username, "username", options.Username, "平台管理员用户名")
 	cmd.Flags().StringVar(&options.DisplayName, "display-name", options.DisplayName, "平台管理员显示名称")
 	cmd.Flags().StringVar(&options.Email, "email", "", "平台管理员邮箱")
@@ -52,7 +54,7 @@ func run(ctx context.Context, options initAdminOptions) error {
 	if password == "" {
 		return fmt.Errorf("必须通过 KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD 提供初始密码")
 	}
-	cfg, err := conf.LoadFromEnv()
+	cfg, err := conf.Load(options.Conf)
 	if err != nil {
 		return fmt.Errorf("加载初始化配置失败: %w", err)
 	}

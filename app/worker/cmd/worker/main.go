@@ -18,23 +18,26 @@ func main() {
 	}
 }
 
-func newRootCommand(run func(context.Context) error) *cobra.Command {
-	return &cobra.Command{
+func newRootCommand(run func(context.Context, string) error) *cobra.Command {
+	confPath := "./configs/worker.yaml"
+	cmd := &cobra.Command{
 		Use:           "worker",
 		Short:         "启动 Kratos Admin 异步任务 Worker",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := run(cmd.Context()); err != nil {
+			if err := run(cmd.Context(), confPath); err != nil {
 				return fmt.Errorf("Worker 启动失败: %w", err)
 			}
 			return nil
 		},
 	}
+	cmd.Flags().StringVarP(&confPath, "conf", "c", confPath, "Worker YAML 配置文件路径")
+	return cmd
 }
 
-func run(ctx context.Context) error {
-	cfg, err := conf.LoadFromEnv()
+func run(ctx context.Context, confPath string) error {
+	cfg, err := conf.Load(confPath)
 	if err != nil {
 		return fmt.Errorf("加载 Worker 配置失败: %w", err)
 	}

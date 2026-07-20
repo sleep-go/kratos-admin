@@ -17,23 +17,26 @@ func main() {
 	}
 }
 
-func newRootCommand(run func(context.Context) error) *cobra.Command {
-	return &cobra.Command{
+func newRootCommand(run func(context.Context, string) error) *cobra.Command {
+	confPath := "./configs/admin.yaml"
+	cmd := &cobra.Command{
 		Use:           "admin-server",
 		Short:         "启动 Kratos Admin HTTP/gRPC 服务",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := run(cmd.Context()); err != nil {
+			if err := run(cmd.Context(), confPath); err != nil {
 				return fmt.Errorf("Admin Server 启动失败: %w", err)
 			}
 			return nil
 		},
 	}
+	cmd.Flags().StringVarP(&confPath, "conf", "c", confPath, "Admin YAML 配置文件路径")
+	return cmd
 }
 
-func run(ctx context.Context) error {
-	cfg, err := conf.LoadFromEnv()
+func run(ctx context.Context, confPath string) error {
+	cfg, err := conf.Load(confPath)
 	if err != nil {
 		return fmt.Errorf("加载 Admin 配置失败: %w", err)
 	}
