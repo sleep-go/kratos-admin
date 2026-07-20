@@ -40,11 +40,11 @@ services:
     image: kratos-admin-migrate:latest
     build:
       context: ..
-      dockerfile: backend/Dockerfile
+      dockerfile: deploy/Dockerfile.backend
       target: tools
     env_file: ../.env
     command:
-      ["sh", "-c", "goose -dir /app/backend/migrations mysql \"$${KRATOS_ADMIN_MYSQL_DSN}\" up"]
+      ["sh", "-c", "goose -dir /app/migrations mysql \"$${KRATOS_ADMIN_MYSQL_DSN}\" up"]
     depends_on:
       mysql:
         condition: service_healthy
@@ -53,7 +53,7 @@ services:
     image: kratos-admin-init-admin:latest
     build:
       context: ..
-      dockerfile: backend/Dockerfile
+      dockerfile: deploy/Dockerfile.backend
       target: init-admin
     env_file: ../.env
     depends_on:
@@ -64,8 +64,8 @@ services:
     image: kratos-admin-api:latest
     build:
       context: ..
-      dockerfile: backend/Dockerfile
-      target: api
+      dockerfile: deploy/Dockerfile.backend
+      target: admin-server
     env_file: ../.env
     ports:
       - "${KRATOS_ADMIN_HTTP_PORT:-8000}:8000"
@@ -89,7 +89,7 @@ services:
     image: kratos-admin-worker:latest
     build:
       context: ..
-      dockerfile: backend/Dockerfile
+      dockerfile: deploy/Dockerfile.backend
       target: worker
     env_file: ../.env
     volumes:

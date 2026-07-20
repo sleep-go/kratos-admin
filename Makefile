@@ -1,20 +1,26 @@
-.PHONY: api gorm-gen init-admin backend-test backend-build frontend-install frontend-test frontend-build frontend-e2e compose-config compose-up compose-down
+.PHONY: api wire gorm-gen init-admin backend-test backend-vet backend-build frontend-install frontend-test frontend-build frontend-e2e compose-config compose-up compose-down
 
 api:
 	buf lint
 	buf generate
 
+wire:
+	GOCACHE=/tmp/go-build go tool wire ./app/admin/cmd/server ./app/worker/cmd/worker
+
 gorm-gen:
-	GOCACHE=/tmp/go-build go run ./backend/cmd/gormgen
+	GOCACHE=/tmp/go-build go run ./app/admin/cmd/gormgen
 
 init-admin:
-	GOCACHE=/tmp/go-build go run ./backend/cmd/initadmin
+	GOCACHE=/tmp/go-build go run ./app/admin/cmd/initadmin
 
 backend-test:
-	GOCACHE=/tmp/go-build go test -race ./backend/...
+	GOCACHE=/tmp/go-build go test -race ./app/... ./internal/...
+
+backend-vet:
+	GOCACHE=/tmp/go-build go vet ./app/... ./internal/...
 
 backend-build:
-	GOCACHE=/tmp/go-build go build ./backend/cmd/api ./backend/cmd/worker
+	GOCACHE=/tmp/go-build go build ./app/admin/cmd/server ./app/admin/cmd/initadmin ./app/admin/cmd/gormgen ./app/worker/cmd/worker
 
 frontend-install:
 	cd frontend && pnpm install

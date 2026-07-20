@@ -1,0 +1,34 @@
+FROM golang:1.26-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY api ./api
+COPY app ./app
+COPY internal ./internal
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/admin-server ./app/admin/cmd/server
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/worker ./app/worker/cmd/worker
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/admin-initadmin ./app/admin/cmd/initadmin
+
+FROM golang:1.26-alpine AS tools
+RUN go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
+WORKDIR /app
+COPY migrations ./migrations
+
+FROM alpine:3.22 AS admin-server
+RUN addgroup -S kratos && adduser -S kratos -G kratos
+COPY --from=build /out/admin-server /usr/local/bin/admin-server
+USER kratos
+EXPOSE 8000 9000
+ENTRYPOINT ["admin-server"]
+
+FROM alpine:3.22 AS worker
+RUN addgroup -S kratos && adduser -S kratos -G kratos
+COPY --from=build /out/worker /usr/local/bin/worker
+USER kratos
+ENTRYPOINT ["worker"]
+
+FROM alpine:3.22 AS init-admin
+RUN addgroup -S kratos && adduser -S kratos -G kratos
+COPY --from=build /out/admin-initadmin /usr/local/bin/admin-initadmin
+USER kratos
+ENTRYPOINT ["admin-initadmin"]
