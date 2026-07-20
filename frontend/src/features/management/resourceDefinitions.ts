@@ -1,9 +1,10 @@
 export interface ResourceField {
   key: string
   label: string
-  type?: 'text' | 'number' | 'status' | 'boolean' | 'textarea'
+  type?: 'text' | 'number' | 'status' | 'boolean' | 'textarea' | 'password'
   required?: boolean
   table?: boolean
+  default?: string | number | boolean
 }
 
 export interface ResourceDefinition {
@@ -18,6 +19,21 @@ const commonStatus: ResourceField = { key: 'status', label: '状态', type: 'sta
 const createdAt: ResourceField = { key: 'created_at', label: '创建时间', table: true }
 
 export const resourceDefinitions: Record<string, ResourceDefinition> = {
+  users: {
+    resource: 'users',
+    title: '全局用户',
+    description: '管理跨租户账号及登录 MFA 安全策略。',
+    fields: [
+      { key: 'username', label: '用户名', required: true, table: true },
+      { key: 'email', label: '邮箱', table: true },
+      { key: 'phone', label: '手机号', table: true },
+      { key: 'display_name', label: '显示名称', required: true, table: true },
+      { key: 'initial_password', label: '初始密码', type: 'password', required: true },
+      { key: 'status', label: '状态', type: 'status', default: 1, table: true },
+      { key: 'mfa_enabled', label: '启用 MFA', type: 'boolean', default: false, table: true },
+      { key: 'mfa_channel', label: 'MFA 渠道', default: 'email', table: true }
+    ]
+  },
   tenants: {
     resource: 'tenants',
     title: '租户管理',

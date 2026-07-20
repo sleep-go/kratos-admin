@@ -69,6 +69,12 @@ export type AdminV1ForgotPasswordResponse = {
     expiresAt?: string;
 };
 
+export type AdminV1GetCaptchaResponse = {
+    captchaId?: string;
+    imageDataUri?: string;
+    expiresAt?: string;
+};
+
 export type AdminV1GetDownloadUrlResponse = {
     download?: AdminV1SignedFileRequest;
 };
@@ -214,6 +220,31 @@ export type GoogleRpcStatus = {
      */
     details?: Array<GoogleProtobufAny>;
 };
+
+export type AuthServiceGetCaptchaData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/captcha';
+};
+
+export type AuthServiceGetCaptchaErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type AuthServiceGetCaptchaError = AuthServiceGetCaptchaErrors[keyof AuthServiceGetCaptchaErrors];
+
+export type AuthServiceGetCaptchaResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1GetCaptchaResponse;
+};
+
+export type AuthServiceGetCaptchaResponse = AuthServiceGetCaptchaResponses[keyof AuthServiceGetCaptchaResponses];
 
 export type AuthServiceForgotPasswordData = {
     body: AdminV1ForgotPasswordRequest;

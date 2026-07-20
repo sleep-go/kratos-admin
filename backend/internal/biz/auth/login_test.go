@@ -33,6 +33,10 @@ func (r *fakeUserRepository) FindByIdentifier(_ context.Context, _ string) (*Use
 	return &copy, nil
 }
 
+func (r *fakeUserRepository) FindByID(_ context.Context, _ uint64) (*User, error) {
+	return r.FindByIdentifier(context.Background(), "")
+}
+
 func (r *fakeUserRepository) ListMemberships(_ context.Context, _ uint64) ([]Membership, error) {
 	return r.memberships, nil
 }

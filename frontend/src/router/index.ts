@@ -9,6 +9,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 
 const managementRoutes: Array<[string, string, string]> = [
+  ['platform/users', 'user-management', 'users'],
   ['platform/tenants', 'tenant-management', 'tenants'],
   ['organization/users', 'member-management', 'members'],
   ['organization/departments', 'department-management', 'departments'],
@@ -31,6 +32,18 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     name: 'login',
     component: () => import('@/views/auth/LoginView.vue'),
+    meta: { guestOnly: true }
+  },
+  {
+    path: '/mfa',
+    name: 'mfa',
+    component: () => import('@/views/auth/MFAView.vue'),
+    meta: { guestOnly: true }
+  },
+  {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: () => import('@/views/auth/PasswordRecoveryView.vue'),
     meta: { guestOnly: true }
   },
   {

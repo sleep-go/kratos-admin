@@ -18,6 +18,7 @@ type AccessValidator interface {
 }
 
 var publicOperations = map[string]struct{}{
+	v1.OperationAuthServiceGetCaptcha:     {},
 	v1.OperationAuthServiceLogin:          {},
 	v1.OperationAuthServiceVerifyMfa:      {},
 	v1.OperationAuthServiceRefresh:        {},

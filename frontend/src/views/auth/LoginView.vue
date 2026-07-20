@@ -1,24 +1,39 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { onMounted, reactive, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import * as authApi from '@/api/auth'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 const { loading } = storeToRefs(authStore)
-const form = reactive({ identifier: '', password: '' })
+const form = reactive({ identifier: '', password: '', captchaId: '', captchaCode: '' })
+const captchaImage = shallowRef('')
+
+async function refreshCaptcha() {
+  const response = await authApi.getCaptcha()
+  form.captchaId = response.captchaId ?? ''
+  form.captchaCode = ''
+  captchaImage.value = response.imageDataUri ?? ''
+}
 
 async function submit() {
-  const response = await authStore.login({ ...form })
-  if (response.mfaRequired) {
-    await router.push({ name: 'mfa', query: { challenge: response.mfaChallengeId } })
-    return
+  try {
+    const response = await authStore.login({ ...form })
+    if (response.mfaRequired) {
+      await router.push({ name: 'mfa', query: { challenge: response.mfaChallengeId } })
+      return
+    }
+    await router.replace(typeof route.query.redirect === 'string' ? route.query.redirect : '/')
+  } catch {
+    await refreshCaptcha()
   }
-  await router.replace(typeof route.query.redirect === 'string' ? route.query.redirect : '/')
 }
+
+onMounted(refreshCaptcha)
 </script>
 
 <template>
@@ -51,6 +66,29 @@ async function submit() {
               required
             />
           </label>
+          <div class="captcha-row">
+            <label class="field">
+              <span>图形验证码</span>
+              <input
+                v-model.trim="form.captchaCode"
+                name="captcha"
+                inputmode="numeric"
+                autocomplete="off"
+                maxlength="5"
+                placeholder="输入图中数字"
+                required
+              />
+            </label>
+            <button
+              type="button"
+              class="captcha-image"
+              aria-label="刷新图形验证码"
+              @click="refreshCaptcha"
+            >
+              <img v-if="captchaImage" :src="captchaImage" alt="图形验证码" />
+              <span v-else>加载中</span>
+            </button>
+          </div>
           <label class="field">
             <span>密码</span>
             <input
@@ -236,6 +274,28 @@ async function submit() {
   a {
     color: #333;
     text-decoration: none;
+  }
+}
+
+.captcha-row {
+  display: grid;
+  grid-template-columns: 1fr 150px;
+  align-items: end;
+  gap: 12px;
+}
+
+.captcha-image {
+  height: 46px;
+  padding: 0;
+  border: 1px solid #d8d8d8;
+  background: #f5f5f5;
+  cursor: pointer;
+
+  img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
   }
 }
 

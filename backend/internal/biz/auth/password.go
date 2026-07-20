@@ -8,9 +8,39 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"golang.org/x/crypto/argon2"
 )
+
+var (
+	// ErrWeakPassword 表示密码不满足安全复杂度要求。
+	ErrWeakPassword = errors.New("密码不满足安全要求")
+)
+
+// ValidatePassword 校验密码长度和大小写字母、数字、特殊字符组合。
+func ValidatePassword(password string) error {
+	if len(password) < 12 || len(password) > 128 {
+		return fmt.Errorf("%w：长度必须为12到128个字符", ErrWeakPassword)
+	}
+	var upper, lower, digit, special bool
+	for _, character := range password {
+		switch {
+		case unicode.IsUpper(character):
+			upper = true
+		case unicode.IsLower(character):
+			lower = true
+		case unicode.IsDigit(character):
+			digit = true
+		default:
+			special = true
+		}
+	}
+	if !upper || !lower || !digit || !special {
+		return fmt.Errorf("%w：必须同时包含大小写字母、数字和特殊字符", ErrWeakPassword)
+	}
+	return nil
+}
 
 // PasswordParams 描述 Argon2id 密码哈希参数。
 type PasswordParams struct {

@@ -86,13 +86,30 @@ func (r *AuthRepository) FindUser(ctx context.Context, userID uint64) (bizauth.U
 	return *mapAuthUser(row), nil
 }
 
+// FindByID 按用户 ID 查询全局用户。
+func (r *AuthRepository) FindByID(ctx context.Context, userID uint64) (*bizauth.User, error) {
+	user, err := r.FindUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func mapAuthUser(row *model.User) *bizauth.User {
 	avatarURL := ""
 	if row.AvatarURL != nil {
 		avatarURL = *row.AvatarURL
 	}
+	email, phone := "", ""
+	if row.Email != nil {
+		email = *row.Email
+	}
+	if row.Phone != nil {
+		phone = *row.Phone
+	}
 	return &bizauth.User{
 		ID: row.ID, Username: row.Username, DisplayName: row.DisplayName, AvatarURL: avatarURL,
+		Email: email, Phone: phone, MFAEnabled: row.MFAEnabled, MFAChannel: row.MFAChannel,
 		PlatformAdmin: row.IsPlatformAdmin, PasswordHash: row.PasswordHash,
 		Status: bizauth.UserStatus(row.Status), FailedLoginCount: row.FailedLoginCount, LockedUntil: row.LockedUntil,
 	}

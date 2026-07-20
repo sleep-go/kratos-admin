@@ -43,6 +43,7 @@ function openCreate() {
   editingID.value = ''
   for (const key of Object.keys(form)) delete form[key]
   for (const field of definition.value.fields) {
+    if (field.default !== undefined) form[field.key] = field.default
     if (field.type === 'status') form[field.key] = 1
     if (field.type === 'boolean') form[field.key] = false
     if (field.type === 'number') form[field.key] = 0
@@ -211,7 +212,7 @@ onMounted(load)
                 'version',
                 'created_by',
                 'is_builtin'
-              ].includes(item.key)
+              ].includes(item.key) && !(editingID && item.key === 'initial_password')
           )"
           :key="field.key"
           :label="field.label"
@@ -225,7 +226,13 @@ onMounted(load)
           <el-input
             v-else
             v-model="form[field.key]"
-            :type="field.type === 'textarea' ? 'textarea' : 'text'"
+            :type="
+              field.type === 'textarea'
+                ? 'textarea'
+                : field.type === 'password'
+                  ? 'password'
+                  : 'text'
+            "
           />
         </el-form-item>
       </el-form>

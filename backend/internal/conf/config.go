@@ -20,6 +20,17 @@ type Config struct {
 	Data        Data
 	Auth        Auth
 	Storage     Storage
+	Messaging   Messaging
+}
+
+// Messaging 描述验证码邮件与短信 Provider 配置。
+type Messaging struct {
+	SMTPAddress  string
+	SMTPHost     string
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom     string
+	SMTPUseTLS   bool
 }
 
 // Server 描述 HTTP 与 gRPC 服务监听配置。
@@ -86,6 +97,11 @@ func LoadFromEnv() (Config, error) {
 			OSSAccessKeySecret: os.Getenv("KRATOS_ADMIN_OSS_ACCESS_KEY_SECRET"),
 			OSSSecurityToken:   os.Getenv("KRATOS_ADMIN_OSS_SECURITY_TOKEN"),
 		},
+		Messaging: Messaging{
+			SMTPAddress: os.Getenv("KRATOS_ADMIN_SMTP_ADDRESS"), SMTPHost: os.Getenv("KRATOS_ADMIN_SMTP_HOST"),
+			SMTPUsername: os.Getenv("KRATOS_ADMIN_SMTP_USERNAME"), SMTPPassword: os.Getenv("KRATOS_ADMIN_SMTP_PASSWORD"),
+			SMTPFrom: os.Getenv("KRATOS_ADMIN_SMTP_FROM"), SMTPUseTLS: boolValueOrDefault("KRATOS_ADMIN_SMTP_USE_TLS", false),
+		},
 	}
 
 	if environment == "production" && (cfg.Auth.SecretKey == "" || cfg.Auth.JWTPrivateKey == "") {
@@ -93,6 +109,18 @@ func LoadFromEnv() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func boolValueOrDefault(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
 }
 
 func int64ValueOrDefault(key string, fallback int64) int64 {

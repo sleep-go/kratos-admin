@@ -5,9 +5,11 @@ import * as authApi from '@/api/auth'
 import { useAuthStore } from './auth'
 
 vi.mock('@/api/auth', () => ({
+  getCaptcha: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
   refresh: vi.fn(),
+  verifyMfa: vi.fn(),
   switchTenant: vi.fn()
 }))
 

@@ -14,6 +14,7 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
 	"github.com/sleep-go/kratos-admin/backend/internal/data/model"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
 )
@@ -39,6 +40,7 @@ func fieldSet(fields ...string) map[string]struct{} {
 }
 
 var managementResources = map[string]resourceDefinition{
+	"users":                  {table: "users", columns: []string{"id", "username", "email", "phone", "display_name", "is_platform_admin", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status", "mfa_enabled", "mfa_channel"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
 	"tenants":                {table: "tenants", columns: []string{"id", "code", "name", "status", "permission_version", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("status"), keywordFields: []string{"code", "name"}, softDelete: true},
 	"members":                {table: "tenant_members", columns: []string{"id", "tenant_id", "user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin", "joined_at"}, writeFields: fieldSet("user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin"), filterFields: fieldSet("status", "primary_department_id", "position_id"), keywordFields: []string{"display_name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"departments":            {table: "departments", columns: []string{"id", "tenant_id", "parent_id", "name", "code", "path", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("parent_id", "name", "code", "path", "sort_order", "status"), filterFields: fieldSet("parent_id", "status"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
@@ -194,6 +196,18 @@ func (r *ManagementRepository) Create(ctx context.Context, scope service.Resourc
 	}
 	if resource == "tenant-resources" {
 		values["created_by"] = scope.UserID
+	}
+	if resource == "users" {
+		initialPassword, _ := data["initial_password"].(string)
+		if err := bizauth.ValidatePassword(initialPassword); err != nil {
+			return 0, err
+		}
+		passwordHash, err := bizauth.NewPasswordHasher(bizauth.DefaultPasswordParams()).Hash(initialPassword)
+		if err != nil {
+			return 0, err
+		}
+		values["password_hash"] = passwordHash
+		values["password_changed_at"] = time.Now().UTC()
 	}
 	var id uint64
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

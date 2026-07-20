@@ -20,6 +20,19 @@ type fakeSessionHandler struct {
 	revoked  string
 }
 
+type fakeCaptchaHandler struct{ verified bool }
+
+func (h *fakeCaptchaHandler) Generate(context.Context) (bizauth.CaptchaChallenge, error) {
+	return bizauth.CaptchaChallenge{ID: "captcha-id", ImageURI: "data:image/png;base64,AA==", ExpireAt: time.Now().Add(time.Minute)}, nil
+}
+func (h *fakeCaptchaHandler) Verify(_ context.Context, id, answer string) error {
+	h.verified = true
+	if id != "captcha-id" || answer != "12345" {
+		return bizauth.ErrCaptchaInvalid
+	}
+	return nil
+}
+
 func (h *fakeSessionHandler) Refresh(context.Context, string) (bizauth.RefreshResult, error) {
 	return bizauth.RefreshResult{
 		Tokens: bizauth.TokenPair{AccessToken: "renewed"},
@@ -52,6 +65,10 @@ func (h *fakeLoginHandler) Login(_ context.Context, input bizauth.LoginInput) (b
 	h.input = input
 	return h.result, nil
 }
+func (h *fakeLoginHandler) CompleteMFA(_ context.Context, _ bizauth.User, input bizauth.LoginInput) (bizauth.LoginResult, error) {
+	h.input = input
+	return h.result, nil
+}
 
 func TestAuthServiceLoginMapsUserAndTenant(t *testing.T) {
 	expiresAt := time.Date(2026, 7, 20, 12, 15, 0, 0, time.UTC)
@@ -78,6 +95,36 @@ func TestAuthServiceLoginMapsUserAndTenant(t *testing.T) {
 	}
 	if handler.input.Identifier != "root" || handler.input.DeviceName != "Chrome" {
 		t.Fatalf("login input = %+v", handler.input)
+	}
+}
+
+func TestAuthServiceRequiresConfiguredCaptcha(t *testing.T) {
+	handler := &fakeLoginHandler{result: bizauth.LoginResult{
+		Tokens: bizauth.TokenPair{AccessToken: "access", RefreshToken: "refresh", AccessExpiresAt: time.Now().Add(time.Minute), RefreshExpiresAt: time.Now().Add(time.Hour)},
+		User:   bizauth.UserProfile{ID: 1},
+	}}
+	captcha := &fakeCaptchaHandler{}
+	service := NewAuthService(handler, false)
+	service.ConfigureCaptcha(captcha)
+	if _, err := service.Login(context.Background(), &v1.LoginRequest{Identifier: "root", Password: "secret"}); err == nil {
+		t.Fatal("Login() without captcha must fail")
+	}
+	if _, err := service.Login(context.Background(), &v1.LoginRequest{Identifier: "root", Password: "secret", CaptchaId: "captcha-id", CaptchaCode: "12345"}); err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	if !captcha.verified {
+		t.Fatal("captcha verifier was not called")
+	}
+}
+
+func TestAuthServiceLoginReturnsMFAChallengeWithoutTokens(t *testing.T) {
+	handler := &fakeLoginHandler{result: bizauth.LoginResult{
+		MFARequired: true, MFAChallenge: bizauth.VerificationChallenge{ID: 19, ExpiresAt: time.Now().Add(5 * time.Minute)},
+	}}
+	service := NewAuthService(handler, false)
+	reply, err := service.Login(context.Background(), &v1.LoginRequest{Identifier: "root", Password: "secret"})
+	if err != nil || !reply.MfaRequired || reply.MfaChallengeId != "19" || reply.AccessToken != "" {
+		t.Fatalf("Login() = %+v, %v", reply, err)
 	}
 }
 

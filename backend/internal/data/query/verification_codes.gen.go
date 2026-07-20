@@ -37,6 +37,7 @@ func newVerificationCode(db *gorm.DB, opts ...gen.DOOption) verificationCode {
 	_verificationCode.AttemptCount = field.NewUint32(tableName, "attempt_count")
 	_verificationCode.ExpiresAt = field.NewTime(tableName, "expires_at")
 	_verificationCode.ConsumedAt = field.NewTime(tableName, "consumed_at")
+	_verificationCode.ContextData = field.NewField(tableName, "context_data")
 	_verificationCode.CreatedAt = field.NewTime(tableName, "created_at")
 
 	_verificationCode.fillFieldMap()
@@ -57,6 +58,7 @@ type verificationCode struct {
 	AttemptCount field.Uint32
 	ExpiresAt    field.Time
 	ConsumedAt   field.Time
+	ContextData  field.Field
 	CreatedAt    field.Time
 
 	fieldMap map[string]field.Expr
@@ -83,6 +85,7 @@ func (v *verificationCode) updateTableName(table string) *verificationCode {
 	v.AttemptCount = field.NewUint32(table, "attempt_count")
 	v.ExpiresAt = field.NewTime(table, "expires_at")
 	v.ConsumedAt = field.NewTime(table, "consumed_at")
+	v.ContextData = field.NewField(table, "context_data")
 	v.CreatedAt = field.NewTime(table, "created_at")
 
 	v.fillFieldMap()
@@ -112,7 +115,7 @@ func (v *verificationCode) GetFieldByName(fieldName string) (field.OrderExpr, bo
 }
 
 func (v *verificationCode) fillFieldMap() {
-	v.fieldMap = make(map[string]field.Expr, 10)
+	v.fieldMap = make(map[string]field.Expr, 11)
 	v.fieldMap["id"] = v.ID
 	v.fieldMap["user_id"] = v.UserID
 	v.fieldMap["target"] = v.Target
@@ -122,6 +125,7 @@ func (v *verificationCode) fillFieldMap() {
 	v.fieldMap["attempt_count"] = v.AttemptCount
 	v.fieldMap["expires_at"] = v.ExpiresAt
 	v.fieldMap["consumed_at"] = v.ConsumedAt
+	v.fieldMap["context_data"] = v.ContextData
 	v.fieldMap["created_at"] = v.CreatedAt
 }
 

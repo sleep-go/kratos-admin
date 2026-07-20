@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	kratoserrors "github.com/go-kratos/kratos/v2/errors"
@@ -17,6 +18,20 @@ import (
 // LoginHandler 定义认证服务调用的登录用例。
 type LoginHandler interface {
 	Login(ctx context.Context, input bizauth.LoginInput) (bizauth.LoginResult, error)
+	CompleteMFA(ctx context.Context, user bizauth.User, input bizauth.LoginInput) (bizauth.LoginResult, error)
+}
+
+// CaptchaHandler 定义图形验证码生成和一次性校验能力。
+type CaptchaHandler interface {
+	Generate(ctx context.Context) (bizauth.CaptchaChallenge, error)
+	Verify(ctx context.Context, id, answer string) error
+}
+
+// VerificationHandler 定义密码重置验证码流程。
+type VerificationHandler interface {
+	ForgotPassword(ctx context.Context, identifier, channel string) (bizauth.VerificationChallenge, error)
+	ResetPassword(ctx context.Context, challengeID uint64, code, newPassword string) error
+	VerifyMFA(ctx context.Context, challengeID uint64, code string) (bizauth.User, bizauth.LoginInput, error)
 }
 
 // SessionHandler 定义 refresh 轮换、退出和租户切换用例。
@@ -36,7 +51,33 @@ type AuthService struct {
 	sessionHandler  SessionHandler
 	tokens          *bizauth.TokenManager
 	accessValidator AccessValidator
+	captcha         CaptchaHandler
+	verification    VerificationHandler
 	secureCookie    bool
+}
+
+// ConfigureVerification 启用邮件短信验证码和密码重置流程。
+func (s *AuthService) ConfigureVerification(handler VerificationHandler) {
+	s.verification = handler
+}
+
+// ConfigureCaptcha 启用登录图形验证码。
+func (s *AuthService) ConfigureCaptcha(handler CaptchaHandler) {
+	s.captcha = handler
+}
+
+// GetCaptcha 生成五分钟有效的一次性图形验证码。
+func (s *AuthService) GetCaptcha(ctx context.Context, _ *v1.GetCaptchaRequest) (*v1.GetCaptchaResponse, error) {
+	if s.captcha == nil {
+		return nil, kratoserrors.ServiceUnavailable("CAPTCHA_NOT_READY", "图形验证码服务尚未就绪")
+	}
+	challenge, err := s.captcha.Generate(ctx)
+	if err != nil {
+		return nil, kratoserrors.InternalServer("CAPTCHA_GENERATE_FAILED", "生成图形验证码失败")
+	}
+	return &v1.GetCaptchaResponse{
+		CaptchaId: challenge.ID, ImageDataUri: challenge.ImageURI, ExpiresAt: timestamppb.New(challenge.ExpireAt),
+	}, nil
 }
 
 // NewAuthService 创建认证服务。
@@ -53,6 +94,11 @@ func (s *AuthService) Login(ctx context.Context, request *v1.LoginRequest) (*v1.
 	if request.GetIdentifier() == "" || request.GetPassword() == "" {
 		return nil, kratoserrors.BadRequest("AUTH_INVALID_ARGUMENT", "账号和密码不能为空")
 	}
+	if s.captcha != nil {
+		if err := s.captcha.Verify(ctx, request.GetCaptchaId(), request.GetCaptchaCode()); err != nil {
+			return nil, kratoserrors.BadRequest("CAPTCHA_INVALID", bizauth.ErrCaptchaInvalid.Error())
+		}
+	}
 	input := bizauth.LoginInput{
 		Identifier: request.GetIdentifier(), Password: request.GetPassword(), DeviceName: request.GetDeviceName(),
 	}
@@ -63,6 +109,11 @@ func (s *AuthService) Login(ctx context.Context, request *v1.LoginRequest) (*v1.
 	result, err := s.loginHandler.Login(ctx, input)
 	if err != nil {
 		return nil, mapAuthError(err)
+	}
+	if result.MFARequired {
+		return &v1.LoginResponse{
+			MfaRequired: true, MfaChallengeId: strconv.FormatUint(result.MFAChallenge.ID, 10),
+		}, nil
 	}
 	setRefreshCookie(ctx, refreshCookie(result.Tokens.RefreshToken, result.Tokens.RefreshExpiresAt, s.secureCookie))
 	tenants := make([]*v1.TenantSummary, 0, len(result.Tenants))
@@ -77,6 +128,33 @@ func (s *AuthService) Login(ctx context.Context, request *v1.LoginRequest) (*v1.
 		CurrentTenant: &v1.TenantSummary{
 			Id: result.CurrentTenant.ID, Name: result.CurrentTenant.Name,
 		},
+	}, nil
+}
+
+// VerifyMfa 消费邮件或短信验证码并签发完整登录会话。
+func (s *AuthService) VerifyMfa(ctx context.Context, request *v1.VerifyMfaRequest) (*v1.VerifyMfaResponse, error) {
+	if s.verification == nil {
+		return nil, kratoserrors.ServiceUnavailable("VERIFICATION_NOT_READY", "验证码服务尚未就绪")
+	}
+	challengeID, err := strconv.ParseUint(request.GetChallengeId(), 10, 64)
+	if err != nil || challengeID == 0 || request.GetCode() == "" {
+		return nil, kratoserrors.BadRequest("VERIFICATION_INVALID_ARGUMENT", "MFA验证参数无效")
+	}
+	user, input, err := s.verification.VerifyMFA(ctx, challengeID, request.GetCode())
+	if err != nil {
+		if errors.Is(err, bizauth.ErrVerificationInvalid) {
+			return nil, kratoserrors.BadRequest("VERIFICATION_INVALID", err.Error())
+		}
+		return nil, kratoserrors.InternalServer("MFA_VERIFY_FAILED", "MFA验证失败")
+	}
+	result, err := s.loginHandler.CompleteMFA(ctx, user, input)
+	if err != nil {
+		return nil, mapAuthError(err)
+	}
+	setRefreshCookie(ctx, refreshCookie(result.Tokens.RefreshToken, result.Tokens.RefreshExpiresAt, s.secureCookie))
+	return &v1.VerifyMfaResponse{
+		AccessToken: result.Tokens.AccessToken, ExpiresAt: timestamppb.New(result.Tokens.AccessExpiresAt),
+		User: mapCurrentUser(result.User), Tenants: mapTenantOptions(result.Tenants), CurrentTenant: mapTenantOption(result.CurrentTenant),
 	}, nil
 }
 
@@ -133,6 +211,52 @@ func (s *AuthService) Logout(ctx context.Context, _ *v1.LogoutRequest) (*v1.Logo
 	}
 	setRefreshCookie(ctx, clearRefreshCookie(s.secureCookie))
 	return &v1.LogoutResponse{}, nil
+}
+
+// ForgotPassword 创建不泄露账号存在性的密码重置挑战。
+func (s *AuthService) ForgotPassword(ctx context.Context, request *v1.ForgotPasswordRequest) (*v1.ForgotPasswordResponse, error) {
+	if s.verification == nil {
+		return nil, kratoserrors.ServiceUnavailable("VERIFICATION_NOT_READY", "验证码服务尚未就绪")
+	}
+	if request.GetIdentifier() == "" || (request.GetChannel() != "email" && request.GetChannel() != "sms") {
+		return nil, kratoserrors.BadRequest("VERIFICATION_INVALID_ARGUMENT", "账号和验证码渠道不能为空")
+	}
+	challenge, err := s.verification.ForgotPassword(ctx, request.GetIdentifier(), request.GetChannel())
+	if err != nil {
+		if errors.Is(err, bizauth.ErrVerificationRateLimited) {
+			return nil, kratoserrors.New(http.StatusTooManyRequests, "VERIFICATION_RATE_LIMITED", err.Error())
+		}
+		if errors.Is(err, bizauth.ErrVerificationTarget) {
+			return nil, kratoserrors.BadRequest("VERIFICATION_TARGET_INVALID", err.Error())
+		}
+		return nil, kratoserrors.InternalServer("VERIFICATION_SEND_FAILED", "验证码发送失败")
+	}
+	challengeID := "0"
+	if challenge.ID != 0 {
+		challengeID = strconv.FormatUint(challenge.ID, 10)
+	}
+	return &v1.ForgotPasswordResponse{ChallengeId: challengeID, ExpiresAt: timestamppb.New(challenge.ExpiresAt)}, nil
+}
+
+// ResetPassword 校验验证码、更新密码并撤销用户现有会话。
+func (s *AuthService) ResetPassword(ctx context.Context, request *v1.ResetPasswordRequest) (*v1.ResetPasswordResponse, error) {
+	if s.verification == nil {
+		return nil, kratoserrors.ServiceUnavailable("VERIFICATION_NOT_READY", "验证码服务尚未就绪")
+	}
+	challengeID, err := strconv.ParseUint(request.GetChallengeId(), 10, 64)
+	if err != nil || challengeID == 0 || request.GetCode() == "" || request.GetNewPassword() == "" {
+		return nil, kratoserrors.BadRequest("VERIFICATION_INVALID_ARGUMENT", "重置密码参数无效")
+	}
+	if err := s.verification.ResetPassword(ctx, challengeID, request.GetCode(), request.GetNewPassword()); err != nil {
+		if errors.Is(err, bizauth.ErrVerificationInvalid) {
+			return nil, kratoserrors.BadRequest("VERIFICATION_INVALID", err.Error())
+		}
+		if errors.Is(err, bizauth.ErrWeakPassword) {
+			return nil, kratoserrors.BadRequest("PASSWORD_WEAK", err.Error())
+		}
+		return nil, kratoserrors.InternalServer("PASSWORD_RESET_FAILED", "重置密码失败")
+	}
+	return &v1.ResetPasswordResponse{}, nil
 }
 
 // ListSessions 返回当前账号的有效设备会话。

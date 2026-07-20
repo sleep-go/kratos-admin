@@ -39,6 +39,8 @@ type User struct {
 	LockedUntil       *time.Time
 	EmailVerifiedAt   *time.Time
 	PhoneVerifiedAt   *time.Time
+	MFAEnabled        bool           `gorm:"not null"`
+	MFAChannel        string         `gorm:"size:16;not null;default:email"`
 	PasswordChangedAt time.Time      `gorm:"not null"`
 	CreatedAt         time.Time      `gorm:"not null"`
 	UpdatedAt         time.Time      `gorm:"not null"`
@@ -224,6 +226,7 @@ type VerificationCode struct {
 	AttemptCount uint32    `gorm:"not null"`
 	ExpiresAt    time.Time `gorm:"not null"`
 	ConsumedAt   *time.Time
+	ContextData  datatypes.JSON
 	CreatedAt    time.Time `gorm:"not null"`
 }
 

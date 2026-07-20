@@ -20,6 +20,7 @@ var _ = binding.EncodeURL
 const _ = http.SupportPackageIsVersion1
 
 const OperationAuthServiceForgotPassword = "/admin.v1.AuthService/ForgotPassword"
+const OperationAuthServiceGetCaptcha = "/admin.v1.AuthService/GetCaptcha"
 const OperationAuthServiceListSessions = "/admin.v1.AuthService/ListSessions"
 const OperationAuthServiceLogin = "/admin.v1.AuthService/Login"
 const OperationAuthServiceLogout = "/admin.v1.AuthService/Logout"
@@ -31,6 +32,7 @@ const OperationAuthServiceVerifyMfa = "/admin.v1.AuthService/VerifyMfa"
 
 type AuthServiceHTTPServer interface {
 	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
+	GetCaptcha(context.Context, *GetCaptchaRequest) (*GetCaptchaResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
@@ -43,6 +45,7 @@ type AuthServiceHTTPServer interface {
 
 func RegisterAuthServiceHTTPServer(s *http.Server, srv AuthServiceHTTPServer) {
 	r := s.Route("/")
+	r.GET("/api/v1/auth/captcha", _AuthService_GetCaptcha0_HTTP_Handler(srv))
 	r.POST("/api/v1/auth/login", _AuthService_Login0_HTTP_Handler(srv))
 	r.POST("/api/v1/auth/mfa/verify", _AuthService_VerifyMfa0_HTTP_Handler(srv))
 	r.POST("/api/v1/auth/refresh", _AuthService_Refresh0_HTTP_Handler(srv))
@@ -52,6 +55,25 @@ func RegisterAuthServiceHTTPServer(s *http.Server, srv AuthServiceHTTPServer) {
 	r.POST("/api/v1/auth/reset-password", _AuthService_ResetPassword0_HTTP_Handler(srv))
 	r.GET("/api/v1/auth/sessions", _AuthService_ListSessions0_HTTP_Handler(srv))
 	r.DELETE("/api/v1/auth/sessions/{session_id}", _AuthService_RevokeSession0_HTTP_Handler(srv))
+}
+
+func _AuthService_GetCaptcha0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in GetCaptchaRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationAuthServiceGetCaptcha)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.GetCaptcha(ctx, req.(*GetCaptchaRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*GetCaptchaResponse)
+		return ctx.Result(200, reply)
+	}
 }
 
 func _AuthService_Login0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
@@ -248,6 +270,7 @@ func _AuthService_RevokeSession0_HTTP_Handler(srv AuthServiceHTTPServer) func(ct
 
 type AuthServiceHTTPClient interface {
 	ForgotPassword(ctx context.Context, req *ForgotPasswordRequest, opts ...http.CallOption) (rsp *ForgotPasswordResponse, err error)
+	GetCaptcha(ctx context.Context, req *GetCaptchaRequest, opts ...http.CallOption) (rsp *GetCaptchaResponse, err error)
 	ListSessions(ctx context.Context, req *ListSessionsRequest, opts ...http.CallOption) (rsp *ListSessionsResponse, err error)
 	Login(ctx context.Context, req *LoginRequest, opts ...http.CallOption) (rsp *LoginResponse, err error)
 	Logout(ctx context.Context, req *LogoutRequest, opts ...http.CallOption) (rsp *LogoutResponse, err error)
@@ -273,6 +296,19 @@ func (c *AuthServiceHTTPClientImpl) ForgotPassword(ctx context.Context, in *Forg
 	opts = append(opts, http.Operation(OperationAuthServiceForgotPassword))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *AuthServiceHTTPClientImpl) GetCaptcha(ctx context.Context, in *GetCaptchaRequest, opts ...http.CallOption) (*GetCaptchaResponse, error) {
+	var out GetCaptchaResponse
+	pattern := "/api/v1/auth/captcha"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationAuthServiceGetCaptcha))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

@@ -18,6 +18,10 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const response = await authApi.login(request)
+      if (response.mfaRequired) {
+        clearSession()
+        return response
+      }
       if (!response.accessToken || !response.user) {
         throw new Error('登录响应缺少访问令牌或用户资料')
       }
@@ -53,6 +57,25 @@ export const useAuthStore = defineStore('auth', () => {
       return false
     } finally {
       sessionRestored.value = true
+    }
+  }
+
+  async function verifyMfa(challengeId: string, code: string) {
+    loading.value = true
+    try {
+      const response = await authApi.verifyMfa({ challengeId, code })
+      if (!response.accessToken || !response.user) {
+        throw new Error('MFA响应缺少访问令牌或用户资料')
+      }
+      accessToken.value = response.accessToken
+      currentUser.value = response.user
+      tenants.value = response.tenants ?? []
+      currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
+      setAccessToken(response.accessToken)
+      sessionRestored.value = true
+      return response
+    } finally {
+      loading.value = false
     }
   }
 
@@ -107,6 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
     sessionRestored,
     login,
     restoreSession,
+    verifyMfa,
     switchTenant,
     logout,
     clearSession

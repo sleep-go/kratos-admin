@@ -41,6 +41,8 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 	_user.LockedUntil = field.NewTime(tableName, "locked_until")
 	_user.EmailVerifiedAt = field.NewTime(tableName, "email_verified_at")
 	_user.PhoneVerifiedAt = field.NewTime(tableName, "phone_verified_at")
+	_user.MFAEnabled = field.NewBool(tableName, "mfa_enabled")
+	_user.MFAChannel = field.NewString(tableName, "mfa_channel")
 	_user.PasswordChangedAt = field.NewTime(tableName, "password_changed_at")
 	_user.CreatedAt = field.NewTime(tableName, "created_at")
 	_user.UpdatedAt = field.NewTime(tableName, "updated_at")
@@ -68,6 +70,8 @@ type user struct {
 	LockedUntil       field.Time
 	EmailVerifiedAt   field.Time
 	PhoneVerifiedAt   field.Time
+	MFAEnabled        field.Bool
+	MFAChannel        field.String
 	PasswordChangedAt field.Time
 	CreatedAt         field.Time
 	UpdatedAt         field.Time
@@ -101,6 +105,8 @@ func (u *user) updateTableName(table string) *user {
 	u.LockedUntil = field.NewTime(table, "locked_until")
 	u.EmailVerifiedAt = field.NewTime(table, "email_verified_at")
 	u.PhoneVerifiedAt = field.NewTime(table, "phone_verified_at")
+	u.MFAEnabled = field.NewBool(table, "mfa_enabled")
+	u.MFAChannel = field.NewString(table, "mfa_channel")
 	u.PasswordChangedAt = field.NewTime(table, "password_changed_at")
 	u.CreatedAt = field.NewTime(table, "created_at")
 	u.UpdatedAt = field.NewTime(table, "updated_at")
@@ -129,7 +135,7 @@ func (u *user) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (u *user) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 17)
+	u.fieldMap = make(map[string]field.Expr, 19)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["username"] = u.Username
 	u.fieldMap["email"] = u.Email
@@ -143,6 +149,8 @@ func (u *user) fillFieldMap() {
 	u.fieldMap["locked_until"] = u.LockedUntil
 	u.fieldMap["email_verified_at"] = u.EmailVerifiedAt
 	u.fieldMap["phone_verified_at"] = u.PhoneVerifiedAt
+	u.fieldMap["mfa_enabled"] = u.MFAEnabled
+	u.fieldMap["mfa_channel"] = u.MFAChannel
 	u.fieldMap["password_changed_at"] = u.PasswordChangedAt
 	u.fieldMap["created_at"] = u.CreatedAt
 	u.fieldMap["updated_at"] = u.UpdatedAt

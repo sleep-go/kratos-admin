@@ -16,6 +16,7 @@ import (
 	filebiz "github.com/sleep-go/kratos-admin/backend/internal/biz/file"
 	"github.com/sleep-go/kratos-admin/backend/internal/conf"
 	"github.com/sleep-go/kratos-admin/backend/internal/data"
+	"github.com/sleep-go/kratos-admin/backend/internal/provider/message"
 	"github.com/sleep-go/kratos-admin/backend/internal/provider/storage"
 	"github.com/sleep-go/kratos-admin/backend/internal/server"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
@@ -71,6 +72,23 @@ func NewAPIResources(ctx context.Context, cfg conf.Config) (*APIResources, error
 	sessionUsecase := bizauth.NewSessionUsecase(repository, tokenManager, nil)
 	authService := service.NewAuthService(loginUsecase, cfg.Environment == "production", sessionUsecase)
 	authService.ConfigureAccessSecurity(tokenManager, sessionUsecase)
+	authService.ConfigureCaptcha(bizauth.NewCaptchaUsecase(data.NewCaptchaStore(dataResources), nil))
+	verificationKey := sha256.Sum256([]byte(cfg.Auth.SecretKey + ":verification"))
+	messageSenders, err := buildMessageSenders(cfg)
+	if err != nil {
+		_ = dataResources.Close()
+		return nil, err
+	}
+	verificationUsecase, err := bizauth.NewVerificationUsecase(
+		repository, repository, bizauth.NewPasswordHasher(bizauth.DefaultPasswordParams()), verificationKey[:],
+		messageSenders, nil,
+	)
+	if err != nil {
+		_ = dataResources.Close()
+		return nil, err
+	}
+	loginUsecase.ConfigureVerification(verificationUsecase)
+	authService.ConfigureVerification(verificationUsecase)
 	managementRepository := data.NewManagementRepository(dataResources)
 	storageProvider, localHandler, err := buildStorageProvider(cfg)
 	if err != nil {
@@ -85,6 +103,21 @@ func NewAPIResources(ctx context.Context, cfg conf.Config) (*APIResources, error
 		FileService:       service.NewFileService(fileUsecase, managementRepository),
 		LocalStorage:      localHandler,
 	}, nil
+}
+
+func buildMessageSenders(cfg conf.Config) ([]message.Sender, error) {
+	emailSender := message.Sender(message.NewLocalSender("email"))
+	if cfg.Messaging.SMTPAddress != "" {
+		smtpSender, err := message.NewSMTPSender(message.SMTPConfig{
+			Address: cfg.Messaging.SMTPAddress, Host: cfg.Messaging.SMTPHost, Username: cfg.Messaging.SMTPUsername,
+			Password: cfg.Messaging.SMTPPassword, From: cfg.Messaging.SMTPFrom, UseTLS: cfg.Messaging.SMTPUseTLS,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("初始化 SMTP Provider 失败: %w", err)
+		}
+		emailSender = smtpSender
+	}
+	return []message.Sender{emailSender, message.NewLocalSender("sms")}, nil
 }
 
 // NewFullAPIApp 创建并注册认证、管理与健康检查的完整 API 应用。

@@ -46,6 +46,10 @@ type User struct {
 	Username         string
 	DisplayName      string
 	AvatarURL        string
+	Email            string
+	Phone            string
+	MFAEnabled       bool
+	MFAChannel       string
 	PlatformAdmin    bool
 	PasswordHash     string
 	Status           UserStatus
@@ -79,6 +83,7 @@ type Session struct {
 // UserRepository 定义登录流程需要的用户与成员数据访问接口。
 type UserRepository interface {
 	FindByIdentifier(ctx context.Context, identifier string) (*User, error)
+	FindByID(ctx context.Context, userID uint64) (*User, error)
 	ListMemberships(ctx context.Context, userID uint64) ([]Membership, error)
 	ListPermissions(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]string, error)
 	UpdateLoginFailure(ctx context.Context, userID uint64, count uint32, lockedUntil *time.Time) error
@@ -112,6 +117,8 @@ type LoginResult struct {
 	User          UserProfile
 	CurrentTenant TenantOption
 	Tenants       []TenantOption
+	MFARequired   bool
+	MFAChallenge  VerificationChallenge
 }
 
 // UserProfile 描述登录响应中可安全返回的用户资料。
@@ -125,11 +132,17 @@ type UserProfile struct {
 
 // LoginUsecase 实施账号锁定、密码验证、租户选择与会话创建规则。
 type LoginUsecase struct {
-	users    UserRepository
-	sessions SessionRepository
-	hasher   *PasswordHasher
-	tokens   *TokenManager
-	now      func() time.Time
+	users        UserRepository
+	sessions     SessionRepository
+	hasher       *PasswordHasher
+	tokens       *TokenManager
+	now          func() time.Time
+	verification *VerificationUsecase
+}
+
+// ConfigureVerification 启用登录 MFA 挑战。
+func (u *LoginUsecase) ConfigureVerification(verification *VerificationUsecase) {
+	u.verification = verification
 }
 
 // NewLoginUsecase 创建账号密码登录用例。
@@ -163,6 +176,31 @@ func (u *LoginUsecase) Login(ctx context.Context, input LoginInput) (LoginResult
 		}
 		return LoginResult{}, ErrInvalidCredentials
 	}
+	if user.MFAEnabled {
+		if u.verification == nil {
+			return LoginResult{}, errors.New("MFA验证码服务尚未配置")
+		}
+		challenge, err := u.verification.IssueMFA(ctx, *user, input)
+		if err != nil {
+			return LoginResult{}, err
+		}
+		if err := u.users.ResetLoginFailures(ctx, user.ID); err != nil {
+			return LoginResult{}, fmt.Errorf("重置登录失败次数失败: %w", err)
+		}
+		return LoginResult{MFARequired: true, MFAChallenge: challenge}, nil
+	}
+	return u.completeLogin(ctx, *user, input)
+}
+
+// CompleteMFA 在验证码已消费后签发租户绑定会话。
+func (u *LoginUsecase) CompleteMFA(ctx context.Context, user User, input LoginInput) (LoginResult, error) {
+	if user.Status != UserStatusEnabled {
+		return LoginResult{}, ErrAccountDisabled
+	}
+	return u.completeLogin(ctx, user, input)
+}
+
+func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input LoginInput) (LoginResult, error) {
 
 	memberships, err := u.users.ListMemberships(ctx, user.ID)
 	if err != nil {
