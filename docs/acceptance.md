@@ -2,7 +2,7 @@
 
 ## 目录与依赖
 
-- Admin 应用位于 `app/admin`，Worker 应用位于 `app/worker`。
+- Admin 应用位于 `app/admin`，Worker 应用位于 `app/worker`，Vue 前端位于 `app/frontend`。
 - 共享领域、配置、仓储和 Provider 位于根级 `internal`。
 - Admin 与 Worker 配置位于 `configs`，配置契约位于 `internal/conf/conf.proto`。
 - Goose 迁移位于 `migrations`，服务与 Worker 不执行 `AutoMigrate`。
@@ -27,13 +27,13 @@ make gorm-gen
 make test
 make vet
 make build
-GOCACHE=/tmp/go-build go test ./app/... ./internal/...
-GOCACHE=/tmp/go-build go vet ./app/... ./internal/...
+GOCACHE=/tmp/go-build go test ./app/admin/... ./app/worker/... ./internal/...
+GOCACHE=/tmp/go-build go vet ./app/admin/... ./app/worker/... ./internal/...
 ```
 
 ## 生成一致性
 
-依次执行 `make config`、`make wire`、`make gorm-gen`、`make api` 和 `cd frontend && pnpm api:generate`，随后确认对应生成目录没有 Git 差异。
+依次执行 `make config`、`make wire`、`make gorm-gen`、`make api` 和 `cd app/frontend && pnpm api:generate`，随后确认对应生成目录没有 Git 差异。
 
 ## 数据库与部署
 
@@ -48,13 +48,13 @@ goose -dir migrations mysql "$KRATOS_ADMIN_TEST_MYSQL_DSN" status
 
 ```bash
 make compose-config
-docker compose --env-file .env -f deploy/docker-compose.yml build migrate init-admin api worker frontend
+docker compose --env-file .env build migrate init-admin api worker frontend
 ```
 
 ## 前端验收
 
 ```bash
-cd frontend
+cd app/frontend
 pnpm lint
 pnpm typecheck
 pnpm test:run

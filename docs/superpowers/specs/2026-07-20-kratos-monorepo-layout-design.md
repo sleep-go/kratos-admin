@@ -50,6 +50,12 @@ app/
       service/
       server/
 
+  frontend/
+    src/
+    e2e/
+    package.json
+    Dockerfile
+
 internal/
   biz/
     audit/
@@ -70,9 +76,9 @@ internal/
     storage/
 
 migrations/
-frontend/
 deploy/
 docs/
+docker-compose.yml
 ```
 
 根级 `internal` 允许同一 Go module 内的两个应用共享实现，同时禁止外部 module 直接依赖业务内部包。该方案不复制领域、模型、仓储和 Provider，也不把业务实现暴露到公共 `pkg`。

@@ -33,7 +33,7 @@ go run ./app/admin/cmd/kratos-admin worker --conf ./configs/worker.yaml
 ```
 
 ```bash
-cd frontend
+cd app/frontend
 pnpm install
 pnpm dev
 ```
@@ -91,8 +91,8 @@ make gorm-gen
 make test
 make vet
 make build
-cd frontend && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
-cd frontend && E2E_ADMIN_PASSWORD='你的初始化密码' E2E_REDIS_PORT=6379 pnpm e2e
+cd app/frontend && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
+cd app/frontend && E2E_ADMIN_PASSWORD='你的初始化密码' E2E_REDIS_PORT=6379 pnpm e2e
 make compose-config
-docker compose --env-file .env -f deploy/docker-compose.yml build
+docker compose --env-file .env build
 ```
