@@ -1,0 +1,95 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: kratos_admin
+      MYSQL_USER: kratos
+      MYSQL_PASSWORD: kratos
+      MYSQL_ROOT_PASSWORD: root
+      TZ: Asia/Shanghai
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: tools
+    env_file: ../.env
+    command:
+      ["sh", "-c", "goose -dir /app/backend/migrations mysql \"$${KRATOS_ADMIN_MYSQL_DSN}\" up"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: api
+    env_file: ../.env
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    volumes:
+      - file-data:/data/files
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/api/v1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: worker
+    env_file: ../.env
+    volumes:
+      - file-data:/data/files
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
+  redis-data:
+  file-data:

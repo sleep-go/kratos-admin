@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package admin.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/sleep-go/kratos-admin/api/admin/v1;v1";
+
+// AuthService 提供登录、MFA、令牌轮换与会话治理接口。
+service AuthService {
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/login"
+      body: "*"
+    };
+  }
+  rpc VerifyMfa(VerifyMfaRequest) returns (VerifyMfaResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/mfa/verify"
+      body: "*"
+    };
+  }
+  rpc Refresh(RefreshRequest) returns (RefreshResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/refresh"
+      body: "*"
+    };
+  }
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {post: "/api/v1/auth/logout"};
+  }
+  rpc SwitchTenant(SwitchTenantRequest) returns (SwitchTenantResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/switch-tenant"
+      body: "*"
+    };
+  }
+  rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/forgot-password"
+      body: "*"
+    };
+  }
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/reset-password"
+      body: "*"
+    };
+  }
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+    option (google.api.http) = {get: "/api/v1/auth/sessions"};
+  }
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse) {
+    option (google.api.http) = {delete: "/api/v1/auth/sessions/{session_id}"};
+  }
+}
+
+message TenantSummary {
+  uint64 id = 1;
+  string name = 2;
+}
+
+message CurrentUser {
+  uint64 id = 1;
+  string display_name = 2;
+  string avatar_url = 3;
+  bool platform_admin = 4;
+}
+
+message LoginRequest {
+  string identifier = 1;
+  string password = 2;
+  string captcha_id = 3;
+  string captcha_code = 4;
+  string device_name = 5;
+}
+
+message LoginResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  CurrentUser user = 3;
+  repeated TenantSummary tenants = 4;
+  TenantSummary current_tenant = 5;
+  string mfa_challenge_id = 6;
+  bool mfa_required = 7;
+}
+
+message VerifyMfaRequest {
+  string challenge_id = 1;
+  string code = 2;
+}
+
+message VerifyMfaResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  CurrentUser user = 3;
+  repeated TenantSummary tenants = 4;
+  TenantSummary current_tenant = 5;
+}
+
+message RefreshRequest {}
+
+message RefreshResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message LogoutRequest {}
+
+message LogoutResponse {}
+
+message SwitchTenantRequest {
+  uint64 tenant_id = 1;
+}
+
+message SwitchTenantResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  TenantSummary current_tenant = 3;
+}
+
+message ForgotPasswordRequest {
+  string identifier = 1;
+  string channel = 2;
+}
+
+message ForgotPasswordResponse {
+  string challenge_id = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message ResetPasswordRequest {
+  string challenge_id = 1;
+  string code = 2;
+  string new_password = 3;
+}
+
+message ResetPasswordResponse {}
+
+message Session {
+  string id = 1;
+  uint64 tenant_id = 2;
+  string device_name = 3;
+  string ip = 4;
+  string user_agent = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  bool current = 8;
+}
+
+message ListSessionsRequest {}
+
+message ListSessionsResponse {
+  repeated Session items = 1;
+}
+
+message RevokeSessionRequest {
+  string session_id = 1;
+}
+
+message RevokeSessionResponse {}

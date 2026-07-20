@@ -1,0 +1,430 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: ""
+    version: 0.0.1
+paths:
+    /api/v1/auth/forgot-password:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_ForgotPassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.ForgotPasswordRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.ForgotPasswordResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/login:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_Login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.LoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.LoginResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/logout:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_Logout
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.LogoutResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/mfa/verify:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_VerifyMfa
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.VerifyMfaRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.VerifyMfaResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/refresh:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_Refresh
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.RefreshRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.RefreshResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/reset-password:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_ResetPassword
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.ResetPasswordRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.ResetPasswordResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/sessions:
+        get:
+            tags:
+                - AuthService
+            operationId: AuthService_ListSessions
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.ListSessionsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/sessions/{session_id}:
+        delete:
+            tags:
+                - AuthService
+            operationId: AuthService_RevokeSession
+            parameters:
+                - name: session_id
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.RevokeSessionResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/switch-tenant:
+        post:
+            tags:
+                - AuthService
+            operationId: AuthService_SwitchTenant
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.SwitchTenantRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.SwitchTenantResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/health:
+        get:
+            tags:
+                - HealthService
+            description: Check 返回 API 进程当前健康状态。
+            operationId: HealthService_Check
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.CheckResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+components:
+    schemas:
+        admin.v1.CheckResponse:
+            type: object
+            properties:
+                status:
+                    type: string
+                service:
+                    type: string
+        admin.v1.CurrentUser:
+            type: object
+            properties:
+                id:
+                    type: string
+                display_name:
+                    type: string
+                avatar_url:
+                    type: string
+                platform_admin:
+                    type: boolean
+        admin.v1.ForgotPasswordRequest:
+            type: object
+            properties:
+                identifier:
+                    type: string
+                channel:
+                    type: string
+        admin.v1.ForgotPasswordResponse:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                expires_at:
+                    type: string
+                    format: date-time
+        admin.v1.ListSessionsResponse:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.Session'
+        admin.v1.LoginRequest:
+            type: object
+            properties:
+                identifier:
+                    type: string
+                password:
+                    type: string
+                captcha_id:
+                    type: string
+                captcha_code:
+                    type: string
+                device_name:
+                    type: string
+        admin.v1.LoginResponse:
+            type: object
+            properties:
+                access_token:
+                    type: string
+                expires_at:
+                    type: string
+                    format: date-time
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
+                tenants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.TenantSummary'
+                current_tenant:
+                    $ref: '#/components/schemas/admin.v1.TenantSummary'
+                mfa_challenge_id:
+                    type: string
+                mfa_required:
+                    type: boolean
+        admin.v1.LogoutResponse:
+            type: object
+            properties: {}
+        admin.v1.RefreshRequest:
+            type: object
+            properties: {}
+        admin.v1.RefreshResponse:
+            type: object
+            properties:
+                access_token:
+                    type: string
+                expires_at:
+                    type: string
+                    format: date-time
+        admin.v1.ResetPasswordRequest:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                code:
+                    type: string
+                new_password:
+                    type: string
+        admin.v1.ResetPasswordResponse:
+            type: object
+            properties: {}
+        admin.v1.RevokeSessionResponse:
+            type: object
+            properties: {}
+        admin.v1.Session:
+            type: object
+            properties:
+                id:
+                    type: string
+                tenant_id:
+                    type: string
+                device_name:
+                    type: string
+                ip:
+                    type: string
+                user_agent:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+                expires_at:
+                    type: string
+                    format: date-time
+                current:
+                    type: boolean
+        admin.v1.SwitchTenantRequest:
+            type: object
+            properties:
+                tenant_id:
+                    type: string
+        admin.v1.SwitchTenantResponse:
+            type: object
+            properties:
+                access_token:
+                    type: string
+                expires_at:
+                    type: string
+                    format: date-time
+                current_tenant:
+                    $ref: '#/components/schemas/admin.v1.TenantSummary'
+        admin.v1.TenantSummary:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+        admin.v1.VerifyMfaRequest:
+            type: object
+            properties:
+                challenge_id:
+                    type: string
+                code:
+                    type: string
+        admin.v1.VerifyMfaResponse:
+            type: object
+            properties:
+                access_token:
+                    type: string
+                expires_at:
+                    type: string
+                    format: date-time
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
+                tenants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.TenantSummary'
+                current_tenant:
+                    $ref: '#/components/schemas/admin.v1.TenantSummary'
+        google.protobuf.Any:
+            type: object
+            properties:
+                '@type':
+                    type: string
+                    description: The type of the serialized message.
+            additionalProperties: true
+            description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
+        google.rpc.Status:
+            type: object
+            properties:
+                code:
+                    type: integer
+                    description: The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+                    format: int32
+                message:
+                    type: string
+                    description: A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+                details:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/google.protobuf.Any'
+                    description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
+            description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+tags:
+    - name: AuthService
+      description: AuthService 提供登录、MFA、令牌轮换与会话治理接口。
+    - name: HealthService
+      description: Health 服务提供部署探针使用的健康检查接口。

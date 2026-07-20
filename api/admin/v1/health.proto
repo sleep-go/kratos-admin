@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package admin.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/sleep-go/kratos-admin/api/admin/v1;v1";
+
+// Health 服务提供部署探针使用的健康检查接口。
+service HealthService {
+  // Check 返回 API 进程当前健康状态。
+  rpc Check(CheckRequest) returns (CheckResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/health"
+    };
+  }
+}
+
+message CheckRequest {}
+
+message CheckResponse {
+  string status = 1;
+  string service = 2;
+}

@@ -1,0 +1,26 @@
+.PHONY: api backend-test backend-build frontend-install frontend-test frontend-build compose-up compose-down
+
+api:
+	buf lint
+	buf generate
+
+backend-test:
+	GOCACHE=/tmp/go-build go test -race ./backend/...
+
+backend-build:
+	GOCACHE=/tmp/go-build go build ./backend/cmd/api ./backend/cmd/worker
+
+frontend-install:
+	cd frontend && pnpm install
+
+frontend-test:
+	cd frontend && pnpm test:run
+
+frontend-build:
+	cd frontend && pnpm build
+
+compose-up:
+	docker compose --env-file .env -f deploy/docker-compose.yml up --build
+
+compose-down:
+	docker compose --env-file .env -f deploy/docker-compose.yml down
