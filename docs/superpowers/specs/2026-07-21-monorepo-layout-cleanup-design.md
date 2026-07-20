@@ -41,7 +41,7 @@ Compose 文件位于仓库根目录后：
 - 所有服务的构建上下文统一为 `.`。
 - 后端 Dockerfile 使用 `deploy/Dockerfile.backend`。
 - 前端 Dockerfile 使用 `app/frontend/Dockerfile`。
-- `env_file` 使用根级 `.env`。
+- `env_file` 由 `KRATOS_ADMIN_ENV_FILE` 指定，默认使用根级 `.env.example`；Make 优先选择已存在的根级 `.env`。
 - Goose 迁移、健康检查、依赖顺序、端口、数据卷和服务名称保持不变。
 
 前端 Dockerfile 从根构建上下文复制 `app/frontend/package.json`、锁文件、源码和 Nginx 配置。后端 Dockerfile 路径及内容保持不变，除非验证发现根级 Compose 引用必须同步。

@@ -16,8 +16,20 @@ func TestMonorepoEntrypoints(t *testing.T) {
 	t.Parallel()
 	assertPathExists(t, "../../app/frontend/package.json")
 	assertPathExists(t, "../../docker-compose.yml")
-	assertPathMissing(t, "../../frontend/package.json")
+	assertPathMissing(t, "../../frontend")
 	assertPathMissing(t, "../../deploy/docker-compose.yml")
+	assertFileContains(t, "../../docker-compose.yml", "${KRATOS_ADMIN_ENV_FILE:-.env.example}")
+}
+
+func assertFileContains(t *testing.T, path, expected string) {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("读取 %s 失败: %v", path, err)
+	}
+	if !strings.Contains(string(content), expected) {
+		t.Fatalf("%s 未包含 %q", path, expected)
+	}
 }
 
 func TestLayerDependencies(t *testing.T) {

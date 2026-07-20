@@ -4,7 +4,7 @@
 
 1. 复制配置：`cp .env.example .env`。
 2. 至少修改 `KRATOS_ADMIN_SECRET_KEY`（精确 32 字节）和 `KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD`（不少于 12 位）。生产环境还必须配置持久化 Ed25519 私钥 `KRATOS_ADMIN_JWT_PRIVATE_KEY`。
-3. 执行 `make compose-config` 检查 Compose 配置，再执行 `make compose-up`。
+3. 执行 `make compose-config` 检查 Compose 配置，再执行 `make compose-up`。Make 默认优先使用根目录 `.env`，缺失时回退到 `.env.example`；也可通过 `COMPOSE_ENV_FILE=/path/to/env` 指定其他文件。
 4. 访问 `http://127.0.0.1:8080`；API 健康检查为 `http://127.0.0.1:8000/api/v1/health`，Mailpit 为 `http://127.0.0.1:8025`。
 
 启动顺序固定为 MySQL 健康检查、Goose 迁移、幂等超级管理员初始化、API/Worker、Frontend。API 和 Worker 不执行 `AutoMigrate`。

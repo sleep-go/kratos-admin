@@ -4,6 +4,7 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unkn
 GOCACHE ?= /tmp/go-build
 GO_APP_PACKAGES := ./app/admin/... ./app/worker/...
 GO_PACKAGES := $(GO_APP_PACKAGES) ./internal/...
+COMPOSE_ENV_FILE ?= $(if $(wildcard .env),.env,.env.example)
 
 ifeq ($(GOHOSTOS),windows)
 	GIT_BASH := $(subst \,/,$(subst cmd\git.exe,bin\bash.exe,$(shell where git)))
@@ -96,19 +97,19 @@ frontend-e2e: ## 运行前端端到端测试
 
 .PHONY: compose-config
 compose-config: ## 校验 Docker Compose 配置
-	docker compose --env-file .env config --quiet
+	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) config --quiet
 
 .PHONY: compose-deps-up
 compose-deps-up: ## 仅启动本地 MySQL、Redis 与 Mailpit 依赖
-	docker compose --env-file .env up -d mysql redis mailpit
+	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) up -d mysql redis mailpit
 
 .PHONY: compose-up
 compose-up: ## 构建并启动完整 Docker Compose 环境
-	docker compose --env-file .env up --build
+	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) up --build
 
 .PHONY: compose-down
 compose-down: ## 停止 Docker Compose 环境
-	docker compose --env-file .env down
+	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) down
 
 # 兼容原有命令名称。
 .PHONY: backend-test backend-vet backend-build

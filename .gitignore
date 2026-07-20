@@ -7,9 +7,6 @@
 
 # Go
 /bin/
-backend/bin/
-backend/coverage.out
-backend/tmp/
 
 # Frontend
 app/frontend/node_modules/
