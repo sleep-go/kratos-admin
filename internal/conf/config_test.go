@@ -5,6 +5,19 @@ import (
 	"time"
 )
 
+func TestBootstrapGeneratedContract(t *testing.T) {
+	bootstrap := &Bootstrap{
+		Environment: "development",
+		Server: &ServerConfig{
+			Http: &ServerConfig_HTTP{Network: "tcp", Addr: ":8000"},
+		},
+	}
+
+	if bootstrap.GetServer().GetHttp().GetAddr() != ":8000" {
+		t.Fatalf("HTTP addr = %q", bootstrap.GetServer().GetHttp().GetAddr())
+	}
+}
+
 func TestLoadFromEnvUsesSafeDevelopmentDefaults(t *testing.T) {
 	t.Setenv("KRATOS_ADMIN_ENV", "development")
 	t.Setenv("KRATOS_ADMIN_MYSQL_DSN", "")

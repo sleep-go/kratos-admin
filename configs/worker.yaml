@@ -1,0 +1,23 @@
+environment: ${KRATOS_ADMIN_ENV:development}
+
+data:
+  database:
+    driver: mysql
+    source: ${KRATOS_ADMIN_MYSQL_DSN:kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local}
+  redis:
+    network: tcp
+    addr: ${KRATOS_ADMIN_REDIS_ADDR:127.0.0.1:6379}
+    db: ${KRATOS_ADMIN_REDIS_DB:0}
+    read_timeout: 2s
+    write_timeout: 2s
+
+storage:
+  provider: ${KRATOS_ADMIN_STORAGE_PROVIDER:local}
+  local_path: ${KRATOS_ADMIN_STORAGE_LOCAL_PATH:./data/files}
+  max_file_size: ${KRATOS_ADMIN_STORAGE_MAX_FILE_SIZE:104857600}
+  oss_region: ${KRATOS_ADMIN_OSS_REGION:}
+  oss_endpoint: ${KRATOS_ADMIN_OSS_ENDPOINT:}
+  oss_bucket: ${KRATOS_ADMIN_OSS_BUCKET:}
+  oss_access_key_id: ${KRATOS_ADMIN_OSS_ACCESS_KEY_ID:}
+  oss_access_key_secret: ${KRATOS_ADMIN_OSS_ACCESS_KEY_SECRET:}
+  oss_security_token: ${KRATOS_ADMIN_OSS_SECURITY_TOKEN:}

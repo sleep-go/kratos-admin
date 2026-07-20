@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package kratos.admin.conf;
+
+option go_package = "github.com/sleep-go/kratos-admin/internal/conf;conf";
+
+import "google/protobuf/duration.proto";
+
+message Bootstrap {
+  string environment = 1;
+  ServerConfig server = 2;
+  DataConfig data = 3;
+  AuthConfig auth = 4;
+  StorageConfig storage = 5;
+  MessagingConfig messaging = 6;
+}
+
+message ServerConfig {
+  message HTTP {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  message GRPC {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  HTTP http = 1;
+  GRPC grpc = 2;
+}
+
+message DataConfig {
+  message Database {
+    string driver = 1;
+    string source = 2;
+  }
+  message Redis {
+    string network = 1;
+    string addr = 2;
+    int32 db = 3;
+    google.protobuf.Duration read_timeout = 4;
+    google.protobuf.Duration write_timeout = 5;
+  }
+  Database database = 1;
+  Redis redis = 2;
+}
+
+message AuthConfig {
+  google.protobuf.Duration access_ttl = 1;
+  google.protobuf.Duration refresh_ttl = 2;
+  string jwt_private_key = 3;
+  string secret_key = 4;
+}
+
+message StorageConfig {
+  string provider = 1;
+  string local_path = 2;
+  int64 max_file_size = 3;
+  string oss_region = 4;
+  string oss_endpoint = 5;
+  string oss_bucket = 6;
+  string oss_access_key_id = 7;
+  string oss_access_key_secret = 8;
+  string oss_security_token = 9;
+}
+
+message MessagingConfig {
+  string smtp_address = 1;
+  string smtp_host = 2;
+  string smtp_username = 3;
+  string smtp_password = 4;
+  string smtp_from = 5;
+  bool smtp_use_tls = 6;
+  string aliyun_sms_region = 7;
+  string aliyun_sms_endpoint = 8;
+  string aliyun_sms_access_key_id = 9;
+  string aliyun_sms_access_key_secret = 10;
+  string aliyun_sms_sign_name = 11;
+  string aliyun_sms_template_code = 12;
+}
