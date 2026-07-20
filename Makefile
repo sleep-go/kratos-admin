@@ -2,6 +2,8 @@ GOHOSTOS := $(shell go env GOHOSTOS)
 GOPATH := $(shell go env GOPATH)
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 GOCACHE ?= /tmp/go-build
+GO_APP_PACKAGES := ./app/admin/... ./app/worker/...
+GO_PACKAGES := $(GO_APP_PACKAGES) ./internal/...
 
 ifeq ($(GOHOSTOS),windows)
 	GIT_BASH := $(subst \,/,$(subst cmd\git.exe,bin\bash.exe,$(shell where git)))
@@ -34,7 +36,7 @@ build: ## 构建统一的 kratos-admin 命令行到 bin
 
 .PHONY: generate
 generate: ## 执行 Go Generate、GORM Gen 并校验模块依赖
-	GOCACHE=$(GOCACHE) go generate ./app/... ./internal/...
+	GOCACHE=$(GOCACHE) go generate $(GO_PACKAGES)
 	$(MAKE) gorm-gen
 	go mod verify
 
@@ -70,43 +72,43 @@ run-worker: ## 启动异步任务 Worker
 
 .PHONY: test
 test: ## 运行后端测试
-	GOCACHE=$(GOCACHE) go test -race ./app/... ./internal/...
+	GOCACHE=$(GOCACHE) go test -race $(GO_PACKAGES)
 
 .PHONY: vet
 vet: ## 运行后端静态检查
-	GOCACHE=$(GOCACHE) go vet ./app/... ./internal/...
+	GOCACHE=$(GOCACHE) go vet $(GO_PACKAGES)
 
 .PHONY: frontend-install
 frontend-install: ## 安装前端依赖
-	cd frontend && pnpm install
+	cd app/frontend && pnpm install
 
 .PHONY: frontend-test
 frontend-test: ## 运行前端组件测试
-	cd frontend && pnpm test:run
+	cd app/frontend && pnpm test:run
 
 .PHONY: frontend-build
 frontend-build: ## 检查并构建前端
-	cd frontend && pnpm build
+	cd app/frontend && pnpm build
 
 .PHONY: frontend-e2e
 frontend-e2e: ## 运行前端端到端测试
-	cd frontend && pnpm e2e
+	cd app/frontend && pnpm e2e
 
 .PHONY: compose-config
 compose-config: ## 校验 Docker Compose 配置
-	docker compose --env-file .env -f deploy/docker-compose.yml config --quiet
+	docker compose --env-file .env config --quiet
 
 .PHONY: compose-deps-up
 compose-deps-up: ## 仅启动本地 MySQL、Redis 与 Mailpit 依赖
-	docker compose --env-file .env -f deploy/docker-compose.yml up -d mysql redis mailpit
+	docker compose --env-file .env up -d mysql redis mailpit
 
 .PHONY: compose-up
 compose-up: ## 构建并启动完整 Docker Compose 环境
-	docker compose --env-file .env -f deploy/docker-compose.yml up --build
+	docker compose --env-file .env up --build
 
 .PHONY: compose-down
 compose-down: ## 停止 Docker Compose 环境
-	docker compose --env-file .env -f deploy/docker-compose.yml down
+	docker compose --env-file .env down
 
 # 兼容原有命令名称。
 .PHONY: backend-test backend-vet backend-build
