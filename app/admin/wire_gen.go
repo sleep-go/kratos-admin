@@ -4,13 +4,13 @@
 //go:build !wireinject
 // +build !wireinject
 
-package main
+package admin
 
 import (
 	"context"
 	"github.com/go-kratos/kratos/v2"
-	"github.com/sleep-go/kratos-admin/app/worker/internal/server"
-	"github.com/sleep-go/kratos-admin/app/worker/internal/service"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/server"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/service"
 	"github.com/sleep-go/kratos-admin/internal/conf"
 	"github.com/sleep-go/kratos-admin/internal/data"
 	"github.com/sleep-go/kratos-admin/internal/provider"
@@ -18,20 +18,25 @@ import (
 
 // Injectors from wire.go:
 
-func wireWorkerApp(ctx context.Context, cfg conf.Config) (*kratos.App, func(), error) {
+func wireApplication(ctx context.Context, cfg conf.Config) (*kratos.App, func(), error) {
 	dataData, cleanup, err := data.NewData(ctx, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
-	workerSet, err := provider.NewWorkerSet(cfg)
+	adminSet, err := provider.NewAdminSet(cfg)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
+	services, err := service.NewServices(cfg, dataData, adminSet)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	httpServer := server.NewHTTPServer(cfg, services, adminSet)
+	grpcServer := server.NewGRPCServer(cfg, services)
 	logger := newLogger()
-	serviceService := service.NewService(dataData, workerSet, logger)
-	serverServer := server.NewServer(cfg, serviceService, logger)
-	app := server.NewApp(serverServer, logger)
+	app := server.NewApp(httpServer, grpcServer, logger)
 	return app, func() {
 		cleanup()
 	}, nil

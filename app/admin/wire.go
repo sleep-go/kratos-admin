@@ -1,6 +1,6 @@
 //go:build wireinject
 
-package main
+package admin
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"github.com/sleep-go/kratos-admin/internal/provider"
 )
 
-func wireAdminApp(ctx context.Context, cfg conf.Config) (*kratos.App, func(), error) {
+func wireApplication(ctx context.Context, cfg conf.Config) (*kratos.App, func(), error) {
 	wire.Build(
 		data.NewData,
 		provider.NewAdminSet,

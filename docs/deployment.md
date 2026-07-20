@@ -19,17 +19,17 @@ export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
 export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
 go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
 goose -dir migrations mysql "$KRATOS_ADMIN_MYSQL_DSN" up
-KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/initadmin --conf ./configs/admin.yaml
+KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
 ```
 
 使用三个终端分别启动 Admin Server、Worker 和前端。Admin Server 与 Worker 终端都必须导出相同的 MySQL、Redis 和密钥变量：
 
 ```bash
-go run ./app/admin/cmd/server --conf ./configs/admin.yaml
+go run ./app/admin/cmd/kratos-admin server --conf ./configs/admin.yaml
 ```
 
 ```bash
-go run ./app/worker/cmd/worker --conf ./configs/worker.yaml
+go run ./app/admin/cmd/kratos-admin worker --conf ./configs/worker.yaml
 ```
 
 ```bash
@@ -38,7 +38,7 @@ pnpm install
 pnpm dev
 ```
 
-GORM Gen 默认输出到 `internal/data/query`，可执行 `go run ./app/admin/cmd/gormgen --out-path internal/data/query`。修改依赖注入后执行 `make wire`，生成的两个 `wire_gen.go` 必须提交。
+所有后端运行和工具能力由同一个 `kratos-admin` 二进制提供。GORM Gen 默认输出到 `internal/data/query`，可执行 `go run ./app/admin/cmd/kratos-admin gorm-gen --out-path internal/data/query`。修改依赖注入后执行 `make wire`，生成的两个 `wire_gen.go` 必须提交。
 
 ## Docker Compose 仅启动依赖
 

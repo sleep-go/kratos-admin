@@ -28,12 +28,9 @@ api: ## 检查并生成业务 API、gRPC、HTTP 与 OpenAPI 代码
 	buf generate
 
 .PHONY: build
-build: ## 构建全部独立后端可执行程序到 bin
+build: ## 构建统一的 kratos-admin 命令行到 bin
 	mkdir -p bin
-	GOCACHE=$(GOCACHE) go build -trimpath -o bin/admin-server ./app/admin/cmd/server
-	GOCACHE=$(GOCACHE) go build -trimpath -o bin/admin-initadmin ./app/admin/cmd/initadmin
-	GOCACHE=$(GOCACHE) go build -trimpath -o bin/admin-gormgen ./app/admin/cmd/gormgen
-	GOCACHE=$(GOCACHE) go build -trimpath -o bin/worker ./app/worker/cmd/worker
+	GOCACHE=$(GOCACHE) go build -trimpath -o bin/kratos-admin ./app/admin/cmd/kratos-admin
 
 .PHONY: generate
 generate: ## 执行 Go Generate、GORM Gen 并校验模块依赖
@@ -49,11 +46,11 @@ all: ## 生成 API、配置及依赖注入代码
 
 .PHONY: wire
 wire: ## 生成 Admin 与 Worker 的 Wire 依赖注入代码
-	GOCACHE=$(GOCACHE) go tool wire ./app/admin/cmd/server ./app/worker/cmd/worker
+	GOCACHE=$(GOCACHE) go tool wire ./app/admin ./app/worker
 
 .PHONY: gorm-gen
 gorm-gen: ## 生成 GORM Gen 类型安全查询代码
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/gormgen
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin gorm-gen
 
 .PHONY: migrate
 migrate: ## 使用 Goose 执行数据库迁移
@@ -61,15 +58,15 @@ migrate: ## 使用 Goose 执行数据库迁移
 
 .PHONY: init-admin
 init-admin: ## 幂等初始化平台超级管理员
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/initadmin --conf ./configs/admin.yaml
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
 
 .PHONY: run-admin
 run-admin: ## 启动 Admin HTTP/gRPC 服务
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/server --conf ./configs/admin.yaml
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin server --conf ./configs/admin.yaml
 
 .PHONY: run-worker
 run-worker: ## 启动异步任务 Worker
-	GOCACHE=$(GOCACHE) go run ./app/worker/cmd/worker --conf ./configs/worker.yaml
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin worker --conf ./configs/worker.yaml
 
 .PHONY: test
 test: ## 运行后端测试

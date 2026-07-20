@@ -1,4 +1,4 @@
-package main
+package worker
 
 import (
 	"os"
@@ -11,6 +11,6 @@ func newLogger() log.Logger {
 		log.NewStdLogger(os.Stdout),
 		"ts", log.DefaultTimestamp,
 		"caller", log.DefaultCaller,
-		"component", "admin",
+		"component", "worker",
 	)
 }

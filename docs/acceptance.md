@@ -9,13 +9,14 @@
 - `internal/data` 不导入应用 Service/Server，`internal/biz` 不导入 Data 或应用内部包。
 - 仓库不存在实际 `backend/` 目录或运行命令兼容入口。
 
-四个独立可执行程序为：
+统一可执行程序及其子命令为：
 
 ```text
-app/admin/cmd/server
-app/admin/cmd/initadmin
-app/admin/cmd/gormgen
-app/worker/cmd/worker
+app/admin/cmd/kratos-admin
+├── server
+├── worker
+├── init-admin
+└── gorm-gen
 ```
 
 ## 后端验收

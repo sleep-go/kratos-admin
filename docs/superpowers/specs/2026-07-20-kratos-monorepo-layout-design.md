@@ -1,5 +1,7 @@
 # Kratos Admin 大仓目录重构设计
 
+> 后续变更：运行入口已按用户确认收敛为 `app/admin/cmd/kratos-admin` 单一 Cobra 可执行程序，原四个命令改为 `server`、`worker`、`init-admin`、`gorm-gen` 子命令。本文中的旧路径仅表示此前设计阶段。
+
 ## 背景与目标
 
 当前后端集中在 `backend/cmd`、`backend/internal` 和 `backend/migrations`。API、Worker、运维命令及共享业务代码处于同一目录层级，不符合用户确认的 go-kratos 大仓结构。

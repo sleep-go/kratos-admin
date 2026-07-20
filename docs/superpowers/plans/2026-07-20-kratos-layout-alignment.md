@@ -1,5 +1,7 @@
 # Kratos Layout 官方规范对齐 Implementation Plan
 
+> 后续变更：用户已将“四个独立可执行程序”调整为单一 `kratos-admin` Cobra 入口；命令统一为 `server`、`worker`、`init-admin`、`gorm-gen` 子命令。本文后续出现的旧命令路径仅保留为实施历史。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在保留多应用大仓、Cobra 和 Kratos v2.9.2 的前提下，补齐官方 kratos-layout 的配置 Proto、YAML、`--conf` 和 Makefile 工作流。

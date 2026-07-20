@@ -5,36 +5,27 @@ RUN go mod download
 COPY api ./api
 COPY app ./app
 COPY internal ./internal
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/admin-server ./app/admin/cmd/server
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/worker ./app/worker/cmd/worker
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/admin-initadmin ./app/admin/cmd/initadmin
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/kratos-admin ./app/admin/cmd/kratos-admin
 
 FROM golang:1.26-alpine AS tools
 RUN go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
 WORKDIR /app
 COPY migrations ./migrations
 
-FROM alpine:3.22 AS admin-server
+FROM alpine:3.22 AS runtime
 RUN addgroup -S kratos && adduser -S kratos -G kratos
 WORKDIR /app
-COPY --from=build /out/admin-server /usr/local/bin/admin-server
+COPY --from=build /out/kratos-admin /usr/local/bin/kratos-admin
 COPY configs ./configs
 USER kratos
+ENTRYPOINT ["kratos-admin"]
+
+FROM runtime AS admin-server
 EXPOSE 8000 9000
-ENTRYPOINT ["admin-server"]
+CMD ["server", "--conf", "/app/configs/admin.yaml"]
 
-FROM alpine:3.22 AS worker
-RUN addgroup -S kratos && adduser -S kratos -G kratos
-WORKDIR /app
-COPY --from=build /out/worker /usr/local/bin/worker
-COPY configs ./configs
-USER kratos
-ENTRYPOINT ["worker"]
+FROM runtime AS worker
+CMD ["worker", "--conf", "/app/configs/worker.yaml"]
 
-FROM alpine:3.22 AS init-admin
-RUN addgroup -S kratos && adduser -S kratos -G kratos
-WORKDIR /app
-COPY --from=build /out/admin-initadmin /usr/local/bin/admin-initadmin
-COPY configs ./configs
-USER kratos
-ENTRYPOINT ["admin-initadmin"]
+FROM runtime AS init-admin
+CMD ["init-admin", "--conf", "/app/configs/admin.yaml"]

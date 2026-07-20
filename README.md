@@ -20,8 +20,8 @@ Kratos Admin 是基于 go-kratos 与 Vue 3 的前后端分离、多租户通用�
 
 ## 大仓目录
 
-- `app/admin`：Admin HTTP/gRPC 服务、超级管理员初始化和 GORM Gen 命令。
-- `app/worker`：Asynq Worker 独立应用。
+- `app/admin`：Admin HTTP/gRPC 应用及统一 `kratos-admin` Cobra 命令入口。
+- `app/worker`：由 `kratos-admin worker` 启动的 Asynq Worker 应用。
 - `configs`：Admin 与 Worker 的 Kratos YAML 运行配置。
 - `internal/conf`：由 Proto 定义并生成的 Bootstrap 配置契约。
 - `internal/biz`：共享领域用例与仓储契约。
@@ -50,18 +50,18 @@ export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
 export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
 go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
 goose -dir migrations mysql "$KRATOS_ADMIN_MYSQL_DSN" up
-KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/initadmin --conf ./configs/admin.yaml
+KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
 ```
 
 随后分别启动三个常驻开发进程；Admin Server 与 Worker 终端都需要具备上述环境变量：
 
 ```bash
-go run ./app/admin/cmd/server --conf ./configs/admin.yaml
-go run ./app/worker/cmd/worker --conf ./configs/worker.yaml
+go run ./app/admin/cmd/kratos-admin server --conf ./configs/admin.yaml
+go run ./app/admin/cmd/kratos-admin worker --conf ./configs/worker.yaml
 cd frontend && pnpm install && pnpm dev
 ```
 
-也可以分别使用 `make run-admin`、`make run-worker`。YAML 管理配置结构与安全默认值，`${KRATOS_ADMIN_*}` 环境变量只负责部署差异和敏感值。执行 `make help` 可查看官方语义目标及大仓扩展目标；常用生成命令为 `make config`、`make api`、`make wire` 和 `make gorm-gen`。
+所有后端能力都由一个二进制提供，可先执行 `make build`，再使用 `./bin/kratos-admin server|worker|init-admin|gorm-gen`。也可以分别使用 `make run-admin`、`make run-worker`。YAML 管理配置结构与安全默认值，`${KRATOS_ADMIN_*}` 环境变量只负责部署差异和敏感值。执行 `make help` 可查看官方语义目标及大仓扩展目标。
 
 ## 配置与 Provider
 
