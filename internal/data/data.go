@@ -23,6 +23,16 @@ type Data struct {
 	AsynqClient *asynq.Client
 }
 
+// NewData 创建共享数据资源，并返回供 Wire 传播的清理函数。
+func NewData(ctx context.Context, cfg conf.Config) (*Data, func(), error) {
+	resources, err := Open(ctx, cfg.Data)
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup := func() { _ = resources.Close() }
+	return resources, cleanup, nil
+}
+
 // Open 建立并验证 MySQL、Redis 连接；该函数绝不执行数据库迁移。
 func Open(ctx context.Context, cfg conf.Data) (*Data, error) {
 	db, err := OpenMySQL(ctx, cfg.MySQLDSN)
