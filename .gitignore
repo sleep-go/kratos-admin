@@ -12,14 +12,14 @@ backend/coverage.out
 backend/tmp/
 
 # Frontend
-frontend/node_modules/
-frontend/.node_modules-incomplete/
-frontend/.node_modules-tmp/
-frontend/dist/
-frontend/coverage/
-frontend/*.tsbuildinfo
-frontend/playwright-report/
-frontend/test-results/
+app/frontend/node_modules/
+app/frontend/.node_modules-incomplete/
+app/frontend/.node_modules-tmp/
+app/frontend/dist/
+app/frontend/coverage/
+app/frontend/*.tsbuildinfo
+app/frontend/playwright-report/
+app/frontend/test-results/
 
 # Runtime data
 /data/

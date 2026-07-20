@@ -1,14 +1,24 @@
 package architecture_test
 
 import (
+	"errors"
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 )
+
+func TestMonorepoEntrypoints(t *testing.T) {
+	t.Parallel()
+	assertPathExists(t, "../../app/frontend/package.json")
+	assertPathExists(t, "../../docker-compose.yml")
+	assertPathMissing(t, "../../frontend/package.json")
+	assertPathMissing(t, "../../deploy/docker-compose.yml")
+}
 
 func TestLayerDependencies(t *testing.T) {
 	t.Parallel()
@@ -47,5 +57,19 @@ func assertNoImports(t *testing.T, root string, forbidden ...string) {
 	})
 	if err != nil {
 		t.Fatalf("扫描 %s 失败: %v", root, err)
+	}
+}
+
+func assertPathExists(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("大仓入口 %s 不存在: %v", path, err)
+	}
+}
+
+func assertPathMissing(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("旧入口 %s 仍然存在", path)
 	}
 }
