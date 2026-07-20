@@ -162,7 +162,7 @@ func managementScope(ctx context.Context, resource string) (ResourceScope, error
 	if !ok {
 		return ResourceScope{}, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
-	platformAdmin := claims.TenantID == 0 && claims.MemberID == 0
+	platformAdmin := claims.PlatformAdmin
 	if (resource == "tenants" || resource == "resources" || resource == "tenant-resources") && !platformAdmin {
 		return ResourceScope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "该资源仅限平台管理员")
 	}

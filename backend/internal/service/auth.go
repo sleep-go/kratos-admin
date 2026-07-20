@@ -5,10 +5,12 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/transport"
+	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
@@ -34,6 +36,23 @@ type VerificationHandler interface {
 	VerifyMFA(ctx context.Context, challengeID uint64, code string) (bizauth.User, bizauth.LoginInput, error)
 }
 
+// LoginLogRecord 描述已脱敏的登录安全事件。
+type LoginLogRecord struct {
+	TenantID   uint64
+	UserID     uint64
+	Identifier string
+	Result     uint8
+	Reason     string
+	IP         string
+	UserAgent  string
+	RequestID  string
+}
+
+// LoginLogRecorder 定义登录安全日志持久化能力。
+type LoginLogRecorder interface {
+	RecordLogin(ctx context.Context, record LoginLogRecord) error
+}
+
 // SessionHandler 定义 refresh 轮换、退出和租户切换用例。
 type SessionHandler interface {
 	Refresh(ctx context.Context, refreshToken string) (bizauth.RefreshResult, error)
@@ -51,9 +70,16 @@ type AuthService struct {
 	sessionHandler  SessionHandler
 	tokens          *bizauth.TokenManager
 	accessValidator AccessValidator
+	accessRecorder  AccessLogRecorder
+	loginRecorder   LoginLogRecorder
 	captcha         CaptchaHandler
 	verification    VerificationHandler
 	secureCookie    bool
+}
+
+// ConfigureLoginLog 配置登录安全日志记录器。
+func (s *AuthService) ConfigureLoginLog(recorder LoginLogRecorder) {
+	s.loginRecorder = recorder
 }
 
 // ConfigureVerification 启用邮件短信验证码和密码重置流程。
@@ -90,7 +116,8 @@ func NewAuthService(loginHandler LoginHandler, secureCookie bool, sessionHandler
 }
 
 // Login 验证账号密码，返回 access token，并通过 HttpOnly Cookie 下发 refresh token。
-func (s *AuthService) Login(ctx context.Context, request *v1.LoginRequest) (*v1.LoginResponse, error) {
+func (s *AuthService) Login(ctx context.Context, request *v1.LoginRequest) (response *v1.LoginResponse, resultErr error) {
+	defer func() { s.recordLogin(ctx, request, response, resultErr) }()
 	if request.GetIdentifier() == "" || request.GetPassword() == "" {
 		return nil, kratoserrors.BadRequest("AUTH_INVALID_ARGUMENT", "账号和密码不能为空")
 	}
@@ -129,6 +156,57 @@ func (s *AuthService) Login(ctx context.Context, request *v1.LoginRequest) (*v1.
 			Id: result.CurrentTenant.ID, Name: result.CurrentTenant.Name,
 		},
 	}, nil
+}
+
+func (s *AuthService) recordLogin(ctx context.Context, request *v1.LoginRequest, response *v1.LoginResponse, loginErr error) {
+	if s.loginRecorder == nil {
+		return
+	}
+	record := LoginLogRecord{Identifier: maskIdentifier(request.GetIdentifier()), Result: 1, RequestID: RequestIDFromContext(ctx)}
+	if transporter, ok := transport.FromServerContext(ctx); ok {
+		record.UserAgent = transporter.RequestHeader().Get("User-Agent")
+		if httpTransport, isHTTP := transporter.(khttp.Transporter); isHTTP {
+			record.IP = clientIP(httpTransport.Request())
+		} else {
+			record.IP = transporter.RequestHeader().Get("X-Real-IP")
+		}
+	}
+	if response != nil {
+		if response.User != nil {
+			record.UserID = response.User.Id
+		}
+		if response.CurrentTenant != nil {
+			record.TenantID = response.CurrentTenant.Id
+		}
+		if response.MfaRequired {
+			record.Result = 4
+			record.Reason = "MFA_REQUIRED"
+		}
+	}
+	if loginErr != nil {
+		kratosError := kratoserrors.FromError(loginErr)
+		record.Result = 2
+		record.Reason = kratosError.Reason
+		if kratosError.Reason == "AUTH_ACCOUNT_LOCKED" {
+			record.Result = 3
+		}
+	}
+	_ = s.loginRecorder.RecordLogin(context.WithoutCancel(ctx), record)
+}
+
+func maskIdentifier(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if at := strings.IndexByte(value, '@'); at > 1 {
+		return value[:1] + "***" + value[at:]
+	}
+	runes := []rune(value)
+	if len(runes) <= 3 {
+		return "***"
+	}
+	return string(runes[:1]) + "***" + string(runes[len(runes)-2:])
 }
 
 // VerifyMfa 消费邮件或短信验证码并签发完整登录会话。

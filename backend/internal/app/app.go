@@ -72,6 +72,8 @@ func NewAPIResources(ctx context.Context, cfg conf.Config) (*APIResources, error
 	sessionUsecase := bizauth.NewSessionUsecase(repository, tokenManager, nil)
 	authService := service.NewAuthService(loginUsecase, cfg.Environment == "production", sessionUsecase)
 	authService.ConfigureAccessSecurity(tokenManager, sessionUsecase)
+	authService.ConfigureAccessLog(repository)
+	authService.ConfigureLoginLog(repository)
 	authService.ConfigureCaptcha(bizauth.NewCaptchaUsecase(data.NewCaptchaStore(dataResources), nil))
 	verificationKey := sha256.Sum256([]byte(cfg.Auth.SecretKey + ":verification"))
 	messageSenders, err := buildMessageSenders(cfg)

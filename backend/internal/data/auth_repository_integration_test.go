@@ -114,3 +114,44 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 		t.Fatalf("Allowed(audit-logs:list) = %v, %v", allowed, err)
 	}
 }
+
+func TestAuthRepositoryRecordsSanitizedSecurityLogs(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	repository := &AuthRepository{db: tx, q: query.Use(tx)}
+
+	if err := repository.RecordAccess(context.Background(), service.AccessLogRecord{
+		TenantID: 2, UserID: 3, RequestID: "request-integration", Method: "POST", Route: "/api/v1/auth/login",
+		StatusCode: 401, DurationMS: 12, IP: "127.0.0.1", UserAgent: "integration", ErrorReason: "AUTH_INVALID_CREDENTIALS",
+	}); err != nil {
+		t.Fatalf("RecordAccess() error = %v", err)
+	}
+	if err := repository.RecordLogin(context.Background(), service.LoginLogRecord{
+		TenantID: 2, UserID: 3, Identifier: "a***@example.com", Result: 2, Reason: "AUTH_INVALID_CREDENTIALS",
+		IP: "127.0.0.1", UserAgent: "integration", RequestID: "request-integration",
+	}); err != nil {
+		t.Fatalf("RecordLogin() error = %v", err)
+	}
+	var access model.APIAccessLog
+	if err := tx.Where("request_id = ?", "request-integration").First(&access).Error; err != nil {
+		t.Fatal(err)
+	}
+	if access.RequestData != nil || access.ErrorReason != "AUTH_INVALID_CREDENTIALS" {
+		t.Fatalf("access log = %+v", access)
+	}
+	var login model.LoginLog
+	if err := tx.Where("request_id = ?", "request-integration").First(&login).Error; err != nil {
+		t.Fatal(err)
+	}
+	if login.Identifier != "a***@example.com" || login.Result != 2 {
+		t.Fatalf("login log = %+v", login)
+	}
+}

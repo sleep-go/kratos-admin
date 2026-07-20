@@ -93,9 +93,13 @@ func (u *SessionUsecase) Refresh(ctx context.Context, refreshToken string) (Refr
 	if err != nil {
 		return RefreshResult{}, err
 	}
+	user, err := u.repository.FindUser(ctx, claims.UserID)
+	if err != nil || user.Status != UserStatusEnabled {
+		return RefreshResult{}, ErrAccountDisabled
+	}
 	pair, err := u.rotate(ctx, claims, session, TokenSubject{
 		UserID: claims.UserID, TenantID: session.TenantID, MemberID: session.MemberID,
-		SessionID: session.ID, PermissionVersion: session.PermissionVersion,
+		PlatformAdmin: user.PlatformAdmin, SessionID: session.ID, PermissionVersion: session.PermissionVersion,
 	})
 	if err != nil {
 		return RefreshResult{}, err
@@ -164,7 +168,7 @@ func (u *SessionUsecase) SwitchTenant(ctx context.Context, refreshToken string, 
 			return SwitchTenantResult{}, ErrNoTenantMembership
 		}
 		pair, rotateErr := u.rotate(ctx, claims, session, TokenSubject{
-			UserID: claims.UserID, SessionID: session.ID,
+			UserID: claims.UserID, PlatformAdmin: true, SessionID: session.ID,
 		})
 		if rotateErr != nil {
 			return SwitchTenantResult{}, rotateErr
@@ -175,9 +179,13 @@ func (u *SessionUsecase) SwitchTenant(ctx context.Context, refreshToken string, 
 	if err != nil || membership.Status != MembershipStatusEnabled {
 		return SwitchTenantResult{}, ErrNoTenantMembership
 	}
+	user, err := u.repository.FindUser(ctx, claims.UserID)
+	if err != nil || user.Status != UserStatusEnabled {
+		return SwitchTenantResult{}, ErrAccountDisabled
+	}
 	pair, err := u.rotate(ctx, claims, session, TokenSubject{
 		UserID: claims.UserID, TenantID: membership.TenantID, MemberID: membership.ID,
-		SessionID: session.ID, PermissionVersion: membership.PermissionVersion,
+		PlatformAdmin: user.PlatformAdmin, SessionID: session.ID, PermissionVersion: membership.PermissionVersion,
 	})
 	if err != nil {
 		return SwitchTenantResult{}, err
@@ -225,6 +233,10 @@ func (u *SessionUsecase) ValidateAccess(ctx context.Context, claims *TokenClaims
 	}
 	if session.PermissionVersion != claims.PermissionVersion {
 		return ErrPermissionVersionChanged
+	}
+	user, err := u.repository.FindUser(ctx, claims.UserID)
+	if err != nil || user.Status != UserStatusEnabled || user.PlatformAdmin != claims.PlatformAdmin {
+		return ErrSessionRevoked
 	}
 	return nil
 }

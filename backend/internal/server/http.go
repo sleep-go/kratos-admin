@@ -2,6 +2,10 @@
 package server
 
 import (
+	"encoding/json"
+	"net/http"
+
+	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
@@ -19,6 +23,7 @@ func NewHTTPServer(cfg conf.Server, healthService *service.HealthService, authSe
 	server := khttp.NewServer(
 		khttp.Address(cfg.HTTPAddr),
 		khttp.Middleware(middlewares...),
+		khttp.ErrorEncoder(encodeError),
 	)
 	v1.RegisterHealthServiceHTTPServer(server, healthService)
 	for _, authService := range authServices {
@@ -27,6 +32,16 @@ func NewHTTPServer(cfg conf.Server, healthService *service.HealthService, authSe
 		}
 	}
 	return server
+}
+
+func encodeError(response http.ResponseWriter, _ *http.Request, err error) {
+	serviceError := kratoserrors.FromError(err)
+	response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	response.WriteHeader(int(serviceError.Code))
+	_ = json.NewEncoder(response).Encode(map[string]any{
+		"code": serviceError.Code, "reason": serviceError.Reason, "message": serviceError.Message,
+		"request_id": response.Header().Get("X-Request-ID"),
+	})
 }
 
 // RegisterManagementHTTP 注册后台资源管理 HTTP API。

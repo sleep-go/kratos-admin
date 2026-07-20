@@ -45,6 +45,12 @@ func (t *testTransport) RequestHeader() transport.Header { return t.request }
 func (t *testTransport) ReplyHeader() transport.Header   { return t.reply }
 
 type fakeAccessValidator struct{ called bool }
+type fakeAccessRecorder struct{ record AccessLogRecord }
+
+func (r *fakeAccessRecorder) RecordAccess(_ context.Context, record AccessLogRecord) error {
+	r.record = record
+	return nil
+}
 
 func (v *fakeAccessValidator) ValidateAccess(_ context.Context, _ *bizauth.TokenClaims) error {
 	v.called = true
@@ -56,8 +62,10 @@ func TestAccessMiddlewareValidatesTokenAndStoresClaims(t *testing.T) {
 	manager := bizauth.NewTokenManager(privateKey, time.Minute, time.Hour, nil)
 	pair, _ := manager.Issue(bizauth.TokenSubject{UserID: 1, TenantID: 2, MemberID: 3, SessionID: "session"})
 	validator := &fakeAccessValidator{}
+	recorder := &fakeAccessRecorder{}
 	service := NewAuthService(&fakeLoginHandler{}, false)
 	service.ConfigureAccessSecurity(manager, validator)
+	service.ConfigureAccessLog(recorder)
 	ctx := transport.NewServerContext(context.Background(), &testTransport{
 		operation: v1.OperationAuthServiceListSessions,
 		request:   testHeader{"Authorization": {"Bearer " + pair.AccessToken}}, reply: testHeader{},
@@ -73,6 +81,9 @@ func TestAccessMiddlewareValidatesTokenAndStoresClaims(t *testing.T) {
 	if err != nil || !validator.called {
 		t.Fatalf("middleware err = %v, validator called = %v", err, validator.called)
 	}
+	if recorder.record.TenantID != 2 || recorder.record.UserID != 1 || recorder.record.RequestID == "" {
+		t.Fatalf("access record = %+v", recorder.record)
+	}
 }
 
 func TestAccessMiddlewareAllowsPublicLoginWithoutToken(t *testing.T) {
@@ -84,5 +95,22 @@ func TestAccessMiddlewareAllowsPublicLoginWithoutToken(t *testing.T) {
 	_, err := service.AccessMiddleware()(func(context.Context, any) (any, error) { called = true; return nil, nil })(ctx, nil)
 	if err != nil || !called {
 		t.Fatalf("public middleware err = %v, called = %v", err, called)
+	}
+}
+
+func TestAccessMiddlewareRecordsUnauthorizedRequest(t *testing.T) {
+	recorder := &fakeAccessRecorder{}
+	service := NewAuthService(&fakeLoginHandler{}, false)
+	service.ConfigureAccessLog(recorder)
+	ctx := transport.NewServerContext(context.Background(), &testTransport{
+		operation: v1.OperationAuthServiceListSessions, request: testHeader{}, reply: testHeader{},
+	})
+
+	_, err := service.AccessMiddleware()(func(context.Context, any) (any, error) {
+		t.Fatal("protected handler must not be called")
+		return nil, nil
+	})(ctx, nil)
+	if err == nil || recorder.record.StatusCode != 401 || recorder.record.ErrorReason != "AUTH_REQUIRED" {
+		t.Fatalf("middleware err = %v, record = %+v", err, recorder.record)
 	}
 }

@@ -28,6 +28,7 @@ type TokenSubject struct {
 	UserID            uint64
 	TenantID          uint64
 	MemberID          uint64
+	PlatformAdmin     bool
 	SessionID         string
 	PermissionVersion uint64
 }
@@ -37,6 +38,7 @@ type TokenClaims struct {
 	UserID            uint64    `json:"uid"`
 	TenantID          uint64    `json:"tid"`
 	MemberID          uint64    `json:"mid"`
+	PlatformAdmin     bool      `json:"pa"`
 	SessionID         string    `json:"sid"`
 	PermissionVersion uint64    `json:"pv"`
 	TokenType         TokenType `json:"typ"`
@@ -141,6 +143,7 @@ func (m *TokenManager) sign(subject TokenSubject, tokenType TokenType, ttl time.
 		UserID:            subject.UserID,
 		TenantID:          subject.TenantID,
 		MemberID:          subject.MemberID,
+		PlatformAdmin:     subject.PlatformAdmin,
 		SessionID:         subject.SessionID,
 		PermissionVersion: subject.PermissionVersion,
 		TokenType:         tokenType,

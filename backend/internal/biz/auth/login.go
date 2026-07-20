@@ -218,6 +218,7 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 		UserID:            user.ID,
 		TenantID:          selected.TenantID,
 		MemberID:          selected.ID,
+		PlatformAdmin:     user.PlatformAdmin,
 		SessionID:         sessionID,
 		PermissionVersion: selected.PermissionVersion,
 	})

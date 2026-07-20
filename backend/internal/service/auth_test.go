@@ -13,6 +13,14 @@ import (
 type fakeLoginHandler struct {
 	result bizauth.LoginResult
 	input  bizauth.LoginInput
+	err    error
+}
+
+type fakeLoginRecorder struct{ record LoginLogRecord }
+
+func (r *fakeLoginRecorder) RecordLogin(_ context.Context, record LoginLogRecord) error {
+	r.record = record
+	return nil
 }
 
 type fakeSessionHandler struct {
@@ -63,7 +71,24 @@ func (h *fakeSessionHandler) Revoke(_ context.Context, sessionID string, _ uint6
 
 func (h *fakeLoginHandler) Login(_ context.Context, input bizauth.LoginInput) (bizauth.LoginResult, error) {
 	h.input = input
-	return h.result, nil
+	return h.result, h.err
+}
+
+func TestAuthServiceRecordsMaskedLoginResult(t *testing.T) {
+	recorder := &fakeLoginRecorder{}
+	service := NewAuthService(&fakeLoginHandler{err: bizauth.ErrInvalidCredentials}, false)
+	service.ConfigureLoginLog(recorder)
+
+	_, err := service.Login(context.Background(), &v1.LoginRequest{Identifier: "admin@example.com", Password: "wrong-password"})
+	if err == nil {
+		t.Fatalf("Login() error = %v, record = %+v", err, recorder.record)
+	}
+	if recorder.record.Identifier != "a***@example.com" || recorder.record.Identifier == "admin@example.com" {
+		t.Fatalf("identifier = %q", recorder.record.Identifier)
+	}
+	if recorder.record.Result != 2 || recorder.record.Reason == "" {
+		t.Fatalf("record = %+v", recorder.record)
+	}
 }
 func (h *fakeLoginHandler) CompleteMFA(_ context.Context, _ bizauth.User, input bizauth.LoginInput) (bizauth.LoginResult, error) {
 	h.input = input

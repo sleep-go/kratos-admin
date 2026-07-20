@@ -19,6 +19,7 @@ func TestTokenManagerIssuesAndParsesTenantSession(t *testing.T) {
 		UserID:            100,
 		TenantID:          200,
 		MemberID:          300,
+		PlatformAdmin:     true,
 		SessionID:         "session-id",
 		PermissionVersion: 9,
 	})
@@ -36,7 +37,7 @@ func TestTokenManagerIssuesAndParsesTenantSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse(access) error = %v", err)
 	}
-	if claims.UserID != 100 || claims.TenantID != 200 || claims.MemberID != 300 {
+	if claims.UserID != 100 || claims.TenantID != 200 || claims.MemberID != 300 || !claims.PlatformAdmin {
 		t.Fatalf("claims subject = %+v", claims)
 	}
 	if claims.PermissionVersion != 9 || claims.SessionID != "session-id" {

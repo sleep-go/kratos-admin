@@ -62,6 +62,21 @@ func TestManagementServiceRejectsPlatformResourceInTenantContext(t *testing.T) {
 	}
 }
 
+func TestPlatformAdminCanGovernFromTenantContext(t *testing.T) {
+	repository := &fakeManagementRepository{}
+	service := NewManagementService(repository, fakePermissionChecker{allowed: false})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{
+		UserID: 5, TenantID: 8, MemberID: 9, PlatformAdmin: true,
+	})
+
+	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "login-logs"}); err != nil {
+		t.Fatalf("platform admin ListResources() error = %v", err)
+	}
+	if !repository.scope.PlatformAdmin {
+		t.Fatalf("scope = %+v", repository.scope)
+	}
+}
+
 func TestManagementServiceRejectsMissingCasbinPermission(t *testing.T) {
 	service := NewManagementService(&fakeManagementRepository{}, fakePermissionChecker{allowed: false})
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
