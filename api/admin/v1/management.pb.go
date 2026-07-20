@@ -655,6 +655,266 @@ func (x *TestProviderConnectionResponse) GetMessage() string {
 	return ""
 }
 
+type RoleResourceGrant struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ResourceCode  string                 `protobuf:"bytes,1,opt,name=resource_code,json=resourceCode,proto3" json:"resource_code,omitempty"`
+	Actions       []string               `protobuf:"bytes,2,rep,name=actions,proto3" json:"actions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoleResourceGrant) Reset() {
+	*x = RoleResourceGrant{}
+	mi := &file_admin_v1_management_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoleResourceGrant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoleResourceGrant) ProtoMessage() {}
+
+func (x *RoleResourceGrant) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoleResourceGrant.ProtoReflect.Descriptor instead.
+func (*RoleResourceGrant) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RoleResourceGrant) GetResourceCode() string {
+	if x != nil {
+		return x.ResourceCode
+	}
+	return ""
+}
+
+func (x *RoleResourceGrant) GetActions() []string {
+	if x != nil {
+		return x.Actions
+	}
+	return nil
+}
+
+type UpdateRoleAuthorizationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoleId        uint64                 `protobuf:"varint,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	DataScope     uint32                 `protobuf:"varint,2,opt,name=data_scope,json=dataScope,proto3" json:"data_scope,omitempty"`
+	Grants        []*RoleResourceGrant   `protobuf:"bytes,3,rep,name=grants,proto3" json:"grants,omitempty"`
+	DepartmentIds []uint64               `protobuf:"varint,4,rep,packed,name=department_ids,json=departmentIds,proto3" json:"department_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateRoleAuthorizationRequest) Reset() {
+	*x = UpdateRoleAuthorizationRequest{}
+	mi := &file_admin_v1_management_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateRoleAuthorizationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateRoleAuthorizationRequest) ProtoMessage() {}
+
+func (x *UpdateRoleAuthorizationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateRoleAuthorizationRequest.ProtoReflect.Descriptor instead.
+func (*UpdateRoleAuthorizationRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *UpdateRoleAuthorizationRequest) GetRoleId() uint64 {
+	if x != nil {
+		return x.RoleId
+	}
+	return 0
+}
+
+func (x *UpdateRoleAuthorizationRequest) GetDataScope() uint32 {
+	if x != nil {
+		return x.DataScope
+	}
+	return 0
+}
+
+func (x *UpdateRoleAuthorizationRequest) GetGrants() []*RoleResourceGrant {
+	if x != nil {
+		return x.Grants
+	}
+	return nil
+}
+
+func (x *UpdateRoleAuthorizationRequest) GetDepartmentIds() []uint64 {
+	if x != nil {
+		return x.DepartmentIds
+	}
+	return nil
+}
+
+type UpdateRoleAuthorizationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoleId        uint64                 `protobuf:"varint,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateRoleAuthorizationResponse) Reset() {
+	*x = UpdateRoleAuthorizationResponse{}
+	mi := &file_admin_v1_management_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateRoleAuthorizationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateRoleAuthorizationResponse) ProtoMessage() {}
+
+func (x *UpdateRoleAuthorizationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateRoleAuthorizationResponse.ProtoReflect.Descriptor instead.
+func (*UpdateRoleAuthorizationResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *UpdateRoleAuthorizationResponse) GetRoleId() uint64 {
+	if x != nil {
+		return x.RoleId
+	}
+	return 0
+}
+
+type UpdateTenantFeaturesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      uint64                 `protobuf:"varint,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ResourceIds   []uint64               `protobuf:"varint,2,rep,packed,name=resource_ids,json=resourceIds,proto3" json:"resource_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTenantFeaturesRequest) Reset() {
+	*x = UpdateTenantFeaturesRequest{}
+	mi := &file_admin_v1_management_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTenantFeaturesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTenantFeaturesRequest) ProtoMessage() {}
+
+func (x *UpdateTenantFeaturesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTenantFeaturesRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTenantFeaturesRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UpdateTenantFeaturesRequest) GetTenantId() uint64 {
+	if x != nil {
+		return x.TenantId
+	}
+	return 0
+}
+
+func (x *UpdateTenantFeaturesRequest) GetResourceIds() []uint64 {
+	if x != nil {
+		return x.ResourceIds
+	}
+	return nil
+}
+
+type UpdateTenantFeaturesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      uint64                 `protobuf:"varint,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTenantFeaturesResponse) Reset() {
+	*x = UpdateTenantFeaturesResponse{}
+	mi := &file_admin_v1_management_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTenantFeaturesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTenantFeaturesResponse) ProtoMessage() {}
+
+func (x *UpdateTenantFeaturesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_management_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTenantFeaturesResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTenantFeaturesResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_management_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UpdateTenantFeaturesResponse) GetTenantId() uint64 {
+	if x != nil {
+		return x.TenantId
+	}
+	return 0
+}
+
 var File_admin_v1_management_proto protoreflect.FileDescriptor
 
 const file_admin_v1_management_proto_rawDesc = "" +
@@ -699,14 +959,32 @@ const file_admin_v1_management_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\"T\n" +
 	"\x1eTestProviderConnectionResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xcd\x06\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"R\n" +
+	"\x11RoleResourceGrant\x12#\n" +
+	"\rresource_code\x18\x01 \x01(\tR\fresourceCode\x12\x18\n" +
+	"\aactions\x18\x02 \x03(\tR\aactions\"\xb4\x01\n" +
+	"\x1eUpdateRoleAuthorizationRequest\x12\x17\n" +
+	"\arole_id\x18\x01 \x01(\x04R\x06roleId\x12\x1d\n" +
+	"\n" +
+	"data_scope\x18\x02 \x01(\rR\tdataScope\x123\n" +
+	"\x06grants\x18\x03 \x03(\v2\x1b.admin.v1.RoleResourceGrantR\x06grants\x12%\n" +
+	"\x0edepartment_ids\x18\x04 \x03(\x04R\rdepartmentIds\":\n" +
+	"\x1fUpdateRoleAuthorizationResponse\x12\x17\n" +
+	"\arole_id\x18\x01 \x01(\x04R\x06roleId\"]\n" +
+	"\x1bUpdateTenantFeaturesRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\x04R\btenantId\x12!\n" +
+	"\fresource_ids\x18\x02 \x03(\x04R\vresourceIds\";\n" +
+	"\x1cUpdateTenantFeaturesResponse\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\x04R\btenantId2\x9f\t\n" +
 	"\x11ManagementService\x12w\n" +
 	"\rListResources\x12\x1e.admin.v1.ListResourcesRequest\x1a\x1f.admin.v1.ListResourcesResponse\"%\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/management/{resource}\x12\x80\x01\n" +
 	"\x0eCreateResource\x12\x1f.admin.v1.CreateResourceRequest\x1a .admin.v1.CreateResourceResponse\"+\x82\xd3\xe4\x93\x02%:\x04data\"\x1d/api/v1/management/{resource}\x12\x85\x01\n" +
 	"\x0eUpdateResource\x12\x1f.admin.v1.UpdateResourceRequest\x1a .admin.v1.UpdateResourceResponse\"0\x82\xd3\xe4\x93\x02*:\x04data\x1a\"/api/v1/management/{resource}/{id}\x12\x7f\n" +
 	"\x0eDeleteResource\x12\x1f.admin.v1.DeleteResourceRequest\x1a .admin.v1.DeleteResourceResponse\"*\x82\xd3\xe4\x93\x02$*\"/api/v1/management/{resource}/{id}\x12\x89\x01\n" +
 	"\x14GetEffectiveSettings\x12%.admin.v1.GetEffectiveSettingsRequest\x1a&.admin.v1.GetEffectiveSettingsResponse\"\"\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/settings/effective\x12\xa6\x01\n" +
-	"\x16TestProviderConnection\x12'.admin.v1.TestProviderConnectionRequest\x1a(.admin.v1.TestProviderConnectionResponse\"9\x82\xd3\xe4\x93\x023\"1/api/v1/management/providers/{id}/connection-testB2Z0github.com/sleep-go/kratos-admin/api/admin/v1;v1b\x06proto3"
+	"\x16TestProviderConnection\x12'.admin.v1.TestProviderConnectionRequest\x1a(.admin.v1.TestProviderConnectionResponse\"9\x82\xd3\xe4\x93\x023\"1/api/v1/management/providers/{id}/connection-test\x12\xab\x01\n" +
+	"\x17UpdateRoleAuthorization\x12(.admin.v1.UpdateRoleAuthorizationRequest\x1a).admin.v1.UpdateRoleAuthorizationResponse\";\x82\xd3\xe4\x93\x025:\x01*\x1a0/api/v1/management/roles/{role_id}/authorization\x12\xa1\x01\n" +
+	"\x14UpdateTenantFeatures\x12%.admin.v1.UpdateTenantFeaturesRequest\x1a&.admin.v1.UpdateTenantFeaturesResponse\":\x82\xd3\xe4\x93\x024:\x01*\x1a//api/v1/management/tenants/{tenant_id}/featuresB2Z0github.com/sleep-go/kratos-admin/api/admin/v1;v1b\x06proto3"
 
 var (
 	file_admin_v1_management_proto_rawDescOnce sync.Once
@@ -720,46 +998,56 @@ func file_admin_v1_management_proto_rawDescGZIP() []byte {
 	return file_admin_v1_management_proto_rawDescData
 }
 
-var file_admin_v1_management_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_admin_v1_management_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_admin_v1_management_proto_goTypes = []any{
-	(*ListResourcesRequest)(nil),           // 0: admin.v1.ListResourcesRequest
-	(*ListResourcesResponse)(nil),          // 1: admin.v1.ListResourcesResponse
-	(*CreateResourceRequest)(nil),          // 2: admin.v1.CreateResourceRequest
-	(*UpdateResourceRequest)(nil),          // 3: admin.v1.UpdateResourceRequest
-	(*DeleteResourceRequest)(nil),          // 4: admin.v1.DeleteResourceRequest
-	(*CreateResourceResponse)(nil),         // 5: admin.v1.CreateResourceResponse
-	(*UpdateResourceResponse)(nil),         // 6: admin.v1.UpdateResourceResponse
-	(*DeleteResourceResponse)(nil),         // 7: admin.v1.DeleteResourceResponse
-	(*GetEffectiveSettingsRequest)(nil),    // 8: admin.v1.GetEffectiveSettingsRequest
-	(*GetEffectiveSettingsResponse)(nil),   // 9: admin.v1.GetEffectiveSettingsResponse
-	(*TestProviderConnectionRequest)(nil),  // 10: admin.v1.TestProviderConnectionRequest
-	(*TestProviderConnectionResponse)(nil), // 11: admin.v1.TestProviderConnectionResponse
-	nil,                                    // 12: admin.v1.ListResourcesRequest.FiltersEntry
-	(*structpb.Struct)(nil),                // 13: google.protobuf.Struct
+	(*ListResourcesRequest)(nil),            // 0: admin.v1.ListResourcesRequest
+	(*ListResourcesResponse)(nil),           // 1: admin.v1.ListResourcesResponse
+	(*CreateResourceRequest)(nil),           // 2: admin.v1.CreateResourceRequest
+	(*UpdateResourceRequest)(nil),           // 3: admin.v1.UpdateResourceRequest
+	(*DeleteResourceRequest)(nil),           // 4: admin.v1.DeleteResourceRequest
+	(*CreateResourceResponse)(nil),          // 5: admin.v1.CreateResourceResponse
+	(*UpdateResourceResponse)(nil),          // 6: admin.v1.UpdateResourceResponse
+	(*DeleteResourceResponse)(nil),          // 7: admin.v1.DeleteResourceResponse
+	(*GetEffectiveSettingsRequest)(nil),     // 8: admin.v1.GetEffectiveSettingsRequest
+	(*GetEffectiveSettingsResponse)(nil),    // 9: admin.v1.GetEffectiveSettingsResponse
+	(*TestProviderConnectionRequest)(nil),   // 10: admin.v1.TestProviderConnectionRequest
+	(*TestProviderConnectionResponse)(nil),  // 11: admin.v1.TestProviderConnectionResponse
+	(*RoleResourceGrant)(nil),               // 12: admin.v1.RoleResourceGrant
+	(*UpdateRoleAuthorizationRequest)(nil),  // 13: admin.v1.UpdateRoleAuthorizationRequest
+	(*UpdateRoleAuthorizationResponse)(nil), // 14: admin.v1.UpdateRoleAuthorizationResponse
+	(*UpdateTenantFeaturesRequest)(nil),     // 15: admin.v1.UpdateTenantFeaturesRequest
+	(*UpdateTenantFeaturesResponse)(nil),    // 16: admin.v1.UpdateTenantFeaturesResponse
+	nil,                                     // 17: admin.v1.ListResourcesRequest.FiltersEntry
+	(*structpb.Struct)(nil),                 // 18: google.protobuf.Struct
 }
 var file_admin_v1_management_proto_depIdxs = []int32{
-	12, // 0: admin.v1.ListResourcesRequest.filters:type_name -> admin.v1.ListResourcesRequest.FiltersEntry
-	13, // 1: admin.v1.ListResourcesResponse.items:type_name -> google.protobuf.Struct
-	13, // 2: admin.v1.CreateResourceRequest.data:type_name -> google.protobuf.Struct
-	13, // 3: admin.v1.UpdateResourceRequest.data:type_name -> google.protobuf.Struct
-	13, // 4: admin.v1.GetEffectiveSettingsResponse.items:type_name -> google.protobuf.Struct
-	0,  // 5: admin.v1.ManagementService.ListResources:input_type -> admin.v1.ListResourcesRequest
-	2,  // 6: admin.v1.ManagementService.CreateResource:input_type -> admin.v1.CreateResourceRequest
-	3,  // 7: admin.v1.ManagementService.UpdateResource:input_type -> admin.v1.UpdateResourceRequest
-	4,  // 8: admin.v1.ManagementService.DeleteResource:input_type -> admin.v1.DeleteResourceRequest
-	8,  // 9: admin.v1.ManagementService.GetEffectiveSettings:input_type -> admin.v1.GetEffectiveSettingsRequest
-	10, // 10: admin.v1.ManagementService.TestProviderConnection:input_type -> admin.v1.TestProviderConnectionRequest
-	1,  // 11: admin.v1.ManagementService.ListResources:output_type -> admin.v1.ListResourcesResponse
-	5,  // 12: admin.v1.ManagementService.CreateResource:output_type -> admin.v1.CreateResourceResponse
-	6,  // 13: admin.v1.ManagementService.UpdateResource:output_type -> admin.v1.UpdateResourceResponse
-	7,  // 14: admin.v1.ManagementService.DeleteResource:output_type -> admin.v1.DeleteResourceResponse
-	9,  // 15: admin.v1.ManagementService.GetEffectiveSettings:output_type -> admin.v1.GetEffectiveSettingsResponse
-	11, // 16: admin.v1.ManagementService.TestProviderConnection:output_type -> admin.v1.TestProviderConnectionResponse
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	17, // 0: admin.v1.ListResourcesRequest.filters:type_name -> admin.v1.ListResourcesRequest.FiltersEntry
+	18, // 1: admin.v1.ListResourcesResponse.items:type_name -> google.protobuf.Struct
+	18, // 2: admin.v1.CreateResourceRequest.data:type_name -> google.protobuf.Struct
+	18, // 3: admin.v1.UpdateResourceRequest.data:type_name -> google.protobuf.Struct
+	18, // 4: admin.v1.GetEffectiveSettingsResponse.items:type_name -> google.protobuf.Struct
+	12, // 5: admin.v1.UpdateRoleAuthorizationRequest.grants:type_name -> admin.v1.RoleResourceGrant
+	0,  // 6: admin.v1.ManagementService.ListResources:input_type -> admin.v1.ListResourcesRequest
+	2,  // 7: admin.v1.ManagementService.CreateResource:input_type -> admin.v1.CreateResourceRequest
+	3,  // 8: admin.v1.ManagementService.UpdateResource:input_type -> admin.v1.UpdateResourceRequest
+	4,  // 9: admin.v1.ManagementService.DeleteResource:input_type -> admin.v1.DeleteResourceRequest
+	8,  // 10: admin.v1.ManagementService.GetEffectiveSettings:input_type -> admin.v1.GetEffectiveSettingsRequest
+	10, // 11: admin.v1.ManagementService.TestProviderConnection:input_type -> admin.v1.TestProviderConnectionRequest
+	13, // 12: admin.v1.ManagementService.UpdateRoleAuthorization:input_type -> admin.v1.UpdateRoleAuthorizationRequest
+	15, // 13: admin.v1.ManagementService.UpdateTenantFeatures:input_type -> admin.v1.UpdateTenantFeaturesRequest
+	1,  // 14: admin.v1.ManagementService.ListResources:output_type -> admin.v1.ListResourcesResponse
+	5,  // 15: admin.v1.ManagementService.CreateResource:output_type -> admin.v1.CreateResourceResponse
+	6,  // 16: admin.v1.ManagementService.UpdateResource:output_type -> admin.v1.UpdateResourceResponse
+	7,  // 17: admin.v1.ManagementService.DeleteResource:output_type -> admin.v1.DeleteResourceResponse
+	9,  // 18: admin.v1.ManagementService.GetEffectiveSettings:output_type -> admin.v1.GetEffectiveSettingsResponse
+	11, // 19: admin.v1.ManagementService.TestProviderConnection:output_type -> admin.v1.TestProviderConnectionResponse
+	14, // 20: admin.v1.ManagementService.UpdateRoleAuthorization:output_type -> admin.v1.UpdateRoleAuthorizationResponse
+	16, // 21: admin.v1.ManagementService.UpdateTenantFeatures:output_type -> admin.v1.UpdateTenantFeaturesResponse
+	14, // [14:22] is the sub-list for method output_type
+	6,  // [6:14] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_admin_v1_management_proto_init() }
@@ -773,7 +1061,7 @@ func file_admin_v1_management_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_admin_v1_management_proto_rawDesc), len(file_admin_v1_management_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

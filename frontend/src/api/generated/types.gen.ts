@@ -71,6 +71,11 @@ export type AdminV1CurrentUser = {
     avatarUrl?: string;
     platformAdmin?: boolean;
     permissions?: Array<string>;
+    username?: string;
+    email?: string;
+    phone?: string;
+    mfaEnabled?: boolean;
+    mfaChannel?: string;
 };
 
 export type AdminV1DeleteFileResponse = {
@@ -114,6 +119,10 @@ export type AdminV1GetExportDownloadUrlResponse = {
 
 export type AdminV1GetExportResponse = {
     item?: AdminV1LogExport;
+};
+
+export type AdminV1ListNavigationResponse = {
+    items?: Array<AdminV1NavigationItem>;
 };
 
 export type AdminV1ListResourcesResponse = {
@@ -163,6 +172,17 @@ export type AdminV1LogoutResponse = {
     [key: string]: unknown;
 };
 
+export type AdminV1NavigationItem = {
+    id?: string;
+    parentId?: string;
+    code?: string;
+    name?: string;
+    routePath?: string;
+    componentKey?: string;
+    icon?: string;
+    sortOrder?: number;
+};
+
 export type AdminV1RefreshRequest = {
     [key: string]: unknown;
 };
@@ -191,6 +211,11 @@ export type AdminV1ResetPasswordResponse = {
 
 export type AdminV1RevokeSessionResponse = {
     [key: string]: unknown;
+};
+
+export type AdminV1RoleResourceGrant = {
+    resourceCode?: string;
+    actions?: Array<string>;
 };
 
 export type AdminV1Session = {
@@ -233,8 +258,39 @@ export type AdminV1TestProviderConnectionResponse = {
     message?: string;
 };
 
+export type AdminV1UpdateProfileRequest = {
+    displayName?: string;
+    avatarUrl?: string;
+    email?: string;
+    phone?: string;
+};
+
+export type AdminV1UpdateProfileResponse = {
+    user?: AdminV1CurrentUser;
+};
+
 export type AdminV1UpdateResourceResponse = {
     id?: string;
+};
+
+export type AdminV1UpdateRoleAuthorizationRequest = {
+    roleId?: string;
+    dataScope?: number;
+    grants?: Array<AdminV1RoleResourceGrant>;
+    departmentIds?: Array<string>;
+};
+
+export type AdminV1UpdateRoleAuthorizationResponse = {
+    roleId?: string;
+};
+
+export type AdminV1UpdateTenantFeaturesRequest = {
+    tenantId?: string;
+    resourceIds?: Array<string>;
+};
+
+export type AdminV1UpdateTenantFeaturesResponse = {
+    tenantId?: string;
 };
 
 export type AdminV1VerifyMfaRequest = {
@@ -403,6 +459,56 @@ export type AuthServiceVerifyMfaResponses = {
 };
 
 export type AuthServiceVerifyMfaResponse = AuthServiceVerifyMfaResponses[keyof AuthServiceVerifyMfaResponses];
+
+export type AuthServiceListNavigationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/navigation';
+};
+
+export type AuthServiceListNavigationErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type AuthServiceListNavigationError = AuthServiceListNavigationErrors[keyof AuthServiceListNavigationErrors];
+
+export type AuthServiceListNavigationResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1ListNavigationResponse;
+};
+
+export type AuthServiceListNavigationResponse = AuthServiceListNavigationResponses[keyof AuthServiceListNavigationResponses];
+
+export type AuthServiceUpdateProfileData = {
+    body: AdminV1UpdateProfileRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/profile';
+};
+
+export type AuthServiceUpdateProfileErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type AuthServiceUpdateProfileError = AuthServiceUpdateProfileErrors[keyof AuthServiceUpdateProfileErrors];
+
+export type AuthServiceUpdateProfileResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1UpdateProfileResponse;
+};
+
+export type AuthServiceUpdateProfileResponse = AuthServiceUpdateProfileResponses[keyof AuthServiceUpdateProfileResponses];
 
 export type AuthServiceRefreshData = {
     body: AdminV1RefreshRequest;
@@ -823,6 +929,60 @@ export type ManagementServiceTestProviderConnectionResponses = {
 };
 
 export type ManagementServiceTestProviderConnectionResponse = ManagementServiceTestProviderConnectionResponses[keyof ManagementServiceTestProviderConnectionResponses];
+
+export type ManagementServiceUpdateRoleAuthorizationData = {
+    body: AdminV1UpdateRoleAuthorizationRequest;
+    path: {
+        roleId: string;
+    };
+    query?: never;
+    url: '/api/v1/management/roles/{roleId}/authorization';
+};
+
+export type ManagementServiceUpdateRoleAuthorizationErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type ManagementServiceUpdateRoleAuthorizationError = ManagementServiceUpdateRoleAuthorizationErrors[keyof ManagementServiceUpdateRoleAuthorizationErrors];
+
+export type ManagementServiceUpdateRoleAuthorizationResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1UpdateRoleAuthorizationResponse;
+};
+
+export type ManagementServiceUpdateRoleAuthorizationResponse = ManagementServiceUpdateRoleAuthorizationResponses[keyof ManagementServiceUpdateRoleAuthorizationResponses];
+
+export type ManagementServiceUpdateTenantFeaturesData = {
+    body: AdminV1UpdateTenantFeaturesRequest;
+    path: {
+        tenantId: string;
+    };
+    query?: never;
+    url: '/api/v1/management/tenants/{tenantId}/features';
+};
+
+export type ManagementServiceUpdateTenantFeaturesErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type ManagementServiceUpdateTenantFeaturesError = ManagementServiceUpdateTenantFeaturesErrors[keyof ManagementServiceUpdateTenantFeaturesErrors];
+
+export type ManagementServiceUpdateTenantFeaturesResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1UpdateTenantFeaturesResponse;
+};
+
+export type ManagementServiceUpdateTenantFeaturesResponse = ManagementServiceUpdateTenantFeaturesResponses[keyof ManagementServiceUpdateTenantFeaturesResponses];
 
 export type ManagementServiceListResourcesData = {
     body?: never;

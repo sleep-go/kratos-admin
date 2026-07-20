@@ -7,6 +7,7 @@ import {
 } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { resolveNavigation } from '@/features/navigation/registry'
 
 const managementRoutes: Array<[string, string, string]> = [
   ['platform/users', 'user-management', 'users'],
@@ -14,9 +15,7 @@ const managementRoutes: Array<[string, string, string]> = [
   ['organization/users', 'member-management', 'members'],
   ['organization/departments', 'department-management', 'departments'],
   ['organization/positions', 'position-management', 'positions'],
-  ['permission/roles', 'role-management', 'roles'],
   ['permission/resources', 'resource-management', 'resources'],
-  ['permission/tenant-features', 'tenant-resource-management', 'tenant-resources'],
   ['permission/policies', 'policy-management', 'casbin-rules'],
   ['logs/login', 'login-logs', 'login-logs'],
   ['logs/audit', 'audit-logs', 'audit-logs'],
@@ -66,9 +65,24 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/settings/ProviderManagementView.vue')
       },
       {
+        path: 'permission/roles',
+        name: 'role-management',
+        component: () => import('@/views/permission/RolePermissionView.vue')
+      },
+      {
+        path: 'permission/tenant-features',
+        name: 'tenant-resource-management',
+        component: () => import('@/views/permission/TenantFeatureView.vue')
+      },
+      {
         path: 'settings',
         name: 'system-settings',
         component: () => import('@/views/settings/SystemSettingsView.vue')
+      },
+      {
+        path: 'account',
+        name: 'user-center',
+        component: () => import('@/views/account/UserCenterView.vue')
       },
       ...managementRoutes.map(([path, name, resourceKey]) => ({
         path,
@@ -95,6 +109,12 @@ export function createAppRouter(mode: 'web' | 'memory' = 'web') {
     }
     if (to.meta.guestOnly && authStore.isAuthenticated) {
       return { name: 'dashboard' }
+    }
+    if (authStore.isAuthenticated && !to.meta.guestOnly && !['/', '/account'].includes(to.path)) {
+      const allowed = resolveNavigation(authStore.navigationItems).some(
+        (item) => item.to === to.path
+      )
+      if (!allowed) return { name: 'dashboard' }
     }
   })
 

@@ -25,6 +25,8 @@ const OperationManagementServiceGetEffectiveSettings = "/admin.v1.ManagementServ
 const OperationManagementServiceListResources = "/admin.v1.ManagementService/ListResources"
 const OperationManagementServiceTestProviderConnection = "/admin.v1.ManagementService/TestProviderConnection"
 const OperationManagementServiceUpdateResource = "/admin.v1.ManagementService/UpdateResource"
+const OperationManagementServiceUpdateRoleAuthorization = "/admin.v1.ManagementService/UpdateRoleAuthorization"
+const OperationManagementServiceUpdateTenantFeatures = "/admin.v1.ManagementService/UpdateTenantFeatures"
 
 type ManagementServiceHTTPServer interface {
 	CreateResource(context.Context, *CreateResourceRequest) (*CreateResourceResponse, error)
@@ -33,6 +35,8 @@ type ManagementServiceHTTPServer interface {
 	ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error)
 	TestProviderConnection(context.Context, *TestProviderConnectionRequest) (*TestProviderConnectionResponse, error)
 	UpdateResource(context.Context, *UpdateResourceRequest) (*UpdateResourceResponse, error)
+	UpdateRoleAuthorization(context.Context, *UpdateRoleAuthorizationRequest) (*UpdateRoleAuthorizationResponse, error)
+	UpdateTenantFeatures(context.Context, *UpdateTenantFeaturesRequest) (*UpdateTenantFeaturesResponse, error)
 }
 
 func RegisterManagementServiceHTTPServer(s *http.Server, srv ManagementServiceHTTPServer) {
@@ -43,6 +47,8 @@ func RegisterManagementServiceHTTPServer(s *http.Server, srv ManagementServiceHT
 	r.DELETE("/api/v1/management/{resource}/{id}", _ManagementService_DeleteResource0_HTTP_Handler(srv))
 	r.GET("/api/v1/settings/effective", _ManagementService_GetEffectiveSettings0_HTTP_Handler(srv))
 	r.POST("/api/v1/management/providers/{id}/connection-test", _ManagementService_TestProviderConnection0_HTTP_Handler(srv))
+	r.PUT("/api/v1/management/roles/{role_id}/authorization", _ManagementService_UpdateRoleAuthorization0_HTTP_Handler(srv))
+	r.PUT("/api/v1/management/tenants/{tenant_id}/features", _ManagementService_UpdateTenantFeatures0_HTTP_Handler(srv))
 }
 
 func _ManagementService_ListResources0_HTTP_Handler(srv ManagementServiceHTTPServer) func(ctx http.Context) error {
@@ -180,6 +186,56 @@ func _ManagementService_TestProviderConnection0_HTTP_Handler(srv ManagementServi
 	}
 }
 
+func _ManagementService_UpdateRoleAuthorization0_HTTP_Handler(srv ManagementServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateRoleAuthorizationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationManagementServiceUpdateRoleAuthorization)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateRoleAuthorization(ctx, req.(*UpdateRoleAuthorizationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*UpdateRoleAuthorizationResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _ManagementService_UpdateTenantFeatures0_HTTP_Handler(srv ManagementServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateTenantFeaturesRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationManagementServiceUpdateTenantFeatures)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateTenantFeatures(ctx, req.(*UpdateTenantFeaturesRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*UpdateTenantFeaturesResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type ManagementServiceHTTPClient interface {
 	CreateResource(ctx context.Context, req *CreateResourceRequest, opts ...http.CallOption) (rsp *CreateResourceResponse, err error)
 	DeleteResource(ctx context.Context, req *DeleteResourceRequest, opts ...http.CallOption) (rsp *DeleteResourceResponse, err error)
@@ -187,6 +243,8 @@ type ManagementServiceHTTPClient interface {
 	ListResources(ctx context.Context, req *ListResourcesRequest, opts ...http.CallOption) (rsp *ListResourcesResponse, err error)
 	TestProviderConnection(ctx context.Context, req *TestProviderConnectionRequest, opts ...http.CallOption) (rsp *TestProviderConnectionResponse, err error)
 	UpdateResource(ctx context.Context, req *UpdateResourceRequest, opts ...http.CallOption) (rsp *UpdateResourceResponse, err error)
+	UpdateRoleAuthorization(ctx context.Context, req *UpdateRoleAuthorizationRequest, opts ...http.CallOption) (rsp *UpdateRoleAuthorizationResponse, err error)
+	UpdateTenantFeatures(ctx context.Context, req *UpdateTenantFeaturesRequest, opts ...http.CallOption) (rsp *UpdateTenantFeaturesResponse, err error)
 }
 
 type ManagementServiceHTTPClientImpl struct {
@@ -269,6 +327,32 @@ func (c *ManagementServiceHTTPClientImpl) UpdateResource(ctx context.Context, in
 	opts = append(opts, http.Operation(OperationManagementServiceUpdateResource))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "PUT", path, in.Data, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *ManagementServiceHTTPClientImpl) UpdateRoleAuthorization(ctx context.Context, in *UpdateRoleAuthorizationRequest, opts ...http.CallOption) (*UpdateRoleAuthorizationResponse, error) {
+	var out UpdateRoleAuthorizationResponse
+	pattern := "/api/v1/management/roles/{role_id}/authorization"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationManagementServiceUpdateRoleAuthorization))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *ManagementServiceHTTPClientImpl) UpdateTenantFeatures(ctx context.Context, in *UpdateTenantFeaturesRequest, opts ...http.CallOption) (*UpdateTenantFeaturesResponse, error) {
+	var out UpdateTenantFeaturesResponse
+	pattern := "/api/v1/management/tenants/{tenant_id}/features"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationManagementServiceUpdateTenantFeatures))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

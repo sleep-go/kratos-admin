@@ -24,8 +24,19 @@ func (r *fakeLoginRecorder) RecordLogin(_ context.Context, record LoginLogRecord
 }
 
 type fakeSessionHandler struct {
-	sessions []bizauth.DeviceSession
-	revoked  string
+	sessions   []bizauth.DeviceSession
+	revoked    string
+	profile    bizauth.UserProfile
+	navigation []bizauth.NavigationItem
+}
+
+func (h *fakeSessionHandler) Navigation(context.Context, uint64, uint64, bool) ([]bizauth.NavigationItem, error) {
+	return h.navigation, nil
+}
+
+func (h *fakeSessionHandler) UpdateProfile(_ context.Context, _ uint64, displayName, avatarURL, email, phone string) (bizauth.UserProfile, error) {
+	h.profile = bizauth.UserProfile{ID: 8, DisplayName: displayName, AvatarURL: avatarURL, Email: email, Phone: phone}
+	return h.profile, nil
 }
 
 type fakeCaptchaHandler struct{ verified bool }
@@ -177,5 +188,27 @@ func TestListAndRevokeSessionUseAuthenticatedUser(t *testing.T) {
 	}
 	if handler.revoked != "device-2" {
 		t.Fatalf("revoked = %q", handler.revoked)
+	}
+}
+
+func TestUpdateProfileUsesAuthenticatedUser(t *testing.T) {
+	handler := &fakeSessionHandler{}
+	service := NewAuthService(&fakeLoginHandler{}, false, handler)
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 8})
+
+	reply, err := service.UpdateProfile(ctx, &v1.UpdateProfileRequest{DisplayName: "新名称", Email: "new@example.com"})
+	if err != nil || reply.User.GetId() != 8 || handler.profile.DisplayName != "新名称" {
+		t.Fatalf("UpdateProfile() = %+v, profile = %+v, err = %v", reply, handler.profile, err)
+	}
+}
+
+func TestListNavigationUsesAuthenticatedTenantAndMember(t *testing.T) {
+	handler := &fakeSessionHandler{navigation: []bizauth.NavigationItem{{ID: 9, Code: "files", Name: "文件管理", ComponentKey: "files"}}}
+	service := NewAuthService(&fakeLoginHandler{}, false, handler)
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 8, TenantID: 10, MemberID: 20})
+
+	reply, err := service.ListNavigation(ctx, &v1.ListNavigationRequest{})
+	if err != nil || len(reply.Items) != 1 || reply.Items[0].GetComponentKey() != "files" {
+		t.Fatalf("ListNavigation() = %+v, err = %v", reply, err)
 	}
 }

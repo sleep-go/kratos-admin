@@ -33,6 +33,18 @@ service ManagementService {
   rpc TestProviderConnection(TestProviderConnectionRequest) returns (TestProviderConnectionResponse) {
     option (google.api.http) = {post: "/api/v1/management/providers/{id}/connection-test"};
   }
+  rpc UpdateRoleAuthorization(UpdateRoleAuthorizationRequest) returns (UpdateRoleAuthorizationResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/management/roles/{role_id}/authorization"
+      body: "*"
+    };
+  }
+  rpc UpdateTenantFeatures(UpdateTenantFeaturesRequest) returns (UpdateTenantFeaturesResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/management/tenants/{tenant_id}/features"
+      body: "*"
+    };
+  }
 }
 
 message ListResourcesRequest {
@@ -94,4 +106,29 @@ message TestProviderConnectionRequest {
 message TestProviderConnectionResponse {
   bool success = 1;
   string message = 2;
+}
+
+message RoleResourceGrant {
+  string resource_code = 1;
+  repeated string actions = 2;
+}
+
+message UpdateRoleAuthorizationRequest {
+  uint64 role_id = 1;
+  uint32 data_scope = 2;
+  repeated RoleResourceGrant grants = 3;
+  repeated uint64 department_ids = 4;
+}
+
+message UpdateRoleAuthorizationResponse {
+  uint64 role_id = 1;
+}
+
+message UpdateTenantFeaturesRequest {
+  uint64 tenant_id = 1;
+  repeated uint64 resource_ids = 2;
+}
+
+message UpdateTenantFeaturesResponse {
+  uint64 tenant_id = 1;
 }

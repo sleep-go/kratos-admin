@@ -164,6 +164,25 @@ func (r *AuthRepository) ResetLoginFailures(ctx context.Context, userID uint64) 
 	return err
 }
 
+// UpdateProfile 更新当前账号允许自行维护的资料字段。
+func (r *AuthRepository) UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) error {
+	u := r.q.User
+	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID), u.DeletedAt.IsNull()).Updates(map[string]any{
+		"display_name": displayName,
+		"avatar_url":   nullableString(avatarURL),
+		"email":        nullableString(email),
+		"phone":        nullableString(phone),
+	})
+	return err
+}
+
+func nullableString(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
 // Create 持久化 refresh 会话，数据库仅保存 jti 摘要。
 func (r *AuthRepository) Create(ctx context.Context, session bizauth.Session) error {
 	return r.q.AuthSession.WithContext(ctx).Create(&model.AuthSession{
@@ -260,6 +279,55 @@ func (r *AuthRepository) List(ctx context.Context, userID uint64) ([]bizauth.Dev
 		items = append(items, bizauth.DeviceSession{
 			ID: row.ID, TenantID: row.TenantID, DeviceName: row.DeviceName,
 			IP: row.IP, UserAgent: row.UserAgent, CreatedAt: row.CreatedAt, ExpiresAt: row.ExpiresAt,
+		})
+	}
+	return items, nil
+}
+
+// ListNavigation 仅返回当前可信权限上下文可见的目录与菜单资源。
+func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]bizauth.NavigationItem, error) {
+	type row struct {
+		ID           uint64
+		ParentID     uint64
+		Code         string
+		Name         string
+		RoutePath    string
+		ComponentKey string
+		Icon         string
+		SortOrder    uint32
+	}
+	query := r.db.WithContext(ctx).Table("resources AS res").
+		Select("DISTINCT res.id, res.parent_id, res.code, res.name, res.route_path, res.component_key, res.icon, res.sort_order").
+		Where("res.type IN (1, 2) AND res.visible = 1 AND res.status = 1 AND res.deleted_at IS NULL")
+	if platformAdmin && tenantID == 0 {
+		query = query.Where("res.code IN ?", []string{
+			"users", "tenants", "resources", "tenant-resources", "login-logs", "audit-logs",
+			"api-logs", "log-exports", "settings", "providers", "dictionary-types", "dictionary-items",
+		})
+	}
+	if !platformAdmin {
+		var tenantAdmin bool
+		if err := r.db.WithContext(ctx).Table("tenant_members").Select("is_tenant_admin").
+			Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", memberID, tenantID).
+			Scan(&tenantAdmin).Error; err != nil {
+			return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)
+		}
+		query = query.Joins("JOIN tenant_resources AS tr ON tr.resource_id = res.id AND tr.tenant_id = ?", tenantID)
+		if !tenantAdmin {
+			query = query.
+				Joins("JOIN casbin_rules AS p ON p.ptype = 'p' AND p.v0 = ? AND p.v2 = res.code", fmt.Sprint(tenantID)).
+				Joins("JOIN casbin_rules AS g ON g.ptype = 'g' AND g.v0 = p.v0 AND g.v2 = p.v1 AND g.v1 = ?", fmt.Sprint(memberID))
+		}
+	}
+	var rows []row
+	if err := query.Order("res.sort_order ASC, res.id ASC").Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("查询授权菜单失败: %w", err)
+	}
+	items := make([]bizauth.NavigationItem, 0, len(rows))
+	for _, item := range rows {
+		items = append(items, bizauth.NavigationItem{
+			ID: item.ID, ParentID: item.ParentID, Code: item.Code, Name: item.Name,
+			RoutePath: item.RoutePath, ComponentKey: item.ComponentKey, Icon: item.Icon, SortOrder: item.SortOrder,
 		})
 	}
 	return items, nil

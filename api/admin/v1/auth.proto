@@ -57,6 +57,15 @@ service AuthService {
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse) {
     option (google.api.http) = {delete: "/api/v1/auth/sessions/{session_id}"};
   }
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/auth/profile"
+      body: "*"
+    };
+  }
+  rpc ListNavigation(ListNavigationRequest) returns (ListNavigationResponse) {
+    option (google.api.http) = {get: "/api/v1/auth/navigation"};
+  }
 }
 
 message GetCaptchaRequest {}
@@ -78,6 +87,11 @@ message CurrentUser {
   string avatar_url = 3;
   bool platform_admin = 4;
   repeated string permissions = 5;
+  string username = 6;
+  string email = 7;
+  string phone = 8;
+  bool mfa_enabled = 9;
+  string mfa_channel = 10;
 }
 
 message LoginRequest {
@@ -175,3 +189,31 @@ message RevokeSessionRequest {
 }
 
 message RevokeSessionResponse {}
+
+message UpdateProfileRequest {
+  string display_name = 1;
+  string avatar_url = 2;
+  string email = 3;
+  string phone = 4;
+}
+
+message UpdateProfileResponse {
+  CurrentUser user = 1;
+}
+
+message NavigationItem {
+  uint64 id = 1;
+  uint64 parent_id = 2;
+  string code = 3;
+  string name = 4;
+  string route_path = 5;
+  string component_key = 6;
+  string icon = 7;
+  uint32 sort_order = 8;
+}
+
+message ListNavigationRequest {}
+
+message ListNavigationResponse {
+  repeated NavigationItem items = 1;
+}

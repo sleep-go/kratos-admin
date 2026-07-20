@@ -124,8 +124,13 @@ type LoginResult struct {
 // UserProfile 描述登录响应中可安全返回的用户资料。
 type UserProfile struct {
 	ID            uint64
+	Username      string
 	DisplayName   string
 	AvatarURL     string
+	Email         string
+	Phone         string
+	MFAEnabled    bool
+	MFAChannel    string
 	PlatformAdmin bool
 	Permissions   []string
 }
@@ -248,10 +253,19 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 	}
 	return LoginResult{
 		Tokens:        tokens,
-		User:          UserProfile{ID: user.ID, DisplayName: user.DisplayName, AvatarURL: user.AvatarURL, PlatformAdmin: user.PlatformAdmin, Permissions: permissions},
+		User:          user.Profile(permissions),
 		CurrentTenant: TenantOption{ID: selected.TenantID, Name: selected.TenantName},
 		Tenants:       options,
 	}, nil
+}
+
+// Profile 返回只包含可安全下发给当前账号的资料。
+func (u User) Profile(permissions []string) UserProfile {
+	return UserProfile{
+		ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarURL: u.AvatarURL,
+		Email: u.Email, Phone: u.Phone, MFAEnabled: u.MFAEnabled, MFAChannel: u.MFAChannel,
+		PlatformAdmin: u.PlatformAdmin, Permissions: permissions,
+	}
 }
 
 func (u *LoginUsecase) recordFailure(ctx context.Context, user *User, now time.Time) error {

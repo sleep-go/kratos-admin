@@ -14,6 +14,7 @@ import (
 
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
 	permissionbiz "github.com/sleep-go/kratos-admin/backend/internal/biz/permission"
@@ -141,7 +142,7 @@ func (r *ManagementRepository) List(ctx context.Context, scope service.ResourceS
 		return nil, 0, errors.New("资源类型不存在")
 	}
 	query := r.db.WithContext(ctx).Table(definition.table)
-	if definition.tenantScoped && (!scope.PlatformAdmin || resource == "settings" || resource == "providers") {
+	if definition.tenantScoped && (scope.TenantID != 0 || resource == "settings" || resource == "providers") {
 		query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
 	}
 	if definition.softDelete {
@@ -375,7 +376,7 @@ func (r *ManagementRepository) Update(ctx context.Context, scope service.Resourc
 	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		query := tx.Table(definition.table).Where("id = ?", id)
-		if definition.tenantScoped && !scope.PlatformAdmin {
+		if definition.tenantScoped && (scope.TenantID != 0 || !scope.PlatformAdmin) {
 			query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
 		}
 		query, err = r.applyDataScope(ctx, query, scope, resource)
@@ -399,9 +400,174 @@ func (r *ManagementRepository) Update(ctx context.Context, scope service.Resourc
 	})
 }
 
+// UpdateRoleAuthorization 在单个事务内替换角色授权、数据范围并递增权限版本。
+func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scope service.ResourceScope, roleID uint64, dataScope uint32, grants []service.RoleGrant, departmentIDs []uint64) error {
+	if scope.TenantID == 0 {
+		return errors.New("角色授权必须在租户上下文执行")
+	}
+	if dataScope < 1 || dataScope > 5 {
+		return errors.New("数据范围取值无效")
+	}
+	allowedActions := map[string]struct{}{
+		"list": {}, "create": {}, "update": {}, "delete": {}, "export": {}, "download": {},
+	}
+	policies := make([]model.CasbinRule, 0)
+	seenPolicies := make(map[string]struct{})
+	for _, grant := range grants {
+		code := strings.TrimSpace(grant.ResourceCode)
+		if code == "" {
+			return errors.New("授权资源编码不能为空")
+		}
+		for _, action := range grant.Actions {
+			if _, allowed := allowedActions[action]; !allowed {
+				return fmt.Errorf("资源动作 %s 不受支持", action)
+			}
+			key := code + ":" + action
+			if _, exists := seenPolicies[key]; exists {
+				continue
+			}
+			seenPolicies[key] = struct{}{}
+			policies = append(policies, model.CasbinRule{
+				Ptype: "p", V0: fmt.Sprint(scope.TenantID), V1: fmt.Sprint(roleID), V2: code, V3: action,
+			})
+		}
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var role model.Role
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", roleID, scope.TenantID).
+			Take(&role).Error; err != nil {
+			return errors.New("角色不存在或已禁用")
+		}
+		if len(seenPolicies) > 0 {
+			codes := make([]string, 0, len(seenPolicies))
+			codeSet := make(map[string]struct{})
+			for _, policy := range policies {
+				if _, exists := codeSet[policy.V2]; !exists {
+					codeSet[policy.V2] = struct{}{}
+					codes = append(codes, policy.V2)
+				}
+			}
+			var count int64
+			if err := tx.Table("tenant_resources AS tr").
+				Joins("JOIN resources AS res ON res.id = tr.resource_id AND res.code IN ? AND res.status = 1 AND res.deleted_at IS NULL", codes).
+				Where("tr.tenant_id = ?", scope.TenantID).Distinct("res.code").Count(&count).Error; err != nil {
+				return err
+			}
+			if count != int64(len(codes)) {
+				return errors.New("角色授权包含租户未获授权的资源")
+			}
+		}
+		if dataScope == 5 && len(departmentIDs) > 0 {
+			var count int64
+			if err := tx.Table("departments").Where("tenant_id = ? AND id IN ? AND status = 1 AND deleted_at IS NULL", scope.TenantID, departmentIDs).
+				Distinct("id").Count(&count).Error; err != nil {
+				return err
+			}
+			if count != int64(len(uniqueUint64(departmentIDs))) {
+				return errors.New("自定义数据范围包含无效部门")
+			}
+		}
+		if err := tx.Model(&model.Role{}).Where("id = ? AND tenant_id = ?", roleID, scope.TenantID).
+			Update("data_scope", dataScope).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("ptype = 'p' AND v0 = ? AND v1 = ?", fmt.Sprint(scope.TenantID), fmt.Sprint(roleID)).Delete(&model.CasbinRule{}).Error; err != nil {
+			return err
+		}
+		if len(policies) > 0 {
+			if err := tx.Create(&policies).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("tenant_id = ? AND role_id = ?", scope.TenantID, roleID).Delete(&model.RoleScopeDepartment{}).Error; err != nil {
+			return err
+		}
+		if dataScope == 5 {
+			rows := make([]model.RoleScopeDepartment, 0, len(departmentIDs))
+			for _, departmentID := range uniqueUint64(departmentIDs) {
+				rows = append(rows, model.RoleScopeDepartment{TenantID: scope.TenantID, RoleID: roleID, DepartmentID: departmentID})
+			}
+			if len(rows) > 0 {
+				if err := tx.Create(&rows).Error; err != nil {
+					return err
+				}
+			}
+		}
+		if err := tx.Table("tenants").Where("id = ? AND deleted_at IS NULL", scope.TenantID).
+			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error; err != nil {
+			return err
+		}
+		return writeAuditOutbox(tx, scope, "update_authorization", "roles", fmt.Sprint(roleID), map[string]any{
+			"data_scope": dataScope, "grant_count": len(policies), "department_count": len(departmentIDs),
+		})
+	})
+}
+
+// UpdateTenantFeatures 在单个事务内替换租户可用功能并递增权限版本。
+func (r *ManagementRepository) UpdateTenantFeatures(ctx context.Context, scope service.ResourceScope, tenantID uint64, resourceIDs []uint64) error {
+	if !scope.PlatformAdmin || tenantID == 0 {
+		return errors.New("仅平台管理员可配置租户功能")
+	}
+	resourceIDs = uniqueUint64(resourceIDs)
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tenant model.Tenant
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", tenantID).Take(&tenant).Error; err != nil {
+			return errors.New("目标租户不存在")
+		}
+		if len(resourceIDs) > 0 {
+			var count int64
+			if err := tx.Table("resources").Where("id IN ? AND status = 1 AND deleted_at IS NULL", resourceIDs).
+				Distinct("id").Count(&count).Error; err != nil {
+				return err
+			}
+			if count != int64(len(resourceIDs)) {
+				return errors.New("租户功能集合包含无效资源")
+			}
+		}
+		if err := tx.Where("tenant_id = ?", tenantID).Delete(&model.TenantResource{}).Error; err != nil {
+			return err
+		}
+		rows := make([]model.TenantResource, 0, len(resourceIDs))
+		for _, resourceID := range resourceIDs {
+			rows = append(rows, model.TenantResource{TenantID: tenantID, ResourceID: resourceID, CreatedBy: scope.UserID})
+		}
+		if len(rows) > 0 {
+			if err := tx.Create(&rows).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Model(&model.Tenant{}).Where("id = ?", tenantID).
+			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error; err != nil {
+			return err
+		}
+		auditScope := scope
+		auditScope.TenantID = tenantID
+		return writeAuditOutbox(tx, auditScope, "update_features", "tenants", fmt.Sprint(tenantID), map[string]any{"resource_count": len(resourceIDs)})
+	})
+}
+
+func uniqueUint64(values []uint64) []uint64 {
+	seen := make(map[uint64]struct{}, len(values))
+	result := make([]uint64, 0, len(values))
+	for _, value := range values {
+		if value == 0 {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
 func targetTenantID(scope service.ResourceScope, data map[string]any) uint64 {
 	if scope.PlatformAdmin {
-		return numericID(data["target_tenant_id"])
+		if target := numericID(data["target_tenant_id"]); target != 0 {
+			return target
+		}
 	}
 	return scope.TenantID
 }
@@ -573,7 +739,7 @@ func (r *ManagementRepository) Delete(ctx context.Context, scope service.Resourc
 			}
 		}
 		query := tx.Table(definition.table).Where("id = ?", id)
-		if definition.tenantScoped && !scope.PlatformAdmin {
+		if definition.tenantScoped && (scope.TenantID != 0 || !scope.PlatformAdmin) {
 			query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
 		}
 		query, err := r.applyDataScope(ctx, query, scope, resource)

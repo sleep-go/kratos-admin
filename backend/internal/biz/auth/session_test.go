@@ -17,6 +17,21 @@ type fakeSessionManagerRepository struct {
 	permissions []string
 	rotated     bool
 	revoked     bool
+	profileName string
+	profileURL  string
+	profileMail string
+	profileTel  string
+	navigation  []NavigationItem
+}
+
+func (r *fakeSessionManagerRepository) ListNavigation(_ context.Context, _, _ uint64, _ bool) ([]NavigationItem, error) {
+	return r.navigation, nil
+}
+
+func (r *fakeSessionManagerRepository) UpdateProfile(_ context.Context, _ uint64, displayName, avatarURL, email, phone string) error {
+	r.profileName, r.profileURL, r.profileMail, r.profileTel = displayName, avatarURL, email, phone
+	r.user.DisplayName, r.user.AvatarURL, r.user.Email, r.user.Phone = displayName, avatarURL, email, phone
+	return nil
 }
 
 func (r *fakeSessionManagerRepository) ListPermissions(_ context.Context, _, _ uint64, platformAdmin bool) ([]string, error) {
@@ -108,6 +123,18 @@ func TestProfileRestoresUserAndTenantContext(t *testing.T) {
 	}
 	if len(profile.User.Permissions) != 1 || profile.User.Permissions[0] != "roles:list" {
 		t.Fatalf("permissions = %+v", profile.User.Permissions)
+	}
+}
+
+func TestUpdateProfilePersistsSafeAccountFields(t *testing.T) {
+	usecase, repository, _, _ := newSessionUsecaseFixture(t)
+
+	profile, err := usecase.UpdateProfile(context.Background(), 1, " 新名称 ", "https://cdn.example/avatar.png", "new@example.com", "13800138000")
+	if err != nil {
+		t.Fatalf("UpdateProfile() error = %v", err)
+	}
+	if repository.profileName != "新名称" || profile.DisplayName != "新名称" || profile.Email != "new@example.com" {
+		t.Fatalf("profile = %+v, repository = %+v", profile, repository)
 	}
 }
 
@@ -205,5 +232,15 @@ func TestListSessionsMarksCurrentDevice(t *testing.T) {
 	items, err := usecase.List(context.Background(), 1, "session")
 	if err != nil || len(items) != 2 || !items[0].Current || items[1].Current {
 		t.Fatalf("List() = %+v, err %v", items, err)
+	}
+}
+
+func TestNavigationUsesTrustedTokenScope(t *testing.T) {
+	usecase, repository, _, _ := newSessionUsecaseFixture(t)
+	repository.navigation = []NavigationItem{{ID: 9, Code: "files", Name: "文件管理", RoutePath: "/files", ComponentKey: "files"}}
+
+	items, err := usecase.Navigation(context.Background(), 10, 20, false)
+	if err != nil || len(items) != 1 || items[0].ComponentKey != "files" {
+		t.Fatalf("Navigation() = %+v, err = %v", items, err)
 	}
 }

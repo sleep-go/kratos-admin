@@ -2,7 +2,9 @@ import { http } from './http'
 import type {
   AdminV1GetEffectiveSettingsResponse,
   AdminV1ListResourcesResponse,
-  AdminV1TestProviderConnectionResponse
+  AdminV1TestProviderConnectionResponse,
+  AdminV1UpdateRoleAuthorizationRequest,
+  AdminV1UpdateTenantFeaturesRequest
 } from './generated'
 
 export type ResourceRow = Record<string, unknown>
@@ -39,4 +41,14 @@ export async function testProviderConnection(id: string) {
     `/management/providers/${id}/connection-test`
   )
   return response.data
+}
+
+export async function updateRoleAuthorization(request: AdminV1UpdateRoleAuthorizationRequest) {
+  if (!request.roleId) throw new Error('角色 ID 不能为空')
+  await http.put(`/management/roles/${encodeURIComponent(request.roleId)}/authorization`, request)
+}
+
+export async function updateTenantFeatures(request: AdminV1UpdateTenantFeaturesRequest) {
+  if (!request.tenantId) throw new Error('租户 ID 不能为空')
+  await http.put(`/management/tenants/${encodeURIComponent(request.tenantId)}/features`, request)
 }

@@ -13,6 +13,20 @@ type fakeManagementRepository struct {
 	filters        map[string]string
 	effectiveRows  []map[string]any
 	providerTested uint64
+	roleID         uint64
+	roleScope      uint32
+	tenantID       uint64
+	featureIDs     []uint64
+}
+
+func (r *fakeManagementRepository) UpdateTenantFeatures(_ context.Context, _ ResourceScope, tenantID uint64, resourceIDs []uint64) error {
+	r.tenantID, r.featureIDs = tenantID, resourceIDs
+	return nil
+}
+
+func (r *fakeManagementRepository) UpdateRoleAuthorization(_ context.Context, _ ResourceScope, roleID uint64, dataScope uint32, _ []RoleGrant, _ []uint64) error {
+	r.roleID, r.roleScope = roleID, dataScope
+	return nil
 }
 
 type fakePermissionChecker struct{ allowed bool }
@@ -123,5 +137,31 @@ func TestProviderConnectionTestRequiresUpdatePermission(t *testing.T) {
 	}
 	if repository.providerTested != 0 {
 		t.Fatalf("providerTested = %d", repository.providerTested)
+	}
+}
+
+func TestUpdateRoleAuthorizationIsSingleAuthorizedOperation(t *testing.T) {
+	repository := &fakeManagementRepository{}
+	service := NewManagementService(repository, fakePermissionChecker{allowed: true})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+
+	_, err := service.UpdateRoleAuthorization(ctx, &v1.UpdateRoleAuthorizationRequest{
+		RoleId: 12, DataScope: 5,
+		Grants:        []*v1.RoleResourceGrant{{ResourceCode: "files", Actions: []string{"list", "download"}}},
+		DepartmentIds: []uint64{3, 4},
+	})
+	if err != nil || repository.roleID != 12 || repository.roleScope != 5 {
+		t.Fatalf("UpdateRoleAuthorization() role=%d scope=%d err=%v", repository.roleID, repository.roleScope, err)
+	}
+}
+
+func TestUpdateTenantFeaturesRequiresPlatformAdministrator(t *testing.T) {
+	repository := &fakeManagementRepository{}
+	service := NewManagementService(repository)
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, PlatformAdmin: true})
+
+	_, err := service.UpdateTenantFeatures(ctx, &v1.UpdateTenantFeaturesRequest{TenantId: 10, ResourceIds: []uint64{2, 3}})
+	if err != nil || repository.tenantID != 10 || len(repository.featureIDs) != 2 {
+		t.Fatalf("UpdateTenantFeatures() tenant=%d resources=%v err=%v", repository.tenantID, repository.featureIDs, err)
 	}
 }

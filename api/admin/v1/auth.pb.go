@@ -178,6 +178,11 @@ type CurrentUser struct {
 	AvatarUrl     string                 `protobuf:"bytes,3,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
 	PlatformAdmin bool                   `protobuf:"varint,4,opt,name=platform_admin,json=platformAdmin,proto3" json:"platform_admin,omitempty"`
 	Permissions   []string               `protobuf:"bytes,5,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	Username      string                 `protobuf:"bytes,6,opt,name=username,proto3" json:"username,omitempty"`
+	Email         string                 `protobuf:"bytes,7,opt,name=email,proto3" json:"email,omitempty"`
+	Phone         string                 `protobuf:"bytes,8,opt,name=phone,proto3" json:"phone,omitempty"`
+	MfaEnabled    bool                   `protobuf:"varint,9,opt,name=mfa_enabled,json=mfaEnabled,proto3" json:"mfa_enabled,omitempty"`
+	MfaChannel    string                 `protobuf:"bytes,10,opt,name=mfa_channel,json=mfaChannel,proto3" json:"mfa_channel,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -245,6 +250,41 @@ func (x *CurrentUser) GetPermissions() []string {
 		return x.Permissions
 	}
 	return nil
+}
+
+func (x *CurrentUser) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *CurrentUser) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *CurrentUser) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+func (x *CurrentUser) GetMfaEnabled() bool {
+	if x != nil {
+		return x.MfaEnabled
+	}
+	return false
+}
+
+func (x *CurrentUser) GetMfaChannel() string {
+	if x != nil {
+		return x.MfaChannel
+	}
+	return ""
 }
 
 type LoginRequest struct {
@@ -1291,6 +1331,298 @@ func (*RevokeSessionResponse) Descriptor() ([]byte, []int) {
 	return file_admin_v1_auth_proto_rawDescGZIP(), []int{22}
 }
 
+type UpdateProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DisplayName   string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	AvatarUrl     string                 `protobuf:"bytes,2,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	Phone         string                 `protobuf:"bytes,4,opt,name=phone,proto3" json:"phone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateProfileRequest) Reset() {
+	*x = UpdateProfileRequest{}
+	mi := &file_admin_v1_auth_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateProfileRequest) ProtoMessage() {}
+
+func (x *UpdateProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_auth_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateProfileRequest.ProtoReflect.Descriptor instead.
+func (*UpdateProfileRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_auth_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *UpdateProfileRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *UpdateProfileRequest) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *UpdateProfileRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *UpdateProfileRequest) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+type UpdateProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *CurrentUser           `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateProfileResponse) Reset() {
+	*x = UpdateProfileResponse{}
+	mi := &file_admin_v1_auth_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateProfileResponse) ProtoMessage() {}
+
+func (x *UpdateProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_auth_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateProfileResponse.ProtoReflect.Descriptor instead.
+func (*UpdateProfileResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_auth_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *UpdateProfileResponse) GetUser() *CurrentUser {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+type NavigationItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ParentId      uint64                 `protobuf:"varint,2,opt,name=parent_id,json=parentId,proto3" json:"parent_id,omitempty"`
+	Code          string                 `protobuf:"bytes,3,opt,name=code,proto3" json:"code,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	RoutePath     string                 `protobuf:"bytes,5,opt,name=route_path,json=routePath,proto3" json:"route_path,omitempty"`
+	ComponentKey  string                 `protobuf:"bytes,6,opt,name=component_key,json=componentKey,proto3" json:"component_key,omitempty"`
+	Icon          string                 `protobuf:"bytes,7,opt,name=icon,proto3" json:"icon,omitempty"`
+	SortOrder     uint32                 `protobuf:"varint,8,opt,name=sort_order,json=sortOrder,proto3" json:"sort_order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NavigationItem) Reset() {
+	*x = NavigationItem{}
+	mi := &file_admin_v1_auth_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NavigationItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NavigationItem) ProtoMessage() {}
+
+func (x *NavigationItem) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_auth_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NavigationItem.ProtoReflect.Descriptor instead.
+func (*NavigationItem) Descriptor() ([]byte, []int) {
+	return file_admin_v1_auth_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *NavigationItem) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *NavigationItem) GetParentId() uint64 {
+	if x != nil {
+		return x.ParentId
+	}
+	return 0
+}
+
+func (x *NavigationItem) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *NavigationItem) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *NavigationItem) GetRoutePath() string {
+	if x != nil {
+		return x.RoutePath
+	}
+	return ""
+}
+
+func (x *NavigationItem) GetComponentKey() string {
+	if x != nil {
+		return x.ComponentKey
+	}
+	return ""
+}
+
+func (x *NavigationItem) GetIcon() string {
+	if x != nil {
+		return x.Icon
+	}
+	return ""
+}
+
+func (x *NavigationItem) GetSortOrder() uint32 {
+	if x != nil {
+		return x.SortOrder
+	}
+	return 0
+}
+
+type ListNavigationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNavigationRequest) Reset() {
+	*x = ListNavigationRequest{}
+	mi := &file_admin_v1_auth_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNavigationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNavigationRequest) ProtoMessage() {}
+
+func (x *ListNavigationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_auth_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNavigationRequest.ProtoReflect.Descriptor instead.
+func (*ListNavigationRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_auth_proto_rawDescGZIP(), []int{26}
+}
+
+type ListNavigationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*NavigationItem      `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNavigationResponse) Reset() {
+	*x = ListNavigationResponse{}
+	mi := &file_admin_v1_auth_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNavigationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNavigationResponse) ProtoMessage() {}
+
+func (x *ListNavigationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_auth_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNavigationResponse.ProtoReflect.Descriptor instead.
+func (*ListNavigationResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_auth_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ListNavigationResponse) GetItems() []*NavigationItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 var File_admin_v1_auth_proto protoreflect.FileDescriptor
 
 const file_admin_v1_auth_proto_rawDesc = "" +
@@ -1305,14 +1637,22 @@ const file_admin_v1_auth_proto_rawDesc = "" +
 	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"3\n" +
 	"\rTenantSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xa8\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xb2\x02\n" +
 	"\vCurrentUser\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
 	"avatar_url\x18\x03 \x01(\tR\tavatarUrl\x12%\n" +
 	"\x0eplatform_admin\x18\x04 \x01(\bR\rplatformAdmin\x12 \n" +
-	"\vpermissions\x18\x05 \x03(\tR\vpermissions\"\xad\x01\n" +
+	"\vpermissions\x18\x05 \x03(\tR\vpermissions\x12\x1a\n" +
+	"\busername\x18\x06 \x01(\tR\busername\x12\x14\n" +
+	"\x05email\x18\a \x01(\tR\x05email\x12\x14\n" +
+	"\x05phone\x18\b \x01(\tR\x05phone\x12\x1f\n" +
+	"\vmfa_enabled\x18\t \x01(\bR\n" +
+	"mfaEnabled\x12\x1f\n" +
+	"\vmfa_channel\x18\n" +
+	" \x01(\tR\n" +
+	"mfaChannel\"\xad\x01\n" +
 	"\fLoginRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +
@@ -1392,7 +1732,30 @@ const file_admin_v1_auth_proto_rawDesc = "" +
 	"\x14RevokeSessionRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\"\x17\n" +
-	"\x15RevokeSessionResponse2\xcc\b\n" +
+	"\x15RevokeSessionResponse\"\x84\x01\n" +
+	"\x14UpdateProfileRequest\x12!\n" +
+	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\x02 \x01(\tR\tavatarUrl\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
+	"\x05phone\x18\x04 \x01(\tR\x05phone\"B\n" +
+	"\x15UpdateProfileResponse\x12)\n" +
+	"\x04user\x18\x01 \x01(\v2\x15.admin.v1.CurrentUserR\x04user\"\xdc\x01\n" +
+	"\x0eNavigationItem\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x1b\n" +
+	"\tparent_id\x18\x02 \x01(\x04R\bparentId\x12\x12\n" +
+	"\x04code\x18\x03 \x01(\tR\x04code\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\x12\x1d\n" +
+	"\n" +
+	"route_path\x18\x05 \x01(\tR\troutePath\x12#\n" +
+	"\rcomponent_key\x18\x06 \x01(\tR\fcomponentKey\x12\x12\n" +
+	"\x04icon\x18\a \x01(\tR\x04icon\x12\x1d\n" +
+	"\n" +
+	"sort_order\x18\b \x01(\rR\tsortOrder\"\x17\n" +
+	"\x15ListNavigationRequest\"H\n" +
+	"\x16ListNavigationResponse\x12.\n" +
+	"\x05items\x18\x01 \x03(\v2\x18.admin.v1.NavigationItemR\x05items2\xb5\n" +
+	"\n" +
 	"\vAuthService\x12e\n" +
 	"\n" +
 	"GetCaptcha\x12\x1b.admin.v1.GetCaptchaRequest\x1a\x1c.admin.v1.GetCaptchaResponse\"\x1c\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/auth/captcha\x12W\n" +
@@ -1404,7 +1767,9 @@ const file_admin_v1_auth_proto_rawDesc = "" +
 	"\x0eForgotPassword\x12\x1f.admin.v1.ForgotPasswordRequest\x1a .admin.v1.ForgotPasswordResponse\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/api/v1/auth/forgot-password\x12x\n" +
 	"\rResetPassword\x12\x1e.admin.v1.ResetPasswordRequest\x1a\x1f.admin.v1.ResetPasswordResponse\"&\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/auth/reset-password\x12l\n" +
 	"\fListSessions\x12\x1d.admin.v1.ListSessionsRequest\x1a\x1e.admin.v1.ListSessionsResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/auth/sessions\x12|\n" +
-	"\rRevokeSession\x12\x1e.admin.v1.RevokeSessionRequest\x1a\x1f.admin.v1.RevokeSessionResponse\"*\x82\xd3\xe4\x93\x02$*\"/api/v1/auth/sessions/{session_id}B2Z0github.com/sleep-go/kratos-admin/api/admin/v1;v1b\x06proto3"
+	"\rRevokeSession\x12\x1e.admin.v1.RevokeSessionRequest\x1a\x1f.admin.v1.RevokeSessionResponse\"*\x82\xd3\xe4\x93\x02$*\"/api/v1/auth/sessions/{session_id}\x12q\n" +
+	"\rUpdateProfile\x12\x1e.admin.v1.UpdateProfileRequest\x1a\x1f.admin.v1.UpdateProfileResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\x1a\x14/api/v1/auth/profile\x12t\n" +
+	"\x0eListNavigation\x12\x1f.admin.v1.ListNavigationRequest\x1a .admin.v1.ListNavigationResponse\"\x1f\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1/auth/navigationB2Z0github.com/sleep-go/kratos-admin/api/admin/v1;v1b\x06proto3"
 
 var (
 	file_admin_v1_auth_proto_rawDescOnce sync.Once
@@ -1418,7 +1783,7 @@ func file_admin_v1_auth_proto_rawDescGZIP() []byte {
 	return file_admin_v1_auth_proto_rawDescData
 }
 
-var file_admin_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_admin_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_admin_v1_auth_proto_goTypes = []any{
 	(*GetCaptchaRequest)(nil),      // 0: admin.v1.GetCaptchaRequest
 	(*GetCaptchaResponse)(nil),     // 1: admin.v1.GetCaptchaResponse
@@ -1443,53 +1808,64 @@ var file_admin_v1_auth_proto_goTypes = []any{
 	(*ListSessionsResponse)(nil),   // 20: admin.v1.ListSessionsResponse
 	(*RevokeSessionRequest)(nil),   // 21: admin.v1.RevokeSessionRequest
 	(*RevokeSessionResponse)(nil),  // 22: admin.v1.RevokeSessionResponse
-	(*timestamppb.Timestamp)(nil),  // 23: google.protobuf.Timestamp
+	(*UpdateProfileRequest)(nil),   // 23: admin.v1.UpdateProfileRequest
+	(*UpdateProfileResponse)(nil),  // 24: admin.v1.UpdateProfileResponse
+	(*NavigationItem)(nil),         // 25: admin.v1.NavigationItem
+	(*ListNavigationRequest)(nil),  // 26: admin.v1.ListNavigationRequest
+	(*ListNavigationResponse)(nil), // 27: admin.v1.ListNavigationResponse
+	(*timestamppb.Timestamp)(nil),  // 28: google.protobuf.Timestamp
 }
 var file_admin_v1_auth_proto_depIdxs = []int32{
-	23, // 0: admin.v1.GetCaptchaResponse.expires_at:type_name -> google.protobuf.Timestamp
-	23, // 1: admin.v1.LoginResponse.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 0: admin.v1.GetCaptchaResponse.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 1: admin.v1.LoginResponse.expires_at:type_name -> google.protobuf.Timestamp
 	3,  // 2: admin.v1.LoginResponse.user:type_name -> admin.v1.CurrentUser
 	2,  // 3: admin.v1.LoginResponse.tenants:type_name -> admin.v1.TenantSummary
 	2,  // 4: admin.v1.LoginResponse.current_tenant:type_name -> admin.v1.TenantSummary
-	23, // 5: admin.v1.VerifyMfaResponse.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 5: admin.v1.VerifyMfaResponse.expires_at:type_name -> google.protobuf.Timestamp
 	3,  // 6: admin.v1.VerifyMfaResponse.user:type_name -> admin.v1.CurrentUser
 	2,  // 7: admin.v1.VerifyMfaResponse.tenants:type_name -> admin.v1.TenantSummary
 	2,  // 8: admin.v1.VerifyMfaResponse.current_tenant:type_name -> admin.v1.TenantSummary
-	23, // 9: admin.v1.RefreshResponse.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 9: admin.v1.RefreshResponse.expires_at:type_name -> google.protobuf.Timestamp
 	3,  // 10: admin.v1.RefreshResponse.user:type_name -> admin.v1.CurrentUser
 	2,  // 11: admin.v1.RefreshResponse.tenants:type_name -> admin.v1.TenantSummary
 	2,  // 12: admin.v1.RefreshResponse.current_tenant:type_name -> admin.v1.TenantSummary
-	23, // 13: admin.v1.SwitchTenantResponse.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 13: admin.v1.SwitchTenantResponse.expires_at:type_name -> google.protobuf.Timestamp
 	2,  // 14: admin.v1.SwitchTenantResponse.current_tenant:type_name -> admin.v1.TenantSummary
-	23, // 15: admin.v1.ForgotPasswordResponse.expires_at:type_name -> google.protobuf.Timestamp
-	23, // 16: admin.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	23, // 17: admin.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 15: admin.v1.ForgotPasswordResponse.expires_at:type_name -> google.protobuf.Timestamp
+	28, // 16: admin.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	28, // 17: admin.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
 	18, // 18: admin.v1.ListSessionsResponse.items:type_name -> admin.v1.Session
-	0,  // 19: admin.v1.AuthService.GetCaptcha:input_type -> admin.v1.GetCaptchaRequest
-	4,  // 20: admin.v1.AuthService.Login:input_type -> admin.v1.LoginRequest
-	6,  // 21: admin.v1.AuthService.VerifyMfa:input_type -> admin.v1.VerifyMfaRequest
-	8,  // 22: admin.v1.AuthService.Refresh:input_type -> admin.v1.RefreshRequest
-	10, // 23: admin.v1.AuthService.Logout:input_type -> admin.v1.LogoutRequest
-	12, // 24: admin.v1.AuthService.SwitchTenant:input_type -> admin.v1.SwitchTenantRequest
-	14, // 25: admin.v1.AuthService.ForgotPassword:input_type -> admin.v1.ForgotPasswordRequest
-	16, // 26: admin.v1.AuthService.ResetPassword:input_type -> admin.v1.ResetPasswordRequest
-	19, // 27: admin.v1.AuthService.ListSessions:input_type -> admin.v1.ListSessionsRequest
-	21, // 28: admin.v1.AuthService.RevokeSession:input_type -> admin.v1.RevokeSessionRequest
-	1,  // 29: admin.v1.AuthService.GetCaptcha:output_type -> admin.v1.GetCaptchaResponse
-	5,  // 30: admin.v1.AuthService.Login:output_type -> admin.v1.LoginResponse
-	7,  // 31: admin.v1.AuthService.VerifyMfa:output_type -> admin.v1.VerifyMfaResponse
-	9,  // 32: admin.v1.AuthService.Refresh:output_type -> admin.v1.RefreshResponse
-	11, // 33: admin.v1.AuthService.Logout:output_type -> admin.v1.LogoutResponse
-	13, // 34: admin.v1.AuthService.SwitchTenant:output_type -> admin.v1.SwitchTenantResponse
-	15, // 35: admin.v1.AuthService.ForgotPassword:output_type -> admin.v1.ForgotPasswordResponse
-	17, // 36: admin.v1.AuthService.ResetPassword:output_type -> admin.v1.ResetPasswordResponse
-	20, // 37: admin.v1.AuthService.ListSessions:output_type -> admin.v1.ListSessionsResponse
-	22, // 38: admin.v1.AuthService.RevokeSession:output_type -> admin.v1.RevokeSessionResponse
-	29, // [29:39] is the sub-list for method output_type
-	19, // [19:29] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	3,  // 19: admin.v1.UpdateProfileResponse.user:type_name -> admin.v1.CurrentUser
+	25, // 20: admin.v1.ListNavigationResponse.items:type_name -> admin.v1.NavigationItem
+	0,  // 21: admin.v1.AuthService.GetCaptcha:input_type -> admin.v1.GetCaptchaRequest
+	4,  // 22: admin.v1.AuthService.Login:input_type -> admin.v1.LoginRequest
+	6,  // 23: admin.v1.AuthService.VerifyMfa:input_type -> admin.v1.VerifyMfaRequest
+	8,  // 24: admin.v1.AuthService.Refresh:input_type -> admin.v1.RefreshRequest
+	10, // 25: admin.v1.AuthService.Logout:input_type -> admin.v1.LogoutRequest
+	12, // 26: admin.v1.AuthService.SwitchTenant:input_type -> admin.v1.SwitchTenantRequest
+	14, // 27: admin.v1.AuthService.ForgotPassword:input_type -> admin.v1.ForgotPasswordRequest
+	16, // 28: admin.v1.AuthService.ResetPassword:input_type -> admin.v1.ResetPasswordRequest
+	19, // 29: admin.v1.AuthService.ListSessions:input_type -> admin.v1.ListSessionsRequest
+	21, // 30: admin.v1.AuthService.RevokeSession:input_type -> admin.v1.RevokeSessionRequest
+	23, // 31: admin.v1.AuthService.UpdateProfile:input_type -> admin.v1.UpdateProfileRequest
+	26, // 32: admin.v1.AuthService.ListNavigation:input_type -> admin.v1.ListNavigationRequest
+	1,  // 33: admin.v1.AuthService.GetCaptcha:output_type -> admin.v1.GetCaptchaResponse
+	5,  // 34: admin.v1.AuthService.Login:output_type -> admin.v1.LoginResponse
+	7,  // 35: admin.v1.AuthService.VerifyMfa:output_type -> admin.v1.VerifyMfaResponse
+	9,  // 36: admin.v1.AuthService.Refresh:output_type -> admin.v1.RefreshResponse
+	11, // 37: admin.v1.AuthService.Logout:output_type -> admin.v1.LogoutResponse
+	13, // 38: admin.v1.AuthService.SwitchTenant:output_type -> admin.v1.SwitchTenantResponse
+	15, // 39: admin.v1.AuthService.ForgotPassword:output_type -> admin.v1.ForgotPasswordResponse
+	17, // 40: admin.v1.AuthService.ResetPassword:output_type -> admin.v1.ResetPasswordResponse
+	20, // 41: admin.v1.AuthService.ListSessions:output_type -> admin.v1.ListSessionsResponse
+	22, // 42: admin.v1.AuthService.RevokeSession:output_type -> admin.v1.RevokeSessionResponse
+	24, // 43: admin.v1.AuthService.UpdateProfile:output_type -> admin.v1.UpdateProfileResponse
+	27, // 44: admin.v1.AuthService.ListNavigation:output_type -> admin.v1.ListNavigationResponse
+	33, // [33:45] is the sub-list for method output_type
+	21, // [21:33] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_admin_v1_auth_proto_init() }
@@ -1503,7 +1879,7 @@ func file_admin_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_admin_v1_auth_proto_rawDesc), len(file_admin_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   23,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -41,6 +42,18 @@ type DeviceSession struct {
 	Current    bool
 }
 
+// NavigationItem 描述服务端授权后可下发的菜单资源。
+type NavigationItem struct {
+	ID           uint64
+	ParentID     uint64
+	Code         string
+	Name         string
+	RoutePath    string
+	ComponentKey string
+	Icon         string
+	SortOrder    uint32
+}
+
 // SessionManagerRepository 定义 refresh 轮换、撤销和租户切换的数据访问能力。
 type SessionManagerRepository interface {
 	Find(ctx context.Context, sessionID string) (SessionRecord, error)
@@ -51,6 +64,8 @@ type SessionManagerRepository interface {
 	Revoke(ctx context.Context, sessionID string, userID uint64) error
 	FindMembership(ctx context.Context, userID, tenantID uint64) (Membership, error)
 	List(ctx context.Context, userID uint64) ([]DeviceSession, error)
+	UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) error
+	ListNavigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]NavigationItem, error)
 }
 
 // SessionProfile 描述 refresh 后恢复前端会话所需的安全用户与租户上下文。
@@ -122,7 +137,7 @@ func (u *SessionUsecase) Profile(ctx context.Context, userID, tenantID uint64) (
 		return SessionProfile{}, err
 	}
 	profile := SessionProfile{
-		User:    UserProfile{ID: user.ID, DisplayName: user.DisplayName, AvatarURL: user.AvatarURL, PlatformAdmin: user.PlatformAdmin},
+		User:    user.Profile(nil),
 		Tenants: make([]TenantOption, 0, len(memberships)),
 	}
 	if tenantID == 0 && user.PlatformAdmin {
@@ -154,6 +169,25 @@ func (u *SessionUsecase) Profile(ctx context.Context, userID, tenantID uint64) (
 	}
 	profile.User.Permissions = permissions
 	return profile, nil
+}
+
+// UpdateProfile 更新当前账号可自行维护的非敏感资料。
+func (u *SessionUsecase) UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) (UserProfile, error) {
+	displayName = strings.TrimSpace(displayName)
+	avatarURL = strings.TrimSpace(avatarURL)
+	email = strings.TrimSpace(email)
+	phone = strings.TrimSpace(phone)
+	if displayName == "" {
+		return UserProfile{}, errors.New("显示名称不能为空")
+	}
+	if err := u.repository.UpdateProfile(ctx, userID, displayName, avatarURL, email, phone); err != nil {
+		return UserProfile{}, err
+	}
+	user, err := u.repository.FindUser(ctx, userID)
+	if err != nil {
+		return UserProfile{}, err
+	}
+	return user.Profile(nil), nil
 }
 
 // SwitchTenant 重新校验目标租户成员身份，并绑定新租户轮换整对令牌。
@@ -208,6 +242,11 @@ func (u *SessionUsecase) List(ctx context.Context, userID uint64, currentSession
 		items[index].Current = items[index].ID == currentSessionID
 	}
 	return items, nil
+}
+
+// Navigation 按令牌中的可信租户、成员身份返回可见菜单。
+func (u *SessionUsecase) Navigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]NavigationItem, error) {
+	return u.repository.ListNavigation(ctx, tenantID, memberID, platformAdmin)
 }
 
 // Logout 根据签名有效的 refresh token 撤销对应服务端会话。

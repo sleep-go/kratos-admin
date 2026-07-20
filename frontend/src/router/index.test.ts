@@ -35,4 +35,18 @@ describe('路由鉴权', () => {
 
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
+
+  it('拒绝访问未出现在服务端菜单中的编译期页面', async () => {
+    const authStore = useAuthStore()
+    authStore.accessToken = 'token'
+    authStore.sessionRestored = true
+    authStore.currentUser = { id: '1', displayName: '普通用户', platformAdmin: false }
+    authStore.navigationItems = [{ name: '文件管理', routePath: '/files', componentKey: 'files' }]
+    const router = createAppRouter('memory')
+
+    await router.push('/permission/roles')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('dashboard')
+  })
 })

@@ -4,12 +4,14 @@ import { defineStore } from 'pinia'
 import * as authApi from '@/api/auth'
 import { setAccessToken } from '@/api/http'
 import type { CurrentUser, LoginRequest, TenantSummary } from '@/types/auth'
+import type { AdminV1NavigationItem } from '@/api/generated'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = shallowRef('')
   const currentUser = ref<CurrentUser | null>(null)
   const tenants = ref<TenantSummary[]>([])
   const currentTenant = ref<TenantSummary | null>(null)
+  const navigationItems = ref<AdminV1NavigationItem[]>([])
   const loading = shallowRef(false)
   const sessionRestored = shallowRef(false)
   const isAuthenticated = computed(() => Boolean(accessToken.value && currentUser.value))
@@ -30,6 +32,7 @@ export const useAuthStore = defineStore('auth', () => {
       tenants.value = response.tenants ?? []
       currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
       setAccessToken(response.accessToken)
+      await loadNavigation()
       sessionRestored.value = true
       return response
     } finally {
@@ -51,6 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
       tenants.value = response.tenants ?? []
       currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
       setAccessToken(response.accessToken)
+      await loadNavigation()
       return true
     } catch {
       clearSession()
@@ -58,6 +62,19 @@ export const useAuthStore = defineStore('auth', () => {
     } finally {
       sessionRestored.value = true
     }
+  }
+
+  async function renewSession() {
+    const response = await authApi.refresh()
+    if (!response.accessToken || !response.user) {
+      throw new Error('刷新响应缺少访问令牌或用户资料')
+    }
+    accessToken.value = response.accessToken
+    currentUser.value = response.user
+    tenants.value = response.tenants ?? []
+    currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
+    setAccessToken(response.accessToken)
+    await loadNavigation()
   }
 
   async function verifyMfa(challengeId: string, code: string) {
@@ -72,6 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
       tenants.value = response.tenants ?? []
       currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
       setAccessToken(response.accessToken)
+      await loadNavigation()
       sessionRestored.value = true
       return response
     } finally {
@@ -95,6 +113,7 @@ export const useAuthStore = defineStore('auth', () => {
       tenants.value = response.tenants ?? []
       currentTenant.value = response.currentTenant ?? switched.currentTenant ?? null
       setAccessToken(response.accessToken)
+      await loadNavigation()
     } catch (error) {
       clearSession()
       throw error
@@ -112,11 +131,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function applyProfile(profile: CurrentUser) {
+    currentUser.value = { ...currentUser.value, ...profile }
+  }
+
+  async function loadNavigation() {
+    try {
+      navigationItems.value = (await authApi.listNavigation()).items ?? []
+    } catch {
+      navigationItems.value = []
+    }
+  }
+
   function clearSession() {
     accessToken.value = ''
     currentUser.value = null
     tenants.value = []
     currentTenant.value = null
+    navigationItems.value = []
     setAccessToken(null)
   }
 
@@ -125,14 +157,18 @@ export const useAuthStore = defineStore('auth', () => {
     currentUser,
     tenants,
     currentTenant,
+    navigationItems,
     loading,
     isAuthenticated,
     sessionRestored,
     login,
     restoreSession,
+    renewSession,
     verifyMfa,
     switchTenant,
     logout,
+    applyProfile,
+    loadNavigation,
     clearSession
   }
 })

@@ -29,6 +29,12 @@ type PageQuery struct {
 	Filters  map[string]string
 }
 
+// RoleGrant 描述角色对单个资源的动作集合。
+type RoleGrant struct {
+	ResourceCode string
+	Actions      []string
+}
+
 // ManagementRepository 定义白名单后台资源的统一持久化接口。
 type ManagementRepository interface {
 	List(ctx context.Context, scope ResourceScope, resource string, query PageQuery) ([]map[string]any, uint64, error)
@@ -37,6 +43,8 @@ type ManagementRepository interface {
 	Delete(ctx context.Context, scope ResourceScope, resource string, id uint64) error
 	EffectiveSettings(ctx context.Context, scope ResourceScope, category string) ([]map[string]any, error)
 	TestProviderConnection(ctx context.Context, scope ResourceScope, id uint64) error
+	UpdateRoleAuthorization(ctx context.Context, scope ResourceScope, roleID uint64, dataScope uint32, grants []RoleGrant, departmentIDs []uint64) error
+	UpdateTenantFeatures(ctx context.Context, scope ResourceScope, tenantID uint64, resourceIDs []uint64) error
 }
 
 // GetEffectiveSettings 返回按代码默认、平台默认和租户覆盖解析后的有效设置。
@@ -79,6 +87,43 @@ func (s *ManagementService) TestProviderConnection(ctx context.Context, request 
 		return nil, kratoserrors.BadRequest("PROVIDER_CONNECTION_FAILED", err.Error())
 	}
 	return &v1.TestProviderConnectionResponse{Success: true, Message: "连接测试成功"}, nil
+}
+
+// UpdateRoleAuthorization 在单个事务内替换角色资源授权与数据范围。
+func (s *ManagementService) UpdateRoleAuthorization(ctx context.Context, request *v1.UpdateRoleAuthorizationRequest) (*v1.UpdateRoleAuthorizationResponse, error) {
+	scope, err := managementScope(ctx, "roles")
+	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, scope, "roles", "update"); err != nil {
+		return nil, err
+	}
+	if request.GetRoleId() == 0 {
+		return nil, kratoserrors.BadRequest("ROLE_ID_REQUIRED", "角色ID不能为空")
+	}
+	grants := make([]RoleGrant, 0, len(request.GetGrants()))
+	for _, grant := range request.GetGrants() {
+		grants = append(grants, RoleGrant{ResourceCode: grant.GetResourceCode(), Actions: grant.GetActions()})
+	}
+	if err := s.repository.UpdateRoleAuthorization(ctx, scope, request.GetRoleId(), request.GetDataScope(), grants, request.GetDepartmentIds()); err != nil {
+		return nil, mapManagementError(err)
+	}
+	return &v1.UpdateRoleAuthorizationResponse{RoleId: request.GetRoleId()}, nil
+}
+
+// UpdateTenantFeatures 在单个事务内替换目标租户功能授权。
+func (s *ManagementService) UpdateTenantFeatures(ctx context.Context, request *v1.UpdateTenantFeaturesRequest) (*v1.UpdateTenantFeaturesResponse, error) {
+	scope, err := managementScope(ctx, "tenant-resources")
+	if err != nil {
+		return nil, err
+	}
+	if request.GetTenantId() == 0 {
+		return nil, kratoserrors.BadRequest("TENANT_ID_REQUIRED", "租户ID不能为空")
+	}
+	if err := s.repository.UpdateTenantFeatures(ctx, scope, request.GetTenantId(), request.GetResourceIds()); err != nil {
+		return nil, mapManagementError(err)
+	}
+	return &v1.UpdateTenantFeaturesResponse{TenantId: request.GetTenantId()}, nil
 }
 
 // ManagementPermissionChecker 定义后台资源动作的 Casbin 权限检查能力。

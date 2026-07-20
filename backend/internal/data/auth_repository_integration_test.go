@@ -51,6 +51,13 @@ func TestAuthRepositoryWithMySQL8(t *testing.T) {
 	if err != nil || len(memberships) != 1 || memberships[0].PermissionVersion != 7 {
 		t.Fatalf("ListMemberships() = %+v, %v", memberships, err)
 	}
+	if err := repository.UpdateProfile(context.Background(), user.ID, "新名称", "", "new@example.com", "13800138000"); err != nil {
+		t.Fatalf("UpdateProfile() error = %v", err)
+	}
+	updated, err := repository.FindUser(context.Background(), user.ID)
+	if err != nil || updated.DisplayName != "新名称" || updated.Email != "new@example.com" {
+		t.Fatalf("FindUser() after update = %+v, %v", updated, err)
+	}
 	if err := repository.Create(context.Background(), bizauth.Session{
 		ID: "550e8400-e29b-41d4-a716-446655440000", UserID: user.ID, TenantID: tenant.ID,
 		MemberID: member.ID, RefreshJTIHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -88,7 +95,7 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 	if err := tx.Create(role).Error; err != nil {
 		t.Fatal(err)
 	}
-	resource := &model.Resource{Type: 4, Code: "audit-logs", Name: "审计日志", Visible: true, Status: 1}
+	resource := &model.Resource{Type: 4, Code: "integration-audit-logs", Name: "集成审计日志", Visible: true, Status: 1}
 	if err := tx.Create(resource).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -98,20 +105,34 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 	if err := tx.Create(&model.CasbinRule{Ptype: "g", V0: fmt.Sprint(tenant.ID), V1: fmt.Sprint(member.ID), V2: fmt.Sprint(role.ID)}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.Create(&model.CasbinRule{Ptype: "p", V0: fmt.Sprint(tenant.ID), V1: fmt.Sprint(role.ID), V2: "audit-logs", V3: "list"}).Error; err != nil {
+	if err := tx.Create(&model.CasbinRule{Ptype: "p", V0: fmt.Sprint(tenant.ID), V1: fmt.Sprint(role.ID), V2: "integration-audit-logs", V3: "list"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	menu := &model.Resource{Type: 2, Code: "integration-menu", Name: "集成菜单", RoutePath: "/integration", ComponentKey: "integration", Visible: true, Status: 1}
+	if err := tx.Create(menu).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(&model.TenantResource{TenantID: tenant.ID, ResourceID: menu.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(&model.CasbinRule{Ptype: "p", V0: fmt.Sprint(tenant.ID), V1: fmt.Sprint(role.ID), V2: "integration-menu", V3: "list"}).Error; err != nil {
 		t.Fatal(err)
 	}
 	repository := &AuthRepository{db: tx, q: query.Use(tx)}
 
 	permissions, err := repository.ListPermissions(context.Background(), tenant.ID, member.ID, false)
-	if err != nil || len(permissions) != 1 || permissions[0] != "audit-logs:list" {
+	if err != nil || len(permissions) != 2 || permissions[0] != "integration-audit-logs:list" || permissions[1] != "integration-menu:list" {
 		t.Fatalf("ListPermissions() = %+v, %v", permissions, err)
 	}
 	allowed, err := (&ManagementRepository{db: tx}).Allowed(context.Background(), service.ResourceScope{
 		TenantID: tenant.ID, UserID: user.ID, MemberID: member.ID,
-	}, "audit-logs", "list")
+	}, "integration-audit-logs", "list")
 	if err != nil || !allowed {
 		t.Fatalf("Allowed(audit-logs:list) = %v, %v", allowed, err)
+	}
+	navigation, err := repository.ListNavigation(context.Background(), tenant.ID, member.ID, false)
+	if err != nil || len(navigation) != 1 || navigation[0].Code != "integration-menu" {
+		t.Fatalf("ListNavigation() = %+v, %v", navigation, err)
 	}
 }
 

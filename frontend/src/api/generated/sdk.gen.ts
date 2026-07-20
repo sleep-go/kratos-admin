@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthServiceForgotPasswordData, AuthServiceForgotPasswordErrors, AuthServiceForgotPasswordResponses, AuthServiceGetCaptchaData, AuthServiceGetCaptchaErrors, AuthServiceGetCaptchaResponses, AuthServiceListSessionsData, AuthServiceListSessionsErrors, AuthServiceListSessionsResponses, AuthServiceLoginData, AuthServiceLoginErrors, AuthServiceLoginResponses, AuthServiceLogoutData, AuthServiceLogoutErrors, AuthServiceLogoutResponses, AuthServiceRefreshData, AuthServiceRefreshErrors, AuthServiceRefreshResponses, AuthServiceResetPasswordData, AuthServiceResetPasswordErrors, AuthServiceResetPasswordResponses, AuthServiceRevokeSessionData, AuthServiceRevokeSessionErrors, AuthServiceRevokeSessionResponses, AuthServiceSwitchTenantData, AuthServiceSwitchTenantErrors, AuthServiceSwitchTenantResponses, AuthServiceVerifyMfaData, AuthServiceVerifyMfaErrors, AuthServiceVerifyMfaResponses, FileServiceAddReferenceData, FileServiceAddReferenceErrors, FileServiceAddReferenceResponses, FileServiceConfirmUploadData, FileServiceConfirmUploadErrors, FileServiceConfirmUploadResponses, FileServiceCreateUploadData, FileServiceCreateUploadErrors, FileServiceCreateUploadResponses, FileServiceDeleteFileData, FileServiceDeleteFileErrors, FileServiceDeleteFileResponses, FileServiceGetDownloadUrlData, FileServiceGetDownloadUrlErrors, FileServiceGetDownloadUrlResponses, FileServiceRemoveReferenceData, FileServiceRemoveReferenceErrors, FileServiceRemoveReferenceResponses, HealthServiceCheckData, HealthServiceCheckErrors, HealthServiceCheckResponses, LogServiceCreateExportData, LogServiceCreateExportErrors, LogServiceCreateExportResponses, LogServiceGetExportData, LogServiceGetExportDownloadUrlData, LogServiceGetExportDownloadUrlErrors, LogServiceGetExportDownloadUrlResponses, LogServiceGetExportErrors, LogServiceGetExportResponses, ManagementServiceCreateResourceData, ManagementServiceCreateResourceErrors, ManagementServiceCreateResourceResponses, ManagementServiceDeleteResourceData, ManagementServiceDeleteResourceErrors, ManagementServiceDeleteResourceResponses, ManagementServiceGetEffectiveSettingsData, ManagementServiceGetEffectiveSettingsErrors, ManagementServiceGetEffectiveSettingsResponses, ManagementServiceListResourcesData, ManagementServiceListResourcesErrors, ManagementServiceListResourcesResponses, ManagementServiceTestProviderConnectionData, ManagementServiceTestProviderConnectionErrors, ManagementServiceTestProviderConnectionResponses, ManagementServiceUpdateResourceData, ManagementServiceUpdateResourceErrors, ManagementServiceUpdateResourceResponses } from './types.gen';
+import type { AuthServiceForgotPasswordData, AuthServiceForgotPasswordErrors, AuthServiceForgotPasswordResponses, AuthServiceGetCaptchaData, AuthServiceGetCaptchaErrors, AuthServiceGetCaptchaResponses, AuthServiceListNavigationData, AuthServiceListNavigationErrors, AuthServiceListNavigationResponses, AuthServiceListSessionsData, AuthServiceListSessionsErrors, AuthServiceListSessionsResponses, AuthServiceLoginData, AuthServiceLoginErrors, AuthServiceLoginResponses, AuthServiceLogoutData, AuthServiceLogoutErrors, AuthServiceLogoutResponses, AuthServiceRefreshData, AuthServiceRefreshErrors, AuthServiceRefreshResponses, AuthServiceResetPasswordData, AuthServiceResetPasswordErrors, AuthServiceResetPasswordResponses, AuthServiceRevokeSessionData, AuthServiceRevokeSessionErrors, AuthServiceRevokeSessionResponses, AuthServiceSwitchTenantData, AuthServiceSwitchTenantErrors, AuthServiceSwitchTenantResponses, AuthServiceUpdateProfileData, AuthServiceUpdateProfileErrors, AuthServiceUpdateProfileResponses, AuthServiceVerifyMfaData, AuthServiceVerifyMfaErrors, AuthServiceVerifyMfaResponses, FileServiceAddReferenceData, FileServiceAddReferenceErrors, FileServiceAddReferenceResponses, FileServiceConfirmUploadData, FileServiceConfirmUploadErrors, FileServiceConfirmUploadResponses, FileServiceCreateUploadData, FileServiceCreateUploadErrors, FileServiceCreateUploadResponses, FileServiceDeleteFileData, FileServiceDeleteFileErrors, FileServiceDeleteFileResponses, FileServiceGetDownloadUrlData, FileServiceGetDownloadUrlErrors, FileServiceGetDownloadUrlResponses, FileServiceRemoveReferenceData, FileServiceRemoveReferenceErrors, FileServiceRemoveReferenceResponses, HealthServiceCheckData, HealthServiceCheckErrors, HealthServiceCheckResponses, LogServiceCreateExportData, LogServiceCreateExportErrors, LogServiceCreateExportResponses, LogServiceGetExportData, LogServiceGetExportDownloadUrlData, LogServiceGetExportDownloadUrlErrors, LogServiceGetExportDownloadUrlResponses, LogServiceGetExportErrors, LogServiceGetExportResponses, ManagementServiceCreateResourceData, ManagementServiceCreateResourceErrors, ManagementServiceCreateResourceResponses, ManagementServiceDeleteResourceData, ManagementServiceDeleteResourceErrors, ManagementServiceDeleteResourceResponses, ManagementServiceGetEffectiveSettingsData, ManagementServiceGetEffectiveSettingsErrors, ManagementServiceGetEffectiveSettingsResponses, ManagementServiceListResourcesData, ManagementServiceListResourcesErrors, ManagementServiceListResourcesResponses, ManagementServiceTestProviderConnectionData, ManagementServiceTestProviderConnectionErrors, ManagementServiceTestProviderConnectionResponses, ManagementServiceUpdateResourceData, ManagementServiceUpdateResourceErrors, ManagementServiceUpdateResourceResponses, ManagementServiceUpdateRoleAuthorizationData, ManagementServiceUpdateRoleAuthorizationErrors, ManagementServiceUpdateRoleAuthorizationResponses, ManagementServiceUpdateTenantFeaturesData, ManagementServiceUpdateTenantFeaturesErrors, ManagementServiceUpdateTenantFeaturesResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -42,6 +42,17 @@ export const authServiceLogout = <ThrowOnError extends boolean = false>(options?
 
 export const authServiceVerifyMfa = <ThrowOnError extends boolean = false>(options: Options<AuthServiceVerifyMfaData, ThrowOnError>): RequestResult<AuthServiceVerifyMfaResponses, AuthServiceVerifyMfaErrors, ThrowOnError> => (options.client ?? client).post<AuthServiceVerifyMfaResponses, AuthServiceVerifyMfaErrors, ThrowOnError>({
     url: '/api/v1/auth/mfa/verify',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const authServiceListNavigation = <ThrowOnError extends boolean = false>(options?: Options<AuthServiceListNavigationData, ThrowOnError>): RequestResult<AuthServiceListNavigationResponses, AuthServiceListNavigationErrors, ThrowOnError> => (options?.client ?? client).get<AuthServiceListNavigationResponses, AuthServiceListNavigationErrors, ThrowOnError>({ url: '/api/v1/auth/navigation', ...options });
+
+export const authServiceUpdateProfile = <ThrowOnError extends boolean = false>(options: Options<AuthServiceUpdateProfileData, ThrowOnError>): RequestResult<AuthServiceUpdateProfileResponses, AuthServiceUpdateProfileErrors, ThrowOnError> => (options.client ?? client).put<AuthServiceUpdateProfileResponses, AuthServiceUpdateProfileErrors, ThrowOnError>({
+    url: '/api/v1/auth/profile',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -132,6 +143,24 @@ export const logServiceGetExport = <ThrowOnError extends boolean = false>(option
 export const logServiceGetExportDownloadUrl = <ThrowOnError extends boolean = false>(options: Options<LogServiceGetExportDownloadUrlData, ThrowOnError>): RequestResult<LogServiceGetExportDownloadUrlResponses, LogServiceGetExportDownloadUrlErrors, ThrowOnError> => (options.client ?? client).get<LogServiceGetExportDownloadUrlResponses, LogServiceGetExportDownloadUrlErrors, ThrowOnError>({ url: '/api/v1/logs/exports/{exportId}/download-url', ...options });
 
 export const managementServiceTestProviderConnection = <ThrowOnError extends boolean = false>(options: Options<ManagementServiceTestProviderConnectionData, ThrowOnError>): RequestResult<ManagementServiceTestProviderConnectionResponses, ManagementServiceTestProviderConnectionErrors, ThrowOnError> => (options.client ?? client).post<ManagementServiceTestProviderConnectionResponses, ManagementServiceTestProviderConnectionErrors, ThrowOnError>({ url: '/api/v1/management/providers/{id}/connection-test', ...options });
+
+export const managementServiceUpdateRoleAuthorization = <ThrowOnError extends boolean = false>(options: Options<ManagementServiceUpdateRoleAuthorizationData, ThrowOnError>): RequestResult<ManagementServiceUpdateRoleAuthorizationResponses, ManagementServiceUpdateRoleAuthorizationErrors, ThrowOnError> => (options.client ?? client).put<ManagementServiceUpdateRoleAuthorizationResponses, ManagementServiceUpdateRoleAuthorizationErrors, ThrowOnError>({
+    url: '/api/v1/management/roles/{roleId}/authorization',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const managementServiceUpdateTenantFeatures = <ThrowOnError extends boolean = false>(options: Options<ManagementServiceUpdateTenantFeaturesData, ThrowOnError>): RequestResult<ManagementServiceUpdateTenantFeaturesResponses, ManagementServiceUpdateTenantFeaturesErrors, ThrowOnError> => (options.client ?? client).put<ManagementServiceUpdateTenantFeaturesResponses, ManagementServiceUpdateTenantFeaturesErrors, ThrowOnError>({
+    url: '/api/v1/management/tenants/{tenantId}/features',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 export const managementServiceListResources = <ThrowOnError extends boolean = false>(options: Options<ManagementServiceListResourcesData, ThrowOnError>): RequestResult<ManagementServiceListResourcesResponses, ManagementServiceListResourcesErrors, ThrowOnError> => (options.client ?? client).get<ManagementServiceListResourcesResponses, ManagementServiceListResourcesErrors, ThrowOnError>({ url: '/api/v1/management/{resource}', ...options });
 

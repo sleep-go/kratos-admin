@@ -1,5 +1,12 @@
 import { http } from './http'
 import type {
+  AdminV1ListSessionsResponse,
+  AdminV1ListNavigationResponse,
+  AdminV1Session,
+  AdminV1UpdateProfileRequest,
+  AdminV1UpdateProfileResponse
+} from './generated'
+import type {
   CaptchaResponse,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
@@ -51,3 +58,26 @@ export async function switchTenant(tenantId: string): Promise<SwitchTenantRespon
   const response = await http.post<SwitchTenantResponse>('/auth/switch-tenant', { tenantId })
   return response.data
 }
+
+export async function listSessions(): Promise<AdminV1ListSessionsResponse> {
+  const response = await http.get<AdminV1ListSessionsResponse>('/auth/sessions')
+  return response.data
+}
+
+export async function listNavigation(): Promise<AdminV1ListNavigationResponse> {
+  const response = await http.get<AdminV1ListNavigationResponse>('/auth/navigation')
+  return response.data
+}
+
+export async function revokeSession(sessionId: string): Promise<void> {
+  await http.delete('/auth/sessions/' + encodeURIComponent(sessionId))
+}
+
+export async function updateProfile(
+  request: AdminV1UpdateProfileRequest
+): Promise<AdminV1UpdateProfileResponse> {
+  const response = await http.put<AdminV1UpdateProfileResponse>('/auth/profile', request)
+  return response.data
+}
+
+export type DeviceSession = AdminV1Session

@@ -27,7 +27,7 @@
 - [x] Task 6：实现 outbox、Asynq Worker、三类日志、保留策略和异步导出。
 - [x] Task 7：实现三级配置、字典、邮件/短信 Provider 和敏感配置加密。
 - [x] Task 8：实现本地/OSS 文件上传、校验、下载、引用与异步清理。
-- [ ] Task 9：实现 Vue 3 登录、工作台、平台管理、组织、权限、日志、文件、设置和个人中心页面。
+- [x] Task 9：实现 Vue 3 登录、工作台、平台管理、组织、权限、日志、文件、设置和个人中心页面。
 - [ ] Task 10：完善响应式适配、Vitest、Playwright、Docker Compose、初始化命令和运维文档。
 - [ ] Task 11：执行生成一致性、迁移、单元、集成、race、vet、lint、E2E 和镜像构建验证。
 

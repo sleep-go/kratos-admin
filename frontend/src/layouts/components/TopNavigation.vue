@@ -46,10 +46,11 @@ const emit = defineEmits<{
         <span aria-hidden="true">⌄</span>
       </button>
       <span class="account-divider" aria-hidden="true"></span>
-      <button class="account-button" type="button" @click="emit('logout')">
+      <RouterLink class="account-button" to="/account" aria-label="打开个人中心">
         <span class="avatar">{{ initials }}</span>
         <span class="account-name">{{ userName }}</span>
-      </button>
+      </RouterLink>
+      <button class="logout-button" type="button" @click="emit('logout')">退出</button>
     </div>
 
     <button
@@ -143,6 +144,7 @@ const emit = defineEmits<{
 
 .tenant-switcher,
 .account-button,
+.logout-button,
 .mobile-menu-button {
   border: 0;
   color: inherit;
@@ -156,6 +158,16 @@ const emit = defineEmits<{
   align-items: center;
   gap: 7px;
   font-size: 12px;
+}
+
+.account-button {
+  color: inherit;
+  text-decoration: none;
+}
+
+.logout-button {
+  font-size: 12px;
+  opacity: 0.78;
 }
 
 .account-divider {

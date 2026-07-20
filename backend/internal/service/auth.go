@@ -61,6 +61,8 @@ type SessionHandler interface {
 	Logout(ctx context.Context, refreshToken string) error
 	List(ctx context.Context, userID uint64, currentSessionID string) ([]bizauth.DeviceSession, error)
 	Revoke(ctx context.Context, sessionID string, userID uint64) error
+	UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) (bizauth.UserProfile, error)
+	Navigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]bizauth.NavigationItem, error)
 }
 
 // AuthService 实现登录、令牌与会话治理 API。
@@ -373,6 +375,42 @@ func (s *AuthService) RevokeSession(ctx context.Context, request *v1.RevokeSessi
 	return &v1.RevokeSessionResponse{}, nil
 }
 
+// UpdateProfile 更新当前登录账号的非敏感个人资料。
+func (s *AuthService) UpdateProfile(ctx context.Context, request *v1.UpdateProfileRequest) (*v1.UpdateProfileResponse, error) {
+	claims, ok := bizauth.ClaimsFromContext(ctx)
+	if !ok || s.sessionHandler == nil {
+		return nil, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
+	}
+	profile, err := s.sessionHandler.UpdateProfile(ctx, claims.UserID, request.GetDisplayName(), request.GetAvatarUrl(), request.GetEmail(), request.GetPhone())
+	if err != nil {
+		if strings.Contains(err.Error(), "不能为空") {
+			return nil, kratoserrors.BadRequest("PROFILE_INVALID", err.Error())
+		}
+		return nil, kratoserrors.InternalServer("PROFILE_UPDATE_FAILED", "更新个人资料失败")
+	}
+	return &v1.UpdateProfileResponse{User: mapCurrentUser(profile)}, nil
+}
+
+// ListNavigation 返回当前令牌上下文已授权的菜单资源。
+func (s *AuthService) ListNavigation(ctx context.Context, _ *v1.ListNavigationRequest) (*v1.ListNavigationResponse, error) {
+	claims, ok := bizauth.ClaimsFromContext(ctx)
+	if !ok || s.sessionHandler == nil {
+		return nil, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
+	}
+	items, err := s.sessionHandler.Navigation(ctx, claims.TenantID, claims.MemberID, claims.PlatformAdmin)
+	if err != nil {
+		return nil, kratoserrors.InternalServer("NAVIGATION_LIST_FAILED", "加载授权菜单失败")
+	}
+	reply := make([]*v1.NavigationItem, 0, len(items))
+	for _, item := range items {
+		reply = append(reply, &v1.NavigationItem{
+			Id: item.ID, ParentId: item.ParentID, Code: item.Code, Name: item.Name,
+			RoutePath: item.RoutePath, ComponentKey: item.ComponentKey, Icon: item.Icon, SortOrder: item.SortOrder,
+		})
+	}
+	return &v1.ListNavigationResponse{Items: reply}, nil
+}
+
 func refreshCookie(token string, expiresAt time.Time, secure bool) string {
 	return (&http.Cookie{
 		Name: "kratos_admin_refresh", Value: token, Path: "/api/v1/auth",
@@ -408,7 +446,11 @@ func setRefreshCookie(ctx context.Context, cookie string) {
 }
 
 func mapCurrentUser(user bizauth.UserProfile) *v1.CurrentUser {
-	return &v1.CurrentUser{Id: user.ID, DisplayName: user.DisplayName, AvatarUrl: user.AvatarURL, PlatformAdmin: user.PlatformAdmin, Permissions: user.Permissions}
+	return &v1.CurrentUser{
+		Id: user.ID, Username: user.Username, DisplayName: user.DisplayName, AvatarUrl: user.AvatarURL,
+		Email: user.Email, Phone: user.Phone, MfaEnabled: user.MFAEnabled, MfaChannel: user.MFAChannel,
+		PlatformAdmin: user.PlatformAdmin, Permissions: user.Permissions,
+	}
 }
 
 func mapTenantOptions(items []bizauth.TenantOption) []*v1.TenantSummary {

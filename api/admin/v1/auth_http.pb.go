@@ -21,6 +21,7 @@ const _ = http.SupportPackageIsVersion1
 
 const OperationAuthServiceForgotPassword = "/admin.v1.AuthService/ForgotPassword"
 const OperationAuthServiceGetCaptcha = "/admin.v1.AuthService/GetCaptcha"
+const OperationAuthServiceListNavigation = "/admin.v1.AuthService/ListNavigation"
 const OperationAuthServiceListSessions = "/admin.v1.AuthService/ListSessions"
 const OperationAuthServiceLogin = "/admin.v1.AuthService/Login"
 const OperationAuthServiceLogout = "/admin.v1.AuthService/Logout"
@@ -28,11 +29,13 @@ const OperationAuthServiceRefresh = "/admin.v1.AuthService/Refresh"
 const OperationAuthServiceResetPassword = "/admin.v1.AuthService/ResetPassword"
 const OperationAuthServiceRevokeSession = "/admin.v1.AuthService/RevokeSession"
 const OperationAuthServiceSwitchTenant = "/admin.v1.AuthService/SwitchTenant"
+const OperationAuthServiceUpdateProfile = "/admin.v1.AuthService/UpdateProfile"
 const OperationAuthServiceVerifyMfa = "/admin.v1.AuthService/VerifyMfa"
 
 type AuthServiceHTTPServer interface {
 	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
 	GetCaptcha(context.Context, *GetCaptchaRequest) (*GetCaptchaResponse, error)
+	ListNavigation(context.Context, *ListNavigationRequest) (*ListNavigationResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
@@ -40,6 +43,7 @@ type AuthServiceHTTPServer interface {
 	ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error)
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
 	SwitchTenant(context.Context, *SwitchTenantRequest) (*SwitchTenantResponse, error)
+	UpdateProfile(context.Context, *UpdateProfileRequest) (*UpdateProfileResponse, error)
 	VerifyMfa(context.Context, *VerifyMfaRequest) (*VerifyMfaResponse, error)
 }
 
@@ -55,6 +59,8 @@ func RegisterAuthServiceHTTPServer(s *http.Server, srv AuthServiceHTTPServer) {
 	r.POST("/api/v1/auth/reset-password", _AuthService_ResetPassword0_HTTP_Handler(srv))
 	r.GET("/api/v1/auth/sessions", _AuthService_ListSessions0_HTTP_Handler(srv))
 	r.DELETE("/api/v1/auth/sessions/{session_id}", _AuthService_RevokeSession0_HTTP_Handler(srv))
+	r.PUT("/api/v1/auth/profile", _AuthService_UpdateProfile0_HTTP_Handler(srv))
+	r.GET("/api/v1/auth/navigation", _AuthService_ListNavigation0_HTTP_Handler(srv))
 }
 
 func _AuthService_GetCaptcha0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
@@ -268,9 +274,51 @@ func _AuthService_RevokeSession0_HTTP_Handler(srv AuthServiceHTTPServer) func(ct
 	}
 }
 
+func _AuthService_UpdateProfile0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateProfileRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationAuthServiceUpdateProfile)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateProfile(ctx, req.(*UpdateProfileRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*UpdateProfileResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _AuthService_ListNavigation0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ListNavigationRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationAuthServiceListNavigation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ListNavigation(ctx, req.(*ListNavigationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ListNavigationResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type AuthServiceHTTPClient interface {
 	ForgotPassword(ctx context.Context, req *ForgotPasswordRequest, opts ...http.CallOption) (rsp *ForgotPasswordResponse, err error)
 	GetCaptcha(ctx context.Context, req *GetCaptchaRequest, opts ...http.CallOption) (rsp *GetCaptchaResponse, err error)
+	ListNavigation(ctx context.Context, req *ListNavigationRequest, opts ...http.CallOption) (rsp *ListNavigationResponse, err error)
 	ListSessions(ctx context.Context, req *ListSessionsRequest, opts ...http.CallOption) (rsp *ListSessionsResponse, err error)
 	Login(ctx context.Context, req *LoginRequest, opts ...http.CallOption) (rsp *LoginResponse, err error)
 	Logout(ctx context.Context, req *LogoutRequest, opts ...http.CallOption) (rsp *LogoutResponse, err error)
@@ -278,6 +326,7 @@ type AuthServiceHTTPClient interface {
 	ResetPassword(ctx context.Context, req *ResetPasswordRequest, opts ...http.CallOption) (rsp *ResetPasswordResponse, err error)
 	RevokeSession(ctx context.Context, req *RevokeSessionRequest, opts ...http.CallOption) (rsp *RevokeSessionResponse, err error)
 	SwitchTenant(ctx context.Context, req *SwitchTenantRequest, opts ...http.CallOption) (rsp *SwitchTenantResponse, err error)
+	UpdateProfile(ctx context.Context, req *UpdateProfileRequest, opts ...http.CallOption) (rsp *UpdateProfileResponse, err error)
 	VerifyMfa(ctx context.Context, req *VerifyMfaRequest, opts ...http.CallOption) (rsp *VerifyMfaResponse, err error)
 }
 
@@ -307,6 +356,19 @@ func (c *AuthServiceHTTPClientImpl) GetCaptcha(ctx context.Context, in *GetCaptc
 	pattern := "/api/v1/auth/captcha"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationAuthServiceGetCaptcha))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *AuthServiceHTTPClientImpl) ListNavigation(ctx context.Context, in *ListNavigationRequest, opts ...http.CallOption) (*ListNavigationResponse, error) {
+	var out ListNavigationResponse
+	pattern := "/api/v1/auth/navigation"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationAuthServiceListNavigation))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {
@@ -400,6 +462,19 @@ func (c *AuthServiceHTTPClientImpl) SwitchTenant(ctx context.Context, in *Switch
 	opts = append(opts, http.Operation(OperationAuthServiceSwitchTenant))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *AuthServiceHTTPClientImpl) UpdateProfile(ctx context.Context, in *UpdateProfileRequest, opts ...http.CallOption) (*UpdateProfileResponse, error) {
+	var out UpdateProfileResponse
+	pattern := "/api/v1/auth/profile"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationAuthServiceUpdateProfile))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "PUT", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

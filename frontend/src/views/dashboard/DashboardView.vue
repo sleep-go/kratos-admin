@@ -1,34 +1,153 @@
 <script setup lang="ts">
-const metrics = [
-  { label: '成员总数', value: '1,286', trend: '+8.2%', tone: 'red' },
-  { label: '角色数量', value: '24', trend: '+2', tone: 'teal' },
-  { label: '今日请求', value: '84,932', trend: '+12.5%', tone: 'blue' },
-  { label: '异常请求', value: '36', trend: '-18.3%', tone: 'amber' }
-]
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { BarChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+import { init, use, type ECharts } from 'echarts/core'
 
-const activities = [
-  ['10:42', '管理员更新了「财务主管」角色权限'],
-  ['09:18', '检测到新设备登录，已完成 MFA 验证'],
-  ['昨天', 'API 日志导出任务执行完成']
-]
+import * as managementApi from '@/api/management'
+import { useAuthStore } from '@/stores/auth'
+import type { ResourceRow } from '@/api/management'
+
+use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
+
+const authStore = useAuthStore()
+const { currentTenant } = storeToRefs(authStore)
+const loading = ref(false)
+const memberTotal = ref(0)
+const roleTotal = ref(0)
+const requestTotal = ref(0)
+const exceptionTotal = ref(0)
+const activities = ref<ResourceRow[]>([])
+const dailyCounts = ref<number[]>(Array.from({ length: 7 }, () => 0))
+const chartElement = ref<globalThis.HTMLElement>()
+let chart: ECharts | undefined
+
+const perspective = computed(() =>
+  String(currentTenant.value?.id ?? '0') === '0' ? '平台治理视角' : '当前租户运行视角'
+)
+const metrics = computed(() => [
+  { label: '成员总数', value: memberTotal.value.toLocaleString('zh-CN'), note: '有效组织成员' },
+  { label: '角色数量', value: roleTotal.value.toLocaleString('zh-CN'), note: '当前权限角色' },
+  { label: 'API 日志', value: requestTotal.value.toLocaleString('zh-CN'), note: '当前可见记录' },
+  {
+    label: '异常请求',
+    value: exceptionTotal.value.toLocaleString('zh-CN'),
+    note: '最近 200 条样本'
+  }
+])
+
+function dateKey(date: Date) {
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
+}
+
+function buildTrend(rows: ResourceRow[]) {
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (6 - index))
+    return date
+  })
+  const counts = new Map(days.map((day) => [dateKey(day), 0]))
+  for (const row of rows) {
+    const createdAt = String(row.created_at ?? '')
+    if (!createdAt) continue
+    const key = dateKey(new Date(createdAt))
+    if (counts.has(key)) counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  dailyCounts.value = days.map((day) => counts.get(dateKey(day)) ?? 0)
+  return days.map((day) => `${day.getMonth() + 1}/${day.getDate()}`)
+}
+
+function renderChart(labels: string[]) {
+  if (!chartElement.value || chartElement.value.clientWidth === 0) return
+  chart ??= init(chartElement.value)
+  chart.setOption({
+    animationDuration: 420,
+    grid: { left: 12, right: 12, top: 20, bottom: 24, containLabel: true },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+      type: 'category',
+      data: labels,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: '#d7d7d7' } }
+    },
+    yAxis: { type: 'value', minInterval: 1, splitLine: { lineStyle: { color: '#eeeeee' } } },
+    series: [
+      {
+        type: 'bar',
+        data: dailyCounts.value,
+        barMaxWidth: 34,
+        itemStyle: {
+          color: (value: { dataIndex: number }) => (value.dataIndex === 6 ? '#ed1515' : '#464646'),
+          borderRadius: [2, 2, 0, 0]
+        }
+      }
+    ]
+  })
+}
+
+async function load() {
+  loading.value = true
+  try {
+    const [members, roles, apiLogs, auditLogs] = await Promise.all([
+      managementApi.listResources('members', { page: 1, page_size: 1 }),
+      managementApi.listResources('roles', { page: 1, page_size: 1 }),
+      managementApi.listResources('api-logs', { page: 1, page_size: 200, sort: 'created_at:desc' }),
+      managementApi.listResources('audit-logs', { page: 1, page_size: 6, sort: 'created_at:desc' })
+    ])
+    memberTotal.value = Number(members.total ?? 0)
+    roleTotal.value = Number(roles.total ?? 0)
+    requestTotal.value = Number(apiLogs.total ?? 0)
+    const apiItems = apiLogs.items ?? []
+    exceptionTotal.value = apiItems.filter((item) => Number(item.status_code ?? 0) >= 400).length
+    activities.value = auditLogs.items ?? []
+    const labels = buildTrend(apiItems)
+    await nextTick()
+    renderChart(labels)
+  } finally {
+    loading.value = false
+  }
+}
+
+function formatActivityTime(value: unknown) {
+  if (!value) return '—'
+  return new Date(String(value)).toLocaleString('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+}
+
+function resizeChart() {
+  chart?.resize()
+}
+onMounted(() => {
+  globalThis.addEventListener('resize', resizeChart)
+  void load()
+})
+onBeforeUnmount(() => {
+  globalThis.removeEventListener('resize', resizeChart)
+  chart?.dispose()
+})
 </script>
 
 <template>
-  <section class="dashboard">
+  <section v-loading="loading" class="dashboard">
     <header class="page-heading">
       <div>
         <p class="eyebrow">OVERVIEW</p>
         <h1>工作台</h1>
-        <p>查看当前租户的运行状态与安全动态。</p>
+        <p>{{ perspective }}，展示真实业务数据与安全动态。</p>
       </div>
-      <button type="button">刷新数据</button>
+      <el-button @click="load">刷新数据</el-button>
     </header>
 
     <div class="metric-grid">
       <article v-for="metric in metrics" :key="metric.label" class="metric-card">
-        <span class="metric-label">{{ metric.label }}</span>
-        <strong>{{ metric.value }}</strong>
-        <span class="metric-trend" :class="`metric-trend--${metric.tone}`">{{ metric.trend }}</span>
+        <span>{{ metric.label }}</span><strong>{{ metric.value }}</strong><small>{{ metric.note }}</small>
       </article>
     </div>
 
@@ -39,17 +158,10 @@ const activities = [
             <span>REQUESTS</span>
             <h2>请求趋势</h2>
           </div>
-          <small>最近 7 天</small>
+          <small>最近 7 天可见日志</small>
         </div>
-        <div class="chart" aria-label="最近七天请求趋势图">
-          <i
-            v-for="height in [38, 56, 44, 72, 62, 86, 74]"
-            :key="height"
-            :style="{ height: `${height}%` }"
-          ></i>
-        </div>
+        <div ref="chartElement" class="chart" aria-label="最近七天请求趋势图"></div>
       </article>
-
       <article class="panel activity-panel">
         <div class="panel-title">
           <div>
@@ -57,11 +169,15 @@ const activities = [
             <h2>安全动态</h2>
           </div>
         </div>
-        <ul>
-          <li v-for="activity in activities" :key="activity[0]">
-            <time>{{ activity[0] }}</time><span>{{ activity[1] }}</span>
+        <ul v-if="activities.length">
+          <li v-for="activity in activities" :key="String(activity.id)">
+            <time>{{ formatActivityTime(activity.created_at) }}</time>
+            <span>{{
+              activity.summary || `${activity.action ?? '操作'} ${activity.resource_type ?? ''}`
+            }}</span>
           </li>
         </ul>
+        <div v-else class="empty-state">暂无可见安全动态</div>
       </article>
     </div>
   </section>
@@ -76,6 +192,7 @@ const activities = [
   display: flex;
   align-items: end;
   justify-content: space-between;
+  gap: 18px;
 }
 .eyebrow,
 .panel-title span {
@@ -94,13 +211,6 @@ h1 {
   margin: 8px 0 0;
   color: var(--ka-muted);
 }
-.page-heading button {
-  padding: 10px 17px;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  background: #fff;
-  cursor: pointer;
-}
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -109,7 +219,6 @@ h1 {
 .metric-card,
 .panel {
   border: 1px solid rgb(0 0 0 / 4%);
-  border-radius: 5px;
   background: #fff;
   box-shadow: var(--ka-shadow);
 }
@@ -129,26 +238,15 @@ h1 {
   background: var(--ka-accent);
   content: '';
 }
-.metric-label {
+.metric-card span,
+.metric-card small,
+.panel-title small {
   color: var(--ka-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .metric-card strong {
   font-size: 30px;
   letter-spacing: -0.03em;
-}
-.metric-trend {
-  position: absolute;
-  right: 20px;
-  bottom: 23px;
-  color: #008f82;
-  font-size: 12px;
-}
-.metric-trend--red {
-  color: var(--ka-accent);
-}
-.metric-trend--amber {
-  color: #b97800;
 }
 .dashboard-grid {
   display: grid;
@@ -161,44 +259,27 @@ h1 {
 }
 .panel-title {
   display: flex;
-  justify-content: space-between;
   align-items: start;
+  justify-content: space-between;
 }
 .panel-title h2 {
   margin: 0;
   font-size: 18px;
 }
-.panel-title small {
-  color: var(--ka-muted);
-}
 .chart {
-  height: 210px;
-  display: flex;
-  align-items: end;
-  gap: clamp(8px, 2vw, 24px);
-  padding: 34px 10px 0;
-  border-bottom: 1px solid #ddd;
-  background: repeating-linear-gradient(to bottom, transparent 0 51px, #eee 52px);
-}
-.chart i {
-  flex: 1;
-  min-width: 16px;
-  border-radius: 2px 2px 0 0;
-  background: linear-gradient(#777, #252525);
-}
-.chart i:last-child {
-  background: linear-gradient(#f25b5b, #d60000);
+  height: 230px;
+  margin-top: 18px;
 }
 ul {
-  margin: 24px 0 0;
+  margin: 16px 0 0;
   padding: 0;
   list-style: none;
 }
 li {
   display: grid;
-  grid-template-columns: 48px 1fr;
-  gap: 12px;
-  padding: 15px 0;
+  grid-template-columns: 92px 1fr;
+  gap: 10px;
+  padding: 14px 0;
   border-bottom: 1px solid #eee;
   font-size: 13px;
   line-height: 1.5;
@@ -206,6 +287,12 @@ li {
 time {
   color: var(--ka-muted);
   font-size: 11px;
+}
+.empty-state {
+  min-height: 210px;
+  display: grid;
+  place-items: center;
+  color: var(--ka-muted);
 }
 @media (max-width: 900px) {
   .metric-grid {
@@ -219,11 +306,10 @@ time {
   .page-heading {
     align-items: start;
   }
-  .page-heading button {
+  .page-heading .el-button {
     display: none;
   }
   .metric-grid {
-    grid-template-columns: 1fr 1fr;
     gap: 10px;
   }
   .metric-card {
@@ -232,9 +318,6 @@ time {
   }
   .metric-card strong {
     font-size: 23px;
-  }
-  .metric-trend {
-    position: static;
   }
   .panel {
     padding: 18px;

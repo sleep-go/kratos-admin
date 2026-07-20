@@ -114,6 +114,48 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/navigation:
+        get:
+            tags:
+                - AuthService
+            operationId: AuthService_ListNavigation
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.ListNavigationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/auth/profile:
+        put:
+            tags:
+                - AuthService
+            operationId: AuthService_UpdateProfile
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.UpdateProfileRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.UpdateProfileResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/v1/auth/refresh:
         post:
             tags:
@@ -509,6 +551,66 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/management/roles/{roleId}/authorization:
+        put:
+            tags:
+                - ManagementService
+            operationId: ManagementService_UpdateRoleAuthorization
+            parameters:
+                - name: roleId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.UpdateRoleAuthorizationRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.UpdateRoleAuthorizationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/management/tenants/{tenantId}/features:
+        put:
+            tags:
+                - ManagementService
+            operationId: ManagementService_UpdateTenantFeatures
+            parameters:
+                - name: tenantId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.UpdateTenantFeaturesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.UpdateTenantFeaturesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/v1/management/{resource}:
         get:
             tags:
@@ -773,6 +875,16 @@ components:
                     type: array
                     items:
                         type: string
+                username:
+                    type: string
+                email:
+                    type: string
+                phone:
+                    type: string
+                mfaEnabled:
+                    type: boolean
+                mfaChannel:
+                    type: string
         admin.v1.DeleteFileResponse:
             type: object
             properties: {}
@@ -831,6 +943,13 @@ components:
             properties:
                 item:
                     $ref: '#/components/schemas/admin.v1.LogExport'
+        admin.v1.ListNavigationResponse:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.NavigationItem'
         admin.v1.ListResourcesResponse:
             type: object
             properties:
@@ -915,6 +1034,26 @@ components:
         admin.v1.LogoutResponse:
             type: object
             properties: {}
+        admin.v1.NavigationItem:
+            type: object
+            properties:
+                id:
+                    type: string
+                parentId:
+                    type: string
+                code:
+                    type: string
+                name:
+                    type: string
+                routePath:
+                    type: string
+                componentKey:
+                    type: string
+                icon:
+                    type: string
+                sortOrder:
+                    type: integer
+                    format: uint32
         admin.v1.RefreshRequest:
             type: object
             properties: {}
@@ -952,6 +1091,15 @@ components:
         admin.v1.RevokeSessionResponse:
             type: object
             properties: {}
+        admin.v1.RoleResourceGrant:
+            type: object
+            properties:
+                resourceCode:
+                    type: string
+                actions:
+                    type: array
+                    items:
+                        type: string
         admin.v1.Session:
             type: object
             properties:
@@ -1016,10 +1164,61 @@ components:
                     type: boolean
                 message:
                     type: string
+        admin.v1.UpdateProfileRequest:
+            type: object
+            properties:
+                displayName:
+                    type: string
+                avatarUrl:
+                    type: string
+                email:
+                    type: string
+                phone:
+                    type: string
+        admin.v1.UpdateProfileResponse:
+            type: object
+            properties:
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
         admin.v1.UpdateResourceResponse:
             type: object
             properties:
                 id:
+                    type: string
+        admin.v1.UpdateRoleAuthorizationRequest:
+            type: object
+            properties:
+                roleId:
+                    type: string
+                dataScope:
+                    type: integer
+                    format: uint32
+                grants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.RoleResourceGrant'
+                departmentIds:
+                    type: array
+                    items:
+                        type: string
+        admin.v1.UpdateRoleAuthorizationResponse:
+            type: object
+            properties:
+                roleId:
+                    type: string
+        admin.v1.UpdateTenantFeaturesRequest:
+            type: object
+            properties:
+                tenantId:
+                    type: string
+                resourceIds:
+                    type: array
+                    items:
+                        type: string
+        admin.v1.UpdateTenantFeaturesResponse:
+            type: object
+            properties:
+                tenantId:
                     type: string
         admin.v1.VerifyMfaRequest:
             type: object

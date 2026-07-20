@@ -1,31 +1,32 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 
 import TopNavigation, { type NavigationItem } from './components/TopNavigation.vue'
+import { resolveNavigation, resolveTopNavigation } from '@/features/navigation/registry'
 import { useAuthStore } from '@/stores/auth'
 
-const navigation: NavigationItem[] = [
-  { label: '工作台', to: '/' },
-  { label: '平台管理', to: '/platform/tenants' },
-  { label: '组织管理', to: '/organization/users' },
-  { label: '权限中心', to: '/permission/roles' },
-  { label: '日志中心', to: '/logs/audit' },
-  { label: '文件管理', to: '/files' },
-  { label: '系统设置', to: '/settings' }
-]
-
 const authStore = useAuthStore()
+const router = useRouter()
 const { currentTenant, currentUser } = storeToRefs(authStore)
 const mobileOpen = shallowRef(false)
 const tenantDialogOpen = shallowRef(false)
 const tenantName = computed(() => currentTenant.value?.name ?? '请选择租户')
 const userName = computed(() => currentUser.value?.displayName ?? '超级管理员')
+const navigation = computed<NavigationItem[]>(() =>
+  resolveTopNavigation(resolveNavigation(authStore.navigationItems))
+)
+
+function openMobileTenantDialog() {
+  mobileOpen.value = false
+  tenantDialogOpen.value = true
+}
 
 async function selectTenant(tenantID: string) {
   await authStore.switchTenant(tenantID)
   tenantDialogOpen.value = false
+  await router.push('/')
 }
 </script>
 
@@ -93,6 +94,13 @@ async function selectTenant(tenantID: string) {
       <div class="mobile-account">
         <strong>{{ userName }}</strong>
         <span>{{ tenantName }}</span>
+        <button
+          type="button"
+          data-testid="mobile-tenant-switcher"
+          @click="openMobileTenantDialog"
+        >
+          切换租户
+        </button>
       </div>
       <RouterLink
         v-for="item in navigation"
@@ -103,6 +111,10 @@ async function selectTenant(tenantID: string) {
       >
         {{ item.label }}
       </RouterLink>
+      <RouterLink to="/account" class="mobile-link" @click="mobileOpen = false">
+        个人中心
+      </RouterLink>
+      <button class="mobile-logout" type="button" @click="authStore.logout()">退出登录</button>
     </div>
     <button
       v-if="mobileOpen"
@@ -167,6 +179,17 @@ async function selectTenant(tenantID: string) {
     color: rgb(255 255 255 / 62%);
     font-size: 12px;
   }
+
+  button {
+    width: fit-content;
+    margin-top: 8px;
+    padding: 0;
+    border: 0;
+    color: #fff;
+    background: transparent;
+    font-weight: 700;
+    cursor: pointer;
+  }
 }
 
 .mobile-link {
@@ -181,6 +204,16 @@ async function selectTenant(tenantID: string) {
     color: #fff;
     background: rgb(255 255 255 / 5%);
   }
+}
+
+.mobile-logout {
+  width: 100%;
+  padding: 15px 8px;
+  border: 0;
+  color: #fff;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
 .mobile-backdrop {

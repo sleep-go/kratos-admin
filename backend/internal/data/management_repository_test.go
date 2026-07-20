@@ -284,3 +284,81 @@ func TestManagementRepositoryEnforcesRoleDataScope(t *testing.T) {
 		t.Fatal("data scope must reject creating a member in another department")
 	}
 }
+
+func TestRoleAuthorizationAndTenantFeaturesAreAtomicInMySQL(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	tenant := &model.Tenant{Code: "atomic-authorization", Name: "原子授权测试", Status: 1, PermissionVersion: 1}
+	if err := tx.Create(tenant).Error; err != nil {
+		t.Fatal(err)
+	}
+	role := &model.Role{TenantID: tenant.ID, Code: "atomic-role", Name: "原子角色", DataScope: 4, Status: 1}
+	department := &model.Department{TenantID: tenant.ID, Name: "授权部门", Code: "atomic-dept", Path: "/atomic", Status: 1}
+	resource := &model.Resource{Type: 2, Code: "atomic-files", Name: "原子文件", RoutePath: "/files", ComponentKey: "files", Visible: true, Status: 1}
+	for _, value := range []any{role, department, resource} {
+		if err := tx.Create(value).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	repository := &ManagementRepository{db: tx}
+	platformScope := service.ResourceScope{UserID: 1, PlatformAdmin: true}
+	if err := repository.UpdateTenantFeatures(context.Background(), platformScope, tenant.ID, []uint64{resource.ID}); err != nil {
+		t.Fatal(err)
+	}
+	tenantScope := service.ResourceScope{TenantID: tenant.ID, UserID: 1, PlatformAdmin: true}
+	if err := repository.UpdateRoleAuthorization(context.Background(), tenantScope, role.ID, 5, []service.RoleGrant{{
+		ResourceCode: resource.Code, Actions: []string{"list", "download"},
+	}}, []uint64{department.ID}); err != nil {
+		t.Fatal(err)
+	}
+	var policyCount, scopeCount int64
+	tx.Model(&model.CasbinRule{}).Where("ptype = 'p' AND v0 = ? AND v1 = ?", fmt.Sprint(tenant.ID), fmt.Sprint(role.ID)).Count(&policyCount)
+	tx.Model(&model.RoleScopeDepartment{}).Where("tenant_id = ? AND role_id = ?", tenant.ID, role.ID).Count(&scopeCount)
+	var version uint64
+	tx.Model(&model.Tenant{}).Where("id = ?", tenant.ID).Pluck("permission_version", &version)
+	if policyCount != 2 || scopeCount != 1 || version != 3 {
+		t.Fatalf("policy=%d scope=%d version=%d", policyCount, scopeCount, version)
+	}
+}
+
+func TestPlatformAdminTenantContextStillEnforcesSelectedTenant(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	first := &model.Tenant{Code: "platform-scope-a", Name: "平台范围甲", Status: 1}
+	second := &model.Tenant{Code: "platform-scope-b", Name: "平台范围乙", Status: 1}
+	if err := tx.Create(first).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(second).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(&model.Role{TenantID: first.ID, Code: "role-a", Name: "角色甲", DataScope: 1, Status: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(&model.Role{TenantID: second.ID, Code: "role-b", Name: "角色乙", DataScope: 1, Status: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+	repository := &ManagementRepository{db: tx}
+	rows, total, err := repository.List(context.Background(), service.ResourceScope{
+		TenantID: first.ID, UserID: 1, PlatformAdmin: true,
+	}, "roles", service.PageQuery{Page: 1, PageSize: 20})
+	if err != nil || total != 1 || len(rows) != 1 || rows[0]["code"] != "role-a" {
+		t.Fatalf("tenant-scoped platform list total=%d rows=%#v err=%v", total, rows, err)
+	}
+}
