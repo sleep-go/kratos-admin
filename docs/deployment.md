@@ -9,6 +9,37 @@
 
 启动顺序固定为 MySQL 健康检查、Goose 迁移、幂等超级管理员初始化、API/Worker、Frontend。API 和 Worker 不执行 `AutoMigrate`。
 
+## 不使用 Docker 启动
+
+本机需要 Go 1.26、MySQL 8、Redis 7、Node.js 和 pnpm。MySQL 与 Redis 就绪后，在项目根目录执行：
+
+```bash
+export KRATOS_ADMIN_MYSQL_DSN='kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local'
+export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
+export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
+go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
+goose -dir migrations mysql "$KRATOS_ADMIN_MYSQL_DSN" up
+KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/initadmin
+```
+
+使用三个终端分别启动 Admin Server、Worker 和前端。Admin Server 与 Worker 终端都必须导出相同的 MySQL、Redis 和密钥变量：
+
+```bash
+go run ./app/admin/cmd/server
+```
+
+```bash
+go run ./app/worker/cmd/worker
+```
+
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+GORM Gen 默认输出到 `internal/data/query`，可执行 `go run ./app/admin/cmd/gormgen --out-path internal/data/query`。修改依赖注入后执行 `make wire`，生成的两个 `wire_gen.go` 必须提交。
+
 ## PolarDB 与 OSS
 
 - 将 `KRATOS_ADMIN_MYSQL_DSN` 改为 PolarDB MySQL 8 内网地址；账号至少需要目标库 DDL/DML 权限。先在维护窗口独立运行 `migrate` 服务，再滚动启动 API 和 Worker。
@@ -41,8 +72,11 @@
 
 ```bash
 make api
-GOCACHE=/tmp/go-build go test -race ./backend/...
-GOCACHE=/tmp/go-build go vet ./backend/...
+make wire
+make gorm-gen
+make backend-test
+make backend-vet
+make backend-build
 cd frontend && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 cd frontend && E2E_ADMIN_PASSWORD='你的初始化密码' E2E_REDIS_PORT=6379 pnpm e2e
 make compose-config

@@ -165,8 +165,19 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	tx := db.Begin()
 	t.Cleanup(func() { tx.Rollback() })
 	repository := &ManagementRepository{db: tx}
+	now := time.Now().UTC()
+	admin := &model.User{
+		Username:          "integration-auto-id-admin",
+		PasswordHash:      "hash",
+		DisplayName:       "自增主键测试管理员",
+		Status:            1,
+		PasswordChangedAt: now,
+	}
+	if err := tx.Create(admin).Error; err != nil {
+		t.Fatal(err)
+	}
 
-	id, err := repository.Create(context.Background(), managementbiz.Scope{UserID: 1, PlatformAdmin: true}, "tenants", map[string]any{
+	id, err := repository.Create(context.Background(), managementbiz.Scope{UserID: admin.ID, PlatformAdmin: true}, "tenants", map[string]any{
 		"code": "integration-id", "name": "自增主键测试", "status": float64(1),
 	})
 	if err != nil {
@@ -176,7 +187,7 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 		t.Fatal("Create() must return MySQL auto-increment ID")
 	}
 	var adminCount int64
-	if err := tx.Table("tenant_members").Where("tenant_id = ? AND user_id = ? AND is_tenant_admin = 1", id, 1).Count(&adminCount).Error; err != nil {
+	if err := tx.Table("tenant_members").Where("tenant_id = ? AND user_id = ? AND is_tenant_admin = 1", id, admin.ID).Count(&adminCount).Error; err != nil {
 		t.Fatal(err)
 	}
 	if adminCount != 1 {

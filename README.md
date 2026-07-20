@@ -18,9 +18,41 @@ Kratos Admin 是基于 go-kratos 与 Vue 3 的前后端分离、多租户通用�
 - 前端：Vue 3、TypeScript、Element Plus、Tailwind CSS、SCSS、Pinia
 - 数据库：PolarDB MySQL 8（本地开发使用 MySQL 8）
 
+## 大仓目录
+
+- `app/admin`：Admin HTTP/gRPC 服务、超级管理员初始化和 GORM Gen 命令。
+- `app/worker`：Asynq Worker 独立应用。
+- `internal/biz`：共享领域用例与仓储契约。
+- `internal/data`：MySQL、Redis、Casbin 和 GORM Gen 仓储实现。
+- `internal/provider`：SMTP、阿里云短信、本地文件、阿里云 OSS 和密钥实现。
+- `migrations`：Goose 数据库迁移，服务启动不会执行 `AutoMigrate`。
+
 详细设计和实施计划见 `docs/superpowers/`。
 
 本地与生产部署、备份、升级及故障排查见 [`docs/deployment.md`](docs/deployment.md)。首次 Compose 启动会按 MySQL → Goose → 幂等超级管理员初始化 → API/Worker → Frontend 的顺序执行。
+
+## 不使用 Docker 启动
+
+先启动 MySQL 8 和 Redis，并在运行后端命令的终端导出本机连接配置：
+
+```bash
+export KRATOS_ADMIN_MYSQL_DSN='kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local'
+export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
+export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
+go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
+goose -dir migrations mysql "$KRATOS_ADMIN_MYSQL_DSN" up
+KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/initadmin
+```
+
+随后分别启动三个常驻开发进程；Admin Server 与 Worker 终端都需要具备上述环境变量：
+
+```bash
+go run ./app/admin/cmd/server
+go run ./app/worker/cmd/worker
+cd frontend && pnpm install && pnpm dev
+```
+
+开发期生成命令为 `make wire`、`make gorm-gen` 和 `make api`。
 
 ## 配置与 Provider
 

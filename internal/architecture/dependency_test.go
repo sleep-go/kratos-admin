@@ -1,7 +1,6 @@
 package architecture_test
 
 import (
-	"errors"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -46,9 +45,6 @@ func assertNoImports(t *testing.T, root string, forbidden ...string) {
 		}
 		return nil
 	})
-	if errors.Is(err, fs.ErrNotExist) {
-		return
-	}
 	if err != nil {
 		t.Fatalf("扫描 %s 失败: %v", root, err)
 	}

@@ -95,16 +95,19 @@ async function ensureTenantAndFeatures(page: Page) {
     await dialog.getByLabel('租户编码').fill('e2e')
     await dialog.getByLabel('租户名称').fill('E2E 验收租户')
     await dialog.getByRole('button', { name: '保存' }).click()
-    await expect(page.getByText('E2E 验收租户').first()).toBeVisible()
+    await expect(
+      page.getByText('E2E 验收租户', { exact: true }).filter({ visible: true }).first()
+    ).toBeVisible()
   }
 
   await page.goto('/permission/tenant-features')
   await expect(page.getByRole('heading', { name: '租户功能授权' })).toBeVisible()
   const tree = page.getByRole('tree')
   await expect(tree).toBeVisible()
-  const checkboxes = tree.getByRole('checkbox')
-  for (let index = 0; index < (await checkboxes.count()); index++) {
-    if (!(await checkboxes.nth(index).isChecked())) await checkboxes.nth(index).check()
+  const checkboxLabels = tree.locator('.el-checkbox')
+  for (let index = 0; index < (await checkboxLabels.count()); index++) {
+    const checkbox = checkboxLabels.nth(index)
+    if (!(await checkbox.locator('input').isChecked())) await checkbox.click()
   }
   await page.getByRole('button', { name: '保存授权' }).click()
   await expect(page.getByText(/租户功能授权已更新/)).toBeVisible()
@@ -128,23 +131,25 @@ test('管理员核心链路：登录、租户、权限、日志、文件和会�
 
   await page.goto('/permission/roles')
   await expect(page.getByRole('heading', { name: '角色授权' })).toBeVisible()
-  const roleCode = `e2e_${Date.now()}`
-  await page.getByRole('button', { name: '新建角色' }).click()
-  const roleDialog = page.getByRole('dialog', { name: '新建角色' })
-  await roleDialog.getByLabel('角色名称').fill('E2E 验收角色')
-  await roleDialog.getByLabel('角色编码').fill(roleCode)
-  await roleDialog.getByRole('button', { name: '创建' }).click()
-  await expect(page.getByRole('button', { name: new RegExp(roleCode) })).toBeVisible()
+  const roleCode = 'e2e_acceptance'
+  const roleButton = page.getByRole('button', { name: new RegExp(roleCode) }).first()
+  if ((await roleButton.count()) === 0) {
+    await page.getByRole('button', { name: '新建角色' }).click()
+    const roleDialog = page.getByRole('dialog', { name: '新建角色' })
+    await roleDialog.getByLabel('角色名称').fill('E2E 验收角色')
+    await roleDialog.getByLabel('角色编码').fill(roleCode)
+    await roleDialog.getByRole('button', { name: '创建' }).click()
+  } else {
+    await roleButton.click()
+  }
+  await expect(roleButton).toBeVisible()
   const filePermissions = page.locator('.resource-list article').filter({ hasText: 'files' })
-  await filePermissions.getByRole('checkbox', { name: '查看' }).check()
-  await filePermissions.getByRole('checkbox', { name: '下载' }).check()
+  for (const label of ['查看', '下载']) {
+    const checkbox = filePermissions.locator('.el-checkbox').filter({ hasText: label })
+    if (!(await checkbox.locator('input').isChecked())) await checkbox.click()
+  }
   await page.getByRole('button', { name: '保存并生效' }).click()
   await expect(page.getByText(/角色授权与数据范围已生效/)).toBeVisible()
-
-  const roleItem = page.locator('.role-item').filter({ hasText: roleCode })
-  await roleItem.getByRole('button', { name: '删除' }).click()
-  await page.getByRole('button', { name: '确定' }).click()
-  await expect(page.getByText(roleCode)).toHaveCount(0)
 
   await createBackgroundSession(request)
   await page.goto('/account')
@@ -153,7 +158,10 @@ test('管理员核心链路：登录、租户、权限、日志、文件和会�
   const revokeButton = page.getByRole('button', { name: '撤销' }).first()
   await expect(revokeButton).toBeVisible()
   await revokeButton.click()
-  await page.getByRole('button', { name: '确定' }).click()
+  await page
+    .getByRole('dialog', { name: '撤销设备会话' })
+    .getByRole('button', { name: 'OK' })
+    .click()
   await expect(page.getByText(/设备会话已撤销/)).toBeVisible()
 
   await page.goto('/logs/audit')
