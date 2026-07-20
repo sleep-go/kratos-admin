@@ -547,6 +547,198 @@ func (*DeleteFileResponse) Descriptor() ([]byte, []int) {
 	return file_admin_v1_file_proto_rawDescGZIP(), []int{8}
 }
 
+type AddReferenceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	BusinessType  string                 `protobuf:"bytes,2,opt,name=business_type,json=businessType,proto3" json:"business_type,omitempty"`
+	BusinessId    string                 `protobuf:"bytes,3,opt,name=business_id,json=businessId,proto3" json:"business_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddReferenceRequest) Reset() {
+	*x = AddReferenceRequest{}
+	mi := &file_admin_v1_file_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddReferenceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddReferenceRequest) ProtoMessage() {}
+
+func (x *AddReferenceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_file_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddReferenceRequest.ProtoReflect.Descriptor instead.
+func (*AddReferenceRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_file_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AddReferenceRequest) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *AddReferenceRequest) GetBusinessType() string {
+	if x != nil {
+		return x.BusinessType
+	}
+	return ""
+}
+
+func (x *AddReferenceRequest) GetBusinessId() string {
+	if x != nil {
+		return x.BusinessId
+	}
+	return ""
+}
+
+type AddReferenceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddReferenceResponse) Reset() {
+	*x = AddReferenceResponse{}
+	mi := &file_admin_v1_file_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddReferenceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddReferenceResponse) ProtoMessage() {}
+
+func (x *AddReferenceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_file_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddReferenceResponse.ProtoReflect.Descriptor instead.
+func (*AddReferenceResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_file_proto_rawDescGZIP(), []int{10}
+}
+
+type RemoveReferenceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	BusinessType  string                 `protobuf:"bytes,2,opt,name=business_type,json=businessType,proto3" json:"business_type,omitempty"`
+	BusinessId    string                 `protobuf:"bytes,3,opt,name=business_id,json=businessId,proto3" json:"business_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveReferenceRequest) Reset() {
+	*x = RemoveReferenceRequest{}
+	mi := &file_admin_v1_file_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveReferenceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveReferenceRequest) ProtoMessage() {}
+
+func (x *RemoveReferenceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_file_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveReferenceRequest.ProtoReflect.Descriptor instead.
+func (*RemoveReferenceRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_file_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RemoveReferenceRequest) GetFileId() string {
+	if x != nil {
+		return x.FileId
+	}
+	return ""
+}
+
+func (x *RemoveReferenceRequest) GetBusinessType() string {
+	if x != nil {
+		return x.BusinessType
+	}
+	return ""
+}
+
+func (x *RemoveReferenceRequest) GetBusinessId() string {
+	if x != nil {
+		return x.BusinessId
+	}
+	return ""
+}
+
+type RemoveReferenceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveReferenceResponse) Reset() {
+	*x = RemoveReferenceResponse{}
+	mi := &file_admin_v1_file_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveReferenceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveReferenceResponse) ProtoMessage() {}
+
+func (x *RemoveReferenceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_file_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveReferenceResponse.ProtoReflect.Descriptor instead.
+func (*RemoveReferenceResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_file_proto_rawDescGZIP(), []int{12}
+}
+
 var File_admin_v1_file_proto protoreflect.FileDescriptor
 
 const file_admin_v1_file_proto_rawDesc = "" +
@@ -594,13 +786,27 @@ const file_admin_v1_file_proto_rawDesc = "" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\",\n" +
 	"\x11DeleteFileRequest\x12\x17\n" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\"\x14\n" +
-	"\x12DeleteFileResponse2\xea\x03\n" +
+	"\x12DeleteFileResponse\"t\n" +
+	"\x13AddReferenceRequest\x12\x17\n" +
+	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12#\n" +
+	"\rbusiness_type\x18\x02 \x01(\tR\fbusinessType\x12\x1f\n" +
+	"\vbusiness_id\x18\x03 \x01(\tR\n" +
+	"businessId\"\x16\n" +
+	"\x14AddReferenceResponse\"w\n" +
+	"\x16RemoveReferenceRequest\x12\x17\n" +
+	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12#\n" +
+	"\rbusiness_type\x18\x02 \x01(\tR\fbusinessType\x12\x1f\n" +
+	"\vbusiness_id\x18\x03 \x01(\tR\n" +
+	"businessId\"\x19\n" +
+	"\x17RemoveReferenceResponse2\x8b\x06\n" +
 	"\vFileService\x12o\n" +
 	"\fCreateUpload\x12\x1d.admin.v1.CreateUploadRequest\x1a\x1e.admin.v1.CreateUploadResponse\" \x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/files/uploads\x12|\n" +
 	"\rConfirmUpload\x12\x1e.admin.v1.ConfirmUploadRequest\x1a\x1f.admin.v1.ConfirmUploadResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/files/{file_id}/confirm\x12\x81\x01\n" +
 	"\x0eGetDownloadURL\x12\x1f.admin.v1.GetDownloadURLRequest\x1a .admin.v1.GetDownloadURLResponse\",\x82\xd3\xe4\x93\x02&\x12$/api/v1/files/{file_id}/download-url\x12h\n" +
 	"\n" +
-	"DeleteFile\x12\x1b.admin.v1.DeleteFileRequest\x1a\x1c.admin.v1.DeleteFileResponse\"\x1f\x82\xd3\xe4\x93\x02\x19*\x17/api/v1/files/{file_id}B2Z0github.com/sleep-go/kratos-admin/api/admin/v1;v1b\x06proto3"
+	"DeleteFile\x12\x1b.admin.v1.DeleteFileRequest\x1a\x1c.admin.v1.DeleteFileResponse\"\x1f\x82\xd3\xe4\x93\x02\x19*\x17/api/v1/files/{file_id}\x12|\n" +
+	"\fAddReference\x12\x1d.admin.v1.AddReferenceRequest\x1a\x1e.admin.v1.AddReferenceResponse\"-\x82\xd3\xe4\x93\x02':\x01*\"\"/api/v1/files/{file_id}/references\x12\xa0\x01\n" +
+	"\x0fRemoveReference\x12 .admin.v1.RemoveReferenceRequest\x1a!.admin.v1.RemoveReferenceResponse\"H\x82\xd3\xe4\x93\x02B*@/api/v1/files/{file_id}/references/{business_type}/{business_id}B2Z0github.com/sleep-go/kratos-admin/api/admin/v1;v1b\x06proto3"
 
 var (
 	file_admin_v1_file_proto_rawDescOnce sync.Once
@@ -614,36 +820,44 @@ func file_admin_v1_file_proto_rawDescGZIP() []byte {
 	return file_admin_v1_file_proto_rawDescData
 }
 
-var file_admin_v1_file_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_admin_v1_file_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_admin_v1_file_proto_goTypes = []any{
-	(*CreateUploadRequest)(nil),    // 0: admin.v1.CreateUploadRequest
-	(*SignedFileRequest)(nil),      // 1: admin.v1.SignedFileRequest
-	(*CreateUploadResponse)(nil),   // 2: admin.v1.CreateUploadResponse
-	(*ConfirmUploadRequest)(nil),   // 3: admin.v1.ConfirmUploadRequest
-	(*ConfirmUploadResponse)(nil),  // 4: admin.v1.ConfirmUploadResponse
-	(*GetDownloadURLResponse)(nil), // 5: admin.v1.GetDownloadURLResponse
-	(*GetDownloadURLRequest)(nil),  // 6: admin.v1.GetDownloadURLRequest
-	(*DeleteFileRequest)(nil),      // 7: admin.v1.DeleteFileRequest
-	(*DeleteFileResponse)(nil),     // 8: admin.v1.DeleteFileResponse
-	nil,                            // 9: admin.v1.SignedFileRequest.HeadersEntry
-	(*timestamppb.Timestamp)(nil),  // 10: google.protobuf.Timestamp
+	(*CreateUploadRequest)(nil),     // 0: admin.v1.CreateUploadRequest
+	(*SignedFileRequest)(nil),       // 1: admin.v1.SignedFileRequest
+	(*CreateUploadResponse)(nil),    // 2: admin.v1.CreateUploadResponse
+	(*ConfirmUploadRequest)(nil),    // 3: admin.v1.ConfirmUploadRequest
+	(*ConfirmUploadResponse)(nil),   // 4: admin.v1.ConfirmUploadResponse
+	(*GetDownloadURLResponse)(nil),  // 5: admin.v1.GetDownloadURLResponse
+	(*GetDownloadURLRequest)(nil),   // 6: admin.v1.GetDownloadURLRequest
+	(*DeleteFileRequest)(nil),       // 7: admin.v1.DeleteFileRequest
+	(*DeleteFileResponse)(nil),      // 8: admin.v1.DeleteFileResponse
+	(*AddReferenceRequest)(nil),     // 9: admin.v1.AddReferenceRequest
+	(*AddReferenceResponse)(nil),    // 10: admin.v1.AddReferenceResponse
+	(*RemoveReferenceRequest)(nil),  // 11: admin.v1.RemoveReferenceRequest
+	(*RemoveReferenceResponse)(nil), // 12: admin.v1.RemoveReferenceResponse
+	nil,                             // 13: admin.v1.SignedFileRequest.HeadersEntry
+	(*timestamppb.Timestamp)(nil),   // 14: google.protobuf.Timestamp
 }
 var file_admin_v1_file_proto_depIdxs = []int32{
-	9,  // 0: admin.v1.SignedFileRequest.headers:type_name -> admin.v1.SignedFileRequest.HeadersEntry
-	10, // 1: admin.v1.SignedFileRequest.expires_at:type_name -> google.protobuf.Timestamp
+	13, // 0: admin.v1.SignedFileRequest.headers:type_name -> admin.v1.SignedFileRequest.HeadersEntry
+	14, // 1: admin.v1.SignedFileRequest.expires_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: admin.v1.CreateUploadResponse.upload:type_name -> admin.v1.SignedFileRequest
-	10, // 3: admin.v1.ConfirmUploadResponse.created_at:type_name -> google.protobuf.Timestamp
+	14, // 3: admin.v1.ConfirmUploadResponse.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 4: admin.v1.GetDownloadURLResponse.download:type_name -> admin.v1.SignedFileRequest
 	0,  // 5: admin.v1.FileService.CreateUpload:input_type -> admin.v1.CreateUploadRequest
 	3,  // 6: admin.v1.FileService.ConfirmUpload:input_type -> admin.v1.ConfirmUploadRequest
 	6,  // 7: admin.v1.FileService.GetDownloadURL:input_type -> admin.v1.GetDownloadURLRequest
 	7,  // 8: admin.v1.FileService.DeleteFile:input_type -> admin.v1.DeleteFileRequest
-	2,  // 9: admin.v1.FileService.CreateUpload:output_type -> admin.v1.CreateUploadResponse
-	4,  // 10: admin.v1.FileService.ConfirmUpload:output_type -> admin.v1.ConfirmUploadResponse
-	5,  // 11: admin.v1.FileService.GetDownloadURL:output_type -> admin.v1.GetDownloadURLResponse
-	8,  // 12: admin.v1.FileService.DeleteFile:output_type -> admin.v1.DeleteFileResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
+	9,  // 9: admin.v1.FileService.AddReference:input_type -> admin.v1.AddReferenceRequest
+	11, // 10: admin.v1.FileService.RemoveReference:input_type -> admin.v1.RemoveReferenceRequest
+	2,  // 11: admin.v1.FileService.CreateUpload:output_type -> admin.v1.CreateUploadResponse
+	4,  // 12: admin.v1.FileService.ConfirmUpload:output_type -> admin.v1.ConfirmUploadResponse
+	5,  // 13: admin.v1.FileService.GetDownloadURL:output_type -> admin.v1.GetDownloadURLResponse
+	8,  // 14: admin.v1.FileService.DeleteFile:output_type -> admin.v1.DeleteFileResponse
+	10, // 15: admin.v1.FileService.AddReference:output_type -> admin.v1.AddReferenceResponse
+	12, // 16: admin.v1.FileService.RemoveReference:output_type -> admin.v1.RemoveReferenceResponse
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -660,7 +874,7 @@ func file_admin_v1_file_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_admin_v1_file_proto_rawDesc), len(file_admin_v1_file_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

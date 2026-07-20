@@ -26,6 +26,10 @@ const (
 	StatusAvailable uint8 = 2
 	// StatusDeleted 表示文件已删除。
 	StatusDeleted uint8 = 3
+	// StatusCleanupFailed 表示 Worker 多次清理对象失败。
+	StatusCleanupFailed uint8 = 4
+	// StatusDeletionPending 表示元数据已冻结并等待 Worker 清理对象。
+	StatusDeletionPending uint8 = 5
 )
 
 var (
@@ -35,6 +39,8 @@ var (
 	ErrObjectMismatch = errors.New("上传对象元数据不匹配")
 	// ErrFileUnavailable 表示文件不存在、未确认或已删除。
 	ErrFileUnavailable = errors.New("文件不可用")
+	// ErrFileReferenced 表示文件仍被业务资源引用，禁止删除。
+	ErrFileReferenced = errors.New("文件仍被业务资源引用")
 )
 
 // Record 描述租户文件持久化状态。
@@ -58,7 +64,9 @@ type Repository interface {
 	Create(ctx context.Context, record Record) error
 	Find(ctx context.Context, tenantID uint64, fileID string) (Record, error)
 	Confirm(ctx context.Context, tenantID uint64, fileID, etag string) error
-	MarkDeleted(ctx context.Context, tenantID uint64, fileID string) error
+	RequestDelete(ctx context.Context, tenantID uint64, fileID string) error
+	AddReference(ctx context.Context, tenantID uint64, fileID, businessType, businessID string) error
+	RemoveReference(ctx context.Context, tenantID uint64, fileID, businessType, businessID string) error
 }
 
 // UploadInput 描述预登记上传文件的可信租户上下文和客户端元数据。
@@ -157,16 +165,45 @@ func (u *Usecase) DownloadURL(ctx context.Context, tenantID uint64, fileID strin
 	return u.provider.PresignDownload(ctx, record.ObjectKey, record.OriginalName, 5*time.Minute)
 }
 
-// Delete 删除对象后将文件元数据标记为已删除。
+// Delete 冻结文件并请求 Worker 异步清理对象。
 func (u *Usecase) Delete(ctx context.Context, tenantID uint64, fileID string) error {
 	record, err := u.repository.Find(ctx, tenantID, fileID)
 	if err != nil || record.Status == StatusDeleted || record.ProviderName != u.provider.Name() {
 		return ErrFileUnavailable
 	}
-	if err := u.provider.Delete(ctx, record.ObjectKey); err != nil {
-		return err
+	return u.repository.RequestDelete(ctx, tenantID, fileID)
+}
+
+// AddReference 为可用文件绑定租户内业务资源引用。
+func (u *Usecase) AddReference(ctx context.Context, tenantID uint64, fileID, businessType, businessID string) error {
+	if !safeReferencePart(businessType) || !safeReferencePart(businessID) {
+		return ErrInvalidFile
 	}
-	return u.repository.MarkDeleted(ctx, tenantID, fileID)
+	record, err := u.repository.Find(ctx, tenantID, fileID)
+	if err != nil || record.Status != StatusAvailable {
+		return ErrFileUnavailable
+	}
+	return u.repository.AddReference(ctx, tenantID, fileID, businessType, businessID)
+}
+
+// RemoveReference 解除文件与租户内业务资源的引用关系。
+func (u *Usecase) RemoveReference(ctx context.Context, tenantID uint64, fileID, businessType, businessID string) error {
+	if !safeReferencePart(businessType) || !safeReferencePart(businessID) {
+		return ErrInvalidFile
+	}
+	return u.repository.RemoveReference(ctx, tenantID, fileID, businessType, businessID)
+}
+
+func safeReferencePart(value string) bool {
+	if value == "" || len(value) > 64 {
+		return false
+	}
+	for _, character := range value {
+		if !(character == '-' || character == '_' || character == '.' || character >= '0' && character <= '9' || character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z') {
+			return false
+		}
+	}
+	return true
 }
 
 func safeFilename(name string) bool {

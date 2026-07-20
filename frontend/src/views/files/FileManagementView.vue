@@ -24,7 +24,7 @@ async function load() {
   try {
     const response = await managementApi.listResources('files', {
       page: page.value,
-      pageSize
+      page_size: pageSize
     })
     items.value = (response.items ?? []) as FileRow[]
     total.value = Number(response.total ?? 0)
@@ -78,15 +78,18 @@ async function remove(row: FileRow) {
     type: 'warning'
   })
   await fileApi.deleteFile(fileId)
-  ElMessage.success('文件已删除')
+  ElMessage.success('删除请求已提交，Worker 将异步清理对象')
   await load()
 }
 
 function statusText(value: unknown) {
   return (
-    ({ 1: '待确认', 2: '可用', 3: '已删除', 4: '清理失败' } as Record<number, string>)[
-      Number(value)
-    ] ?? '未知'
+    (
+      { 1: '待确认', 2: '可用', 3: '已删除', 4: '清理失败', 5: '等待清理' } as Record<
+        number,
+        string
+      >
+    )[Number(value)] ?? '未知'
   )
 }
 

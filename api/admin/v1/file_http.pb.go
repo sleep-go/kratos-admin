@@ -19,16 +19,20 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
+const OperationFileServiceAddReference = "/admin.v1.FileService/AddReference"
 const OperationFileServiceConfirmUpload = "/admin.v1.FileService/ConfirmUpload"
 const OperationFileServiceCreateUpload = "/admin.v1.FileService/CreateUpload"
 const OperationFileServiceDeleteFile = "/admin.v1.FileService/DeleteFile"
 const OperationFileServiceGetDownloadURL = "/admin.v1.FileService/GetDownloadURL"
+const OperationFileServiceRemoveReference = "/admin.v1.FileService/RemoveReference"
 
 type FileServiceHTTPServer interface {
+	AddReference(context.Context, *AddReferenceRequest) (*AddReferenceResponse, error)
 	ConfirmUpload(context.Context, *ConfirmUploadRequest) (*ConfirmUploadResponse, error)
 	CreateUpload(context.Context, *CreateUploadRequest) (*CreateUploadResponse, error)
 	DeleteFile(context.Context, *DeleteFileRequest) (*DeleteFileResponse, error)
 	GetDownloadURL(context.Context, *GetDownloadURLRequest) (*GetDownloadURLResponse, error)
+	RemoveReference(context.Context, *RemoveReferenceRequest) (*RemoveReferenceResponse, error)
 }
 
 func RegisterFileServiceHTTPServer(s *http.Server, srv FileServiceHTTPServer) {
@@ -37,6 +41,8 @@ func RegisterFileServiceHTTPServer(s *http.Server, srv FileServiceHTTPServer) {
 	r.POST("/api/v1/files/{file_id}/confirm", _FileService_ConfirmUpload0_HTTP_Handler(srv))
 	r.GET("/api/v1/files/{file_id}/download-url", _FileService_GetDownloadURL0_HTTP_Handler(srv))
 	r.DELETE("/api/v1/files/{file_id}", _FileService_DeleteFile0_HTTP_Handler(srv))
+	r.POST("/api/v1/files/{file_id}/references", _FileService_AddReference0_HTTP_Handler(srv))
+	r.DELETE("/api/v1/files/{file_id}/references/{business_type}/{business_id}", _FileService_RemoveReference0_HTTP_Handler(srv))
 }
 
 func _FileService_CreateUpload0_HTTP_Handler(srv FileServiceHTTPServer) func(ctx http.Context) error {
@@ -130,11 +136,60 @@ func _FileService_DeleteFile0_HTTP_Handler(srv FileServiceHTTPServer) func(ctx h
 	}
 }
 
+func _FileService_AddReference0_HTTP_Handler(srv FileServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in AddReferenceRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationFileServiceAddReference)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.AddReference(ctx, req.(*AddReferenceRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*AddReferenceResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _FileService_RemoveReference0_HTTP_Handler(srv FileServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in RemoveReferenceRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindVars(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationFileServiceRemoveReference)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.RemoveReference(ctx, req.(*RemoveReferenceRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*RemoveReferenceResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 type FileServiceHTTPClient interface {
+	AddReference(ctx context.Context, req *AddReferenceRequest, opts ...http.CallOption) (rsp *AddReferenceResponse, err error)
 	ConfirmUpload(ctx context.Context, req *ConfirmUploadRequest, opts ...http.CallOption) (rsp *ConfirmUploadResponse, err error)
 	CreateUpload(ctx context.Context, req *CreateUploadRequest, opts ...http.CallOption) (rsp *CreateUploadResponse, err error)
 	DeleteFile(ctx context.Context, req *DeleteFileRequest, opts ...http.CallOption) (rsp *DeleteFileResponse, err error)
 	GetDownloadURL(ctx context.Context, req *GetDownloadURLRequest, opts ...http.CallOption) (rsp *GetDownloadURLResponse, err error)
+	RemoveReference(ctx context.Context, req *RemoveReferenceRequest, opts ...http.CallOption) (rsp *RemoveReferenceResponse, err error)
 }
 
 type FileServiceHTTPClientImpl struct {
@@ -143,6 +198,19 @@ type FileServiceHTTPClientImpl struct {
 
 func NewFileServiceHTTPClient(client *http.Client) FileServiceHTTPClient {
 	return &FileServiceHTTPClientImpl{client}
+}
+
+func (c *FileServiceHTTPClientImpl) AddReference(ctx context.Context, in *AddReferenceRequest, opts ...http.CallOption) (*AddReferenceResponse, error) {
+	var out AddReferenceResponse
+	pattern := "/api/v1/files/{file_id}/references"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationFileServiceAddReference))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 func (c *FileServiceHTTPClientImpl) ConfirmUpload(ctx context.Context, in *ConfirmUploadRequest, opts ...http.CallOption) (*ConfirmUploadResponse, error) {
@@ -191,6 +259,19 @@ func (c *FileServiceHTTPClientImpl) GetDownloadURL(ctx context.Context, in *GetD
 	opts = append(opts, http.Operation(OperationFileServiceGetDownloadURL))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *FileServiceHTTPClientImpl) RemoveReference(ctx context.Context, in *RemoveReferenceRequest, opts ...http.CallOption) (*RemoveReferenceResponse, error) {
+	var out RemoveReferenceResponse
+	pattern := "/api/v1/files/{file_id}/references/{business_type}/{business_id}"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationFileServiceRemoveReference))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "DELETE", path, nil, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

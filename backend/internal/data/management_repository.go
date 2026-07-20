@@ -65,7 +65,7 @@ var managementResources = map[string]resourceDefinition{
 	"dictionary-types":       {table: "dictionary_types", columns: []string{"id", "tenant_id", "code", "name", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("status"), keywordFields: []string{"code", "name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"dictionary-items":       {table: "dictionary_items", columns: []string{"id", "tenant_id", "type_id", "item_value", "label", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("type_id", "item_value", "label", "sort_order", "status"), filterFields: fieldSet("type_id", "status"), keywordFields: []string{"item_value", "label"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"providers":              {table: "provider_configs", columns: []string{"id", "tenant_id", "provider_type", "provider_name", "display_name", "encrypted_config", "status", "is_default", "updated_by", "created_at", "updated_at"}, writeFields: fieldSet("provider_type", "provider_name", "display_name", "config", "status", "is_default"), filterFields: fieldSet("provider_type", "status", "is_default"), keywordFields: []string{"provider_name", "display_name"}, tenantScoped: true, tenantColumn: "tenant_id"},
-	"files":                  {table: "files", columns: []string{"id", "tenant_id", "uploader_member_id", "provider_name", "object_key", "original_name", "content_type", "size_bytes", "sha256", "status", "created_at"}, filterFields: fieldSet("provider_name", "content_type", "status"), keywordFields: []string{"original_name", "object_key", "sha256"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
+	"files":                  {table: "files", columns: []string{"id", "tenant_id", "uploader_member_id", "provider_name", "object_key", "original_name", "content_type", "size_bytes", "sha256", "status", "created_at"}, filterFields: fieldSet("provider_name", "content_type", "status"), keywordFields: []string{"original_name", "object_key", "sha256"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true, readOnly: true},
 }
 
 // ManagementRepository 使用编译期白名单访问后台资源。
@@ -110,6 +110,28 @@ func (r *ManagementRepository) Allowed(ctx context.Context, scope service.Resour
 		Joins("JOIN casbin_rules AS g ON g.ptype = 'g' AND g.v0 = p.v0 AND g.v2 = p.v1 AND g.v1 = ?", fmt.Sprint(scope.MemberID)).
 		Count(&count).Error
 	return count > 0, err
+}
+
+// AllowedRecord 按可信租户和角色数据范围校验单条资源可见性。
+func (r *ManagementRepository) AllowedRecord(ctx context.Context, scope service.ResourceScope, resource, id string) (bool, error) {
+	definition, ok := managementResources[resource]
+	if !ok || id == "" {
+		return false, nil
+	}
+	query := r.db.WithContext(ctx).Table(definition.table).Where("id = ?", id)
+	if definition.tenantScoped {
+		query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
+	}
+	if definition.softDelete {
+		query = query.Where("deleted_at IS NULL")
+	}
+	query, err := r.applyDataScope(ctx, query, scope, resource)
+	if err != nil {
+		return false, err
+	}
+	var count int64
+	err = query.Count(&count).Error
+	return count == 1, err
 }
 
 // List 分页查询资源，租户条件始终来自认证上下文。

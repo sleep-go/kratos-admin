@@ -330,6 +330,70 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/files/{fileId}/references:
+        post:
+            tags:
+                - FileService
+            operationId: FileService_AddReference
+            parameters:
+                - name: fileId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.AddReferenceRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.AddReferenceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/files/{fileId}/references/{businessType}/{businessId}:
+        delete:
+            tags:
+                - FileService
+            operationId: FileService_RemoveReference
+            parameters:
+                - name: fileId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: businessType
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+                - name: businessId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.RemoveReferenceResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/v1/health:
         get:
             tags:
@@ -604,6 +668,18 @@ paths:
                                 $ref: '#/components/schemas/google.rpc.Status'
 components:
     schemas:
+        admin.v1.AddReferenceRequest:
+            type: object
+            properties:
+                fileId:
+                    type: string
+                businessType:
+                    type: string
+                businessId:
+                    type: string
+        admin.v1.AddReferenceResponse:
+            type: object
+            properties: {}
         admin.v1.CheckResponse:
             type: object
             properties:
@@ -858,6 +934,9 @@ components:
                         $ref: '#/components/schemas/admin.v1.TenantSummary'
                 currentTenant:
                     $ref: '#/components/schemas/admin.v1.TenantSummary'
+        admin.v1.RemoveReferenceResponse:
+            type: object
+            properties: {}
         admin.v1.ResetPasswordRequest:
             type: object
             properties:

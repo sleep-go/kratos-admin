@@ -13,6 +13,7 @@ import (
 	"github.com/hibiken/asynq"
 
 	"github.com/sleep-go/kratos-admin/backend/internal/biz/audit"
+	filebiz "github.com/sleep-go/kratos-admin/backend/internal/biz/file"
 	"github.com/sleep-go/kratos-admin/backend/internal/biz/logexport"
 	"github.com/sleep-go/kratos-admin/backend/internal/conf"
 	"github.com/sleep-go/kratos-admin/backend/internal/data"
@@ -20,8 +21,9 @@ import (
 )
 
 const (
-	auditTaskType     = "audit:publish:v1"
-	logExportTaskType = "log:export:v1"
+	auditTaskType       = "audit:publish:v1"
+	logExportTaskType   = "log:export:v1"
+	fileCleanupTaskType = "file:cleanup:v1"
 )
 
 type auditTaskPayload struct {
@@ -30,6 +32,13 @@ type auditTaskPayload struct {
 
 type logExportTaskPayload struct {
 	ExportID string `json:"export_id"`
+}
+
+type fileCleanupTaskPayload struct {
+	TenantID     uint64 `json:"tenant_id"`
+	FileID       string `json:"file_id"`
+	ProviderName string `json:"provider_name"`
+	ObjectKey    string `json:"object_key"`
 }
 
 // Server 将 Asynq Worker 适配为 Kratos Server 生命周期。
@@ -41,6 +50,8 @@ type Server struct {
 	logRepository   *data.LogExportRepository
 	logProcessor    *logexport.Processor
 	maintenance     *data.LogMaintenanceRepository
+	fileRepository  *data.FileRepository
+	storageProvider storage.Provider
 	nextMaintenance time.Time
 	logger          *log.Helper
 	stop            chan struct{}
@@ -55,8 +66,9 @@ func NewServer(cfg conf.Data, resources *data.Data, storageProvider storage.Prov
 		server: asynq.NewServer(asynq.RedisClientOpt{Addr: cfg.RedisAddr, DB: cfg.RedisDB}, asynq.Config{Concurrency: 10}),
 		client: resources.AsynqClient, repository: repository, processor: audit.NewProcessor(repository),
 		logRepository: logRepository, logProcessor: logexport.NewProcessor(logRepository, storageProvider, nil),
-		maintenance: data.NewLogMaintenanceRepository(resources),
-		logger:      log.NewHelper(logger), stop: make(chan struct{}),
+		maintenance:    data.NewLogMaintenanceRepository(resources),
+		fileRepository: data.NewFileRepository(resources), storageProvider: storageProvider,
+		logger: log.NewHelper(logger), stop: make(chan struct{}),
 	}
 }
 
@@ -65,11 +77,38 @@ func (s *Server) Start(ctx context.Context) error {
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(auditTaskType, s.handleAudit)
 	mux.HandleFunc(logExportTaskType, s.handleLogExport)
+	mux.HandleFunc(fileCleanupTaskType, s.handleFileCleanup)
 	go s.dispatch(ctx)
 	s.logger.Info("异步任务 Worker 已启动")
 	if err := s.server.Run(mux); err != nil {
 		return fmt.Errorf("Asynq Worker 退出: %w", err)
 	}
+	return nil
+}
+
+func (s *Server) handleFileCleanup(ctx context.Context, task *asynq.Task) error {
+	var payload fileCleanupTaskPayload
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil || payload.TenantID == 0 || payload.FileID == "" || payload.ObjectKey == "" {
+		return fmt.Errorf("解析文件清理任务失败: %w", asynq.SkipRetry)
+	}
+	if payload.ProviderName != s.storageProvider.Name() {
+		if err := s.fileRepository.FailCleanup(context.WithoutCancel(ctx), payload.TenantID, payload.FileID); err != nil {
+			s.logger.Errorf("标记文件清理失败 tenant_id=%d file_id=%s error=%v", payload.TenantID, payload.FileID, err)
+		}
+		return fmt.Errorf("文件 Provider %s 与 Worker Provider %s 不一致: %w", payload.ProviderName, s.storageProvider.Name(), asynq.SkipRetry)
+	}
+	if err := s.storageProvider.Delete(ctx, payload.ObjectKey); err != nil {
+		retryCount, _ := asynq.GetRetryCount(ctx)
+		maxRetry, _ := asynq.GetMaxRetry(ctx)
+		if retryCount >= maxRetry {
+			_ = s.fileRepository.FailCleanup(context.WithoutCancel(ctx), payload.TenantID, payload.FileID)
+		}
+		return err
+	}
+	if err := s.fileRepository.CompleteCleanup(ctx, payload.TenantID, payload.FileID); err != nil {
+		return err
+	}
+	s.logger.Infof("文件对象已异步清理 tenant_id=%d file_id=%s", payload.TenantID, payload.FileID)
 	return nil
 }
 
@@ -160,6 +199,23 @@ func (s *Server) enqueuePending(ctx context.Context) error {
 			return err
 		}
 		_, err = s.client.EnqueueContext(ctx, asynq.NewTask(logExportTaskType, payload), asynq.TaskID("log-export:"+exportID), asynq.MaxRetry(10), asynq.Timeout(10*time.Minute))
+		if err != nil && !errors.Is(err, asynq.ErrTaskIDConflict) {
+			return err
+		}
+	}
+	files, err := s.fileRepository.PendingCleanup(ctx, 100)
+	if err != nil {
+		return err
+	}
+	for _, record := range files {
+		if record.Status != filebiz.StatusDeletionPending {
+			continue
+		}
+		payload, err := json.Marshal(fileCleanupTaskPayload{TenantID: record.TenantID, FileID: record.ID, ProviderName: record.ProviderName, ObjectKey: record.ObjectKey})
+		if err != nil {
+			return err
+		}
+		_, err = s.client.EnqueueContext(ctx, asynq.NewTask(fileCleanupTaskType, payload), asynq.TaskID("file-cleanup:"+record.ID), asynq.MaxRetry(10), asynq.Timeout(5*time.Minute))
 		if err != nil && !errors.Is(err, asynq.ErrTaskIDConflict) {
 			return err
 		}

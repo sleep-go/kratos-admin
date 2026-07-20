@@ -27,6 +27,15 @@ service FileService {
   rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse) {
     option (google.api.http) = {delete: "/api/v1/files/{file_id}"};
   }
+  rpc AddReference(AddReferenceRequest) returns (AddReferenceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/files/{file_id}/references"
+      body: "*"
+    };
+  }
+  rpc RemoveReference(RemoveReferenceRequest) returns (RemoveReferenceResponse) {
+    option (google.api.http) = {delete: "/api/v1/files/{file_id}/references/{business_type}/{business_id}"};
+  }
 }
 
 message CreateUploadRequest {
@@ -79,3 +88,19 @@ message DeleteFileRequest {
 }
 
 message DeleteFileResponse {}
+
+message AddReferenceRequest {
+  string file_id = 1;
+  string business_type = 2;
+  string business_id = 3;
+}
+
+message AddReferenceResponse {}
+
+message RemoveReferenceRequest {
+  string file_id = 1;
+  string business_type = 2;
+  string business_id = 3;
+}
+
+message RemoveReferenceResponse {}

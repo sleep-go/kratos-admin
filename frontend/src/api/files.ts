@@ -3,6 +3,7 @@ import axios from 'axios'
 import { http } from './http'
 import type {
   AdminV1ConfirmUploadResponse,
+  AdminV1AddReferenceRequest,
   AdminV1CreateUploadRequest,
   AdminV1CreateUploadResponse,
   AdminV1GetDownloadUrlResponse,
@@ -14,6 +15,21 @@ export async function createUpload(
 ): Promise<AdminV1CreateUploadResponse> {
   const response = await http.post<AdminV1CreateUploadResponse>('/files/uploads', request)
   return response.data
+}
+
+export async function addReference(request: AdminV1AddReferenceRequest): Promise<void> {
+  if (!request.fileId) throw new Error('文件 ID 不能为空')
+  await http.post('/files/' + encodeURIComponent(request.fileId) + '/references', request)
+}
+
+export async function removeReference(
+  fileId: string,
+  businessType: string,
+  businessId: string
+): Promise<void> {
+  await http.delete(
+    `/files/${encodeURIComponent(fileId)}/references/${encodeURIComponent(businessType)}/${encodeURIComponent(businessId)}`
+  )
 }
 
 export async function putSignedFile(

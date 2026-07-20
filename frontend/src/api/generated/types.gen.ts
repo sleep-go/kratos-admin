@@ -4,6 +4,16 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AdminV1AddReferenceRequest = {
+    fileId?: string;
+    businessType?: string;
+    businessId?: string;
+};
+
+export type AdminV1AddReferenceResponse = {
+    [key: string]: unknown;
+};
+
 export type AdminV1CheckResponse = {
     status?: string;
     service?: string;
@@ -163,6 +173,10 @@ export type AdminV1RefreshResponse = {
     user?: AdminV1CurrentUser;
     tenants?: Array<AdminV1TenantSummary>;
     currentTenant?: AdminV1TenantSummary;
+};
+
+export type AdminV1RemoveReferenceResponse = {
+    [key: string]: unknown;
 };
 
 export type AdminV1ResetPasswordRequest = {
@@ -622,6 +636,62 @@ export type FileServiceGetDownloadUrlResponses = {
 };
 
 export type FileServiceGetDownloadUrlResponse = FileServiceGetDownloadUrlResponses[keyof FileServiceGetDownloadUrlResponses];
+
+export type FileServiceAddReferenceData = {
+    body: AdminV1AddReferenceRequest;
+    path: {
+        fileId: string;
+    };
+    query?: never;
+    url: '/api/v1/files/{fileId}/references';
+};
+
+export type FileServiceAddReferenceErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type FileServiceAddReferenceError = FileServiceAddReferenceErrors[keyof FileServiceAddReferenceErrors];
+
+export type FileServiceAddReferenceResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1AddReferenceResponse;
+};
+
+export type FileServiceAddReferenceResponse = FileServiceAddReferenceResponses[keyof FileServiceAddReferenceResponses];
+
+export type FileServiceRemoveReferenceData = {
+    body?: never;
+    path: {
+        fileId: string;
+        businessType: string;
+        businessId: string;
+    };
+    query?: never;
+    url: '/api/v1/files/{fileId}/references/{businessType}/{businessId}';
+};
+
+export type FileServiceRemoveReferenceErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type FileServiceRemoveReferenceError = FileServiceRemoveReferenceErrors[keyof FileServiceRemoveReferenceErrors];
+
+export type FileServiceRemoveReferenceResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1RemoveReferenceResponse;
+};
+
+export type FileServiceRemoveReferenceResponse = FileServiceRemoveReferenceResponses[keyof FileServiceRemoveReferenceResponses];
 
 export type HealthServiceCheckData = {
     body?: never;

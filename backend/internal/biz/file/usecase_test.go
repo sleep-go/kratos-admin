@@ -12,9 +12,10 @@ import (
 )
 
 type fakeRepository struct {
-	created Record
-	record  Record
-	status  uint8
+	created         Record
+	record          Record
+	status          uint8
+	deleteRequested bool
 }
 
 func (r *fakeRepository) Create(_ context.Context, record Record) error {
@@ -34,8 +35,15 @@ func (r *fakeRepository) Confirm(_ context.Context, tenantID uint64, fileID, eta
 	r.record.ETag = etag
 	return nil
 }
-func (r *fakeRepository) MarkDeleted(_ context.Context, _ uint64, _ string) error {
-	r.status = StatusDeleted
+func (r *fakeRepository) RequestDelete(_ context.Context, _ uint64, _ string) error {
+	r.status = StatusDeletionPending
+	r.deleteRequested = true
+	return nil
+}
+func (r *fakeRepository) AddReference(context.Context, uint64, string, string, string) error {
+	return nil
+}
+func (r *fakeRepository) RemoveReference(context.Context, uint64, string, string, string) error {
 	return nil
 }
 
@@ -119,5 +127,21 @@ func TestCreateRejectsMaliciousFilenameAndOversize(t *testing.T) {
 		if _, err := usecase.CreateUpload(context.Background(), input); err == nil {
 			t.Fatalf("CreateUpload(%+v) must fail", input)
 		}
+	}
+}
+
+func TestDeleteOnlyMarksCleanupPendingForWorker(t *testing.T) {
+	repository := &fakeRepository{record: Record{ID: "file-id", TenantID: 8, ProviderName: "fake", ObjectKey: "8/file.txt", Status: StatusAvailable}}
+	provider := &fakeProvider{}
+	usecase := NewUsecase(repository, provider, 10, nil)
+
+	if err := usecase.Delete(context.Background(), 8, "file-id"); err != nil {
+		t.Fatal(err)
+	}
+	if !repository.deleteRequested || repository.status != StatusDeletionPending {
+		t.Fatalf("repository = %+v", repository)
+	}
+	if provider.deleted != "" {
+		t.Fatalf("API process must not delete object synchronously: %q", provider.deleted)
 	}
 }
