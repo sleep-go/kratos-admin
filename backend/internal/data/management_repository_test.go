@@ -2,8 +2,10 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/sleep-go/kratos-admin/backend/internal/biz/providerconfig"
 	"github.com/sleep-go/kratos-admin/backend/internal/data/model"
@@ -214,5 +216,71 @@ func TestPermissionMutationIncrementsTenantVersion(t *testing.T) {
 	}
 	if version != 2 {
 		t.Fatalf("permission_version = %d, want 2", version)
+	}
+}
+
+func TestManagementRepositoryEnforcesRoleDataScope(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	tenant := &model.Tenant{Code: "data-scope", Name: "数据范围测试", Status: 1, PermissionVersion: 1}
+	if err := tx.Create(tenant).Error; err != nil {
+		t.Fatal(err)
+	}
+	root := &model.Department{TenantID: tenant.ID, Name: "研发部", Code: "rd", Path: "/rd", Status: 1}
+	outside := &model.Department{TenantID: tenant.ID, Name: "财务部", Code: "finance", Path: "/finance", Status: 1}
+	if err := tx.Create(root).Error; err != nil {
+		t.Fatal(err)
+	}
+	child := &model.Department{TenantID: tenant.ID, ParentID: root.ID, Name: "研发一组", Code: "rd-1", Path: "/rd/rd-1", Status: 1}
+	if err := tx.Create(child).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(outside).Error; err != nil {
+		t.Fatal(err)
+	}
+	joinedAt := time.Now().UTC()
+	actor := &model.TenantMember{TenantID: tenant.ID, UserID: 101, PrimaryDepartmentID: root.ID, DisplayName: "范围操作者", Status: 1, JoinedAt: joinedAt}
+	inside := &model.TenantMember{TenantID: tenant.ID, UserID: 102, PrimaryDepartmentID: child.ID, DisplayName: "范围内成员", Status: 1, JoinedAt: joinedAt}
+	blocked := &model.TenantMember{TenantID: tenant.ID, UserID: 103, PrimaryDepartmentID: outside.ID, DisplayName: "范围外成员", Status: 1, JoinedAt: joinedAt}
+	if err := tx.Create(actor).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(inside).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(blocked).Error; err != nil {
+		t.Fatal(err)
+	}
+	role := &model.Role{TenantID: tenant.ID, Code: "department-tree", Name: "部门树角色", DataScope: 2, Status: 1}
+	if err := tx.Create(role).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(&model.CasbinRule{Ptype: "g", V0: fmt.Sprint(tenant.ID), V1: fmt.Sprint(actor.ID), V2: fmt.Sprint(role.ID)}).Error; err != nil {
+		t.Fatal(err)
+	}
+	repository := &ManagementRepository{db: tx}
+	scope := service.ResourceScope{TenantID: tenant.ID, UserID: actor.UserID, MemberID: actor.ID}
+	rows, total, err := repository.List(context.Background(), scope, "members", service.PageQuery{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(rows) != 2 {
+		t.Fatalf("visible members total = %d, rows = %#v", total, rows)
+	}
+	if err := repository.Update(context.Background(), scope, "members", blocked.ID, map[string]any{"display_name": "越权修改"}); err == nil {
+		t.Fatal("data scope must reject updating a member in another department")
+	}
+	if _, err := repository.Create(context.Background(), scope, "members", map[string]any{
+		"user_id": 104, "primary_department_id": outside.ID, "display_name": "越权创建成员", "status": 1,
+	}); err == nil {
+		t.Fatal("data scope must reject creating a member in another department")
 	}
 }

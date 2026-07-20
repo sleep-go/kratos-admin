@@ -27,7 +27,15 @@ func TestResolveDataScope(t *testing.T) {
 		{
 			name:  "本部门及下级保留层级扩展标记",
 			roles: []RoleDataScope{{Type: DataScopeDepartmentTree, PrimaryDepartmentID: 10}},
-			want:  QueryDataScope{DepartmentIDs: []uint64{10}, IncludeDescendants: true},
+			want:  QueryDataScope{DepartmentIDs: []uint64{10}, DescendantRootIDs: []uint64{10}},
+		},
+		{
+			name: "层级部门不会错误扩展自定义部门",
+			roles: []RoleDataScope{
+				{Type: DataScopeDepartmentTree, PrimaryDepartmentID: 10},
+				{Type: DataScopeCustom, DepartmentIDs: []uint64{20}},
+			},
+			want: QueryDataScope{DepartmentIDs: []uint64{10, 20}, DescendantRootIDs: []uint64{10}},
 		},
 		{
 			name:  "只有本人权限时限制创建人",

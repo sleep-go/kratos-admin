@@ -16,6 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
+	permissionbiz "github.com/sleep-go/kratos-admin/backend/internal/biz/permission"
 	"github.com/sleep-go/kratos-admin/backend/internal/biz/providerconfig"
 	settingbiz "github.com/sleep-go/kratos-admin/backend/internal/biz/setting"
 	"github.com/sleep-go/kratos-admin/backend/internal/data/model"
@@ -124,6 +125,10 @@ func (r *ManagementRepository) List(ctx context.Context, scope service.ResourceS
 	if definition.softDelete {
 		query = query.Where("deleted_at IS NULL")
 	}
+	query, err := r.applyDataScope(ctx, query, scope, resource)
+	if err != nil {
+		return nil, 0, err
+	}
 	if page.Keyword != "" && len(definition.keywordFields) > 0 {
 		parts := make([]string, 0, len(definition.keywordFields))
 		args := make([]any, 0, len(definition.keywordFields))
@@ -144,7 +149,7 @@ func (r *ManagementRepository) List(ctx context.Context, scope service.ResourceS
 	}
 	order := resourceOrder(definition, page.Sort)
 	var rows []map[string]any
-	err := query.Select(strings.Join(definition.columns, ",")).Order(order).
+	err = query.Select(strings.Join(definition.columns, ",")).Order(order).
 		Offset(int((page.Page - 1) * page.PageSize)).Limit(int(page.PageSize)).Find(&rows).Error
 	r.redactManagementRows(resource, rows)
 	return rows, uint64(total), err
@@ -252,6 +257,9 @@ func (r *ManagementRepository) Create(ctx context.Context, scope service.Resourc
 	if err := r.prepareCreateValues(resource, values, scope); err != nil {
 		return 0, err
 	}
+	if err := r.validateCreateDataScope(ctx, scope, resource, values); err != nil {
+		return 0, err
+	}
 	if resource == "tenant-resources" {
 		values["created_by"] = scope.UserID
 	}
@@ -307,6 +315,32 @@ func (r *ManagementRepository) Create(ctx context.Context, scope service.Resourc
 	return id, err
 }
 
+func (r *ManagementRepository) validateCreateDataScope(ctx context.Context, scope service.ResourceScope, resource string, values map[string]any) error {
+	if resource != "members" && resource != "departments" {
+		return nil
+	}
+	resolved, err := r.resolveDataScope(ctx, scope)
+	if err != nil {
+		return err
+	}
+	if resolved.All {
+		return nil
+	}
+	if resolved.SelfOnly {
+		return errors.New("仅本人数据范围不允许创建组织数据")
+	}
+	departmentID := numericID(values["primary_department_id"])
+	if resource == "departments" {
+		departmentID = numericID(values["parent_id"])
+	}
+	for _, allowedID := range resolved.DepartmentIDs {
+		if allowedID == departmentID {
+			return nil
+		}
+	}
+	return errors.New("目标部门超出当前角色数据范围")
+}
+
 // Update 在可信作用域内更新资源并写入审计 Outbox。
 func (r *ManagementRepository) Update(ctx context.Context, scope service.ResourceScope, resource string, id uint64, data map[string]any) error {
 	definition, ok := managementResources[resource]
@@ -321,6 +355,10 @@ func (r *ManagementRepository) Update(ctx context.Context, scope service.Resourc
 		query := tx.Table(definition.table).Where("id = ?", id)
 		if definition.tenantScoped && !scope.PlatformAdmin {
 			query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
+		}
+		query, err = r.applyDataScope(ctx, query, scope, resource)
+		if err != nil {
+			return err
 		}
 		if err := r.prepareUpdateValues(tx, query, resource, values, scope); err != nil {
 			return err
@@ -516,6 +554,10 @@ func (r *ManagementRepository) Delete(ctx context.Context, scope service.Resourc
 		if definition.tenantScoped && !scope.PlatformAdmin {
 			query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
 		}
+		query, err := r.applyDataScope(ctx, query, scope, resource)
+		if err != nil {
+			return err
+		}
 		var result *gorm.DB
 		if definition.softDelete {
 			result = query.Update("deleted_at", time.Now().UTC())
@@ -533,6 +575,148 @@ func (r *ManagementRepository) Delete(ctx context.Context, scope service.Resourc
 		}
 		return writeAuditOutbox(tx, scope, "delete", resource, fmt.Sprint(id), nil)
 	})
+}
+
+type resolvedDataScope struct {
+	permissionbiz.QueryDataScope
+	PrimaryDepartmentID uint64
+}
+
+func (r *ManagementRepository) applyDataScope(ctx context.Context, query *gorm.DB, scope service.ResourceScope, resource string) (*gorm.DB, error) {
+	switch resource {
+	case "members", "departments", "files", "audit-logs", "login-logs", "api-logs":
+	default:
+		return query, nil
+	}
+	resolved, err := r.resolveDataScope(ctx, scope)
+	if err != nil {
+		return nil, err
+	}
+	if resolved.All {
+		return query, nil
+	}
+	if resolved.SelfOnly {
+		switch resource {
+		case "members":
+			return query.Where("id = ?", scope.MemberID), nil
+		case "departments":
+			return query.Where("id = ?", resolved.PrimaryDepartmentID), nil
+		case "files":
+			return query.Where("uploader_member_id = ?", scope.MemberID), nil
+		case "audit-logs":
+			return query.Where("member_id = ?", scope.MemberID), nil
+		case "login-logs", "api-logs":
+			return query.Where("user_id = ?", scope.UserID), nil
+		}
+	}
+	departmentIDs := resolved.DepartmentIDs
+	if len(departmentIDs) == 0 {
+		return query.Where("1 = 0"), nil
+	}
+	switch resource {
+	case "members":
+		query = query.Where("primary_department_id IN ?", departmentIDs)
+	case "departments":
+		query = query.Where("id IN ?", departmentIDs)
+	case "files":
+		query = query.Where("uploader_member_id IN (?)", r.db.WithContext(ctx).Table("tenant_members").Select("id").Where("tenant_id = ? AND primary_department_id IN ? AND deleted_at IS NULL", scope.TenantID, departmentIDs))
+	case "audit-logs":
+		query = query.Where("member_id IN (?)", r.db.WithContext(ctx).Table("tenant_members").Select("id").Where("tenant_id = ? AND primary_department_id IN ? AND deleted_at IS NULL", scope.TenantID, departmentIDs))
+	case "login-logs", "api-logs":
+		query = query.Where("user_id IN (?)", r.db.WithContext(ctx).Table("tenant_members").Select("user_id").Where("tenant_id = ? AND primary_department_id IN ? AND deleted_at IS NULL", scope.TenantID, departmentIDs))
+	}
+	return query, nil
+}
+
+func (r *ManagementRepository) resolveDataScope(ctx context.Context, scope service.ResourceScope) (resolvedDataScope, error) {
+	if scope.PlatformAdmin {
+		return resolvedDataScope{QueryDataScope: permissionbiz.QueryDataScope{All: true}}, nil
+	}
+	var member struct {
+		PrimaryDepartmentID uint64
+		IsTenantAdmin       bool
+	}
+	if err := r.db.WithContext(ctx).Table("tenant_members").Select("primary_department_id, is_tenant_admin").
+		Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", scope.MemberID, scope.TenantID).Take(&member).Error; err != nil {
+		return resolvedDataScope{}, errors.New("当前租户成员不存在或已禁用")
+	}
+	if member.IsTenantAdmin {
+		return resolvedDataScope{QueryDataScope: permissionbiz.QueryDataScope{All: true}, PrimaryDepartmentID: member.PrimaryDepartmentID}, nil
+	}
+	var roleRows []struct {
+		ID        uint64
+		DataScope uint8
+	}
+	if err := r.db.WithContext(ctx).Table("casbin_rules AS g").
+		Select("r.id, r.data_scope").
+		Joins("JOIN roles AS r ON r.id = CAST(g.v2 AS UNSIGNED) AND r.tenant_id = ? AND r.status = 1 AND r.deleted_at IS NULL", scope.TenantID).
+		Where("g.ptype = 'g' AND g.v0 = ? AND g.v1 = ?", fmt.Sprint(scope.TenantID), fmt.Sprint(scope.MemberID)).
+		Find(&roleRows).Error; err != nil {
+		return resolvedDataScope{}, err
+	}
+	roleIDs := make([]uint64, 0, len(roleRows))
+	for _, role := range roleRows {
+		roleIDs = append(roleIDs, role.ID)
+	}
+	custom := make(map[uint64][]uint64)
+	if len(roleIDs) > 0 {
+		var rows []model.RoleScopeDepartment
+		if err := r.db.WithContext(ctx).Where("tenant_id = ? AND role_id IN ?", scope.TenantID, roleIDs).Find(&rows).Error; err != nil {
+			return resolvedDataScope{}, err
+		}
+		for _, row := range rows {
+			custom[row.RoleID] = append(custom[row.RoleID], row.DepartmentID)
+		}
+	}
+	roles := make([]permissionbiz.RoleDataScope, 0, len(roleRows))
+	for _, role := range roleRows {
+		roles = append(roles, permissionbiz.RoleDataScope{Type: permissionbiz.DataScopeType(role.DataScope), PrimaryDepartmentID: member.PrimaryDepartmentID, DepartmentIDs: custom[role.ID]})
+	}
+	resolved := permissionbiz.ResolveDataScope(roles)
+	if len(resolved.DescendantRootIDs) > 0 {
+		expanded, err := r.expandDepartmentDescendants(ctx, scope.TenantID, resolved.DepartmentIDs, resolved.DescendantRootIDs)
+		if err != nil {
+			return resolvedDataScope{}, err
+		}
+		resolved.DepartmentIDs = expanded
+	}
+	return resolvedDataScope{QueryDataScope: resolved, PrimaryDepartmentID: member.PrimaryDepartmentID}, nil
+}
+
+func (r *ManagementRepository) expandDepartmentDescendants(ctx context.Context, tenantID uint64, departmentIDs, roots []uint64) ([]uint64, error) {
+	var rows []struct {
+		ID       uint64
+		ParentID uint64
+	}
+	if err := r.db.WithContext(ctx).Table("departments").Select("id, parent_id").Where("tenant_id = ? AND deleted_at IS NULL", tenantID).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	children := make(map[uint64][]uint64)
+	for _, row := range rows {
+		children[row.ParentID] = append(children[row.ParentID], row.ID)
+	}
+	set := make(map[uint64]struct{}, len(departmentIDs))
+	for _, id := range departmentIDs {
+		set[id] = struct{}{}
+	}
+	queue := append([]uint64(nil), roots...)
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, child := range children[current] {
+			if _, exists := set[child]; exists {
+				continue
+			}
+			set[child] = struct{}{}
+			queue = append(queue, child)
+		}
+	}
+	result := make([]uint64, 0, len(set))
+	for id := range set {
+		result = append(result, id)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	return result, nil
 }
 
 func incrementPermissionVersion(tx *gorm.DB, scope service.ResourceScope, resource string, values map[string]any, resourceID uint64) error {

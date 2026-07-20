@@ -28,15 +28,16 @@ type RoleDataScope struct {
 
 // QueryDataScope 描述仓储查询实际应用的数据过滤范围。
 type QueryDataScope struct {
-	All                bool
-	SelfOnly           bool
-	IncludeDescendants bool
-	DepartmentIDs      []uint64
+	All               bool
+	SelfOnly          bool
+	DepartmentIDs     []uint64
+	DescendantRootIDs []uint64
 }
 
 // ResolveDataScope 将多个角色的数据范围合并为最小限制的有效范围。
 func ResolveDataScope(roles []RoleDataScope) QueryDataScope {
 	departmentSet := make(map[uint64]struct{})
+	descendantRootSet := make(map[uint64]struct{})
 	result := QueryDataScope{SelfOnly: true}
 	for _, role := range roles {
 		switch role.Type {
@@ -44,8 +45,8 @@ func ResolveDataScope(roles []RoleDataScope) QueryDataScope {
 			return QueryDataScope{All: true}
 		case DataScopeDepartmentTree:
 			result.SelfOnly = false
-			result.IncludeDescendants = true
 			addDepartment(departmentSet, role.PrimaryDepartmentID)
+			addDepartment(descendantRootSet, role.PrimaryDepartmentID)
 		case DataScopeDepartment:
 			result.SelfOnly = false
 			addDepartment(departmentSet, role.PrimaryDepartmentID)
@@ -68,6 +69,15 @@ func ResolveDataScope(roles []RoleDataScope) QueryDataScope {
 	sort.Slice(result.DepartmentIDs, func(i, j int) bool {
 		return result.DepartmentIDs[i] < result.DepartmentIDs[j]
 	})
+	if len(descendantRootSet) > 0 {
+		result.DescendantRootIDs = make([]uint64, 0, len(descendantRootSet))
+		for departmentID := range descendantRootSet {
+			result.DescendantRootIDs = append(result.DescendantRootIDs, departmentID)
+		}
+		sort.Slice(result.DescendantRootIDs, func(i, j int) bool {
+			return result.DescendantRootIDs[i] < result.DescendantRootIDs[j]
+		})
+	}
 	return result
 }
 

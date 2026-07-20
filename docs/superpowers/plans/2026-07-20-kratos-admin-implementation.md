@@ -23,7 +23,7 @@
 - [x] Task 2：通过 Goose 建立身份、租户、组织、权限、日志、配置、任务和文件数据结构。
 - [x] Task 3：实现密码、验证码、MFA、JWT 双令牌、会话撤销和租户切换。
 - [x] Task 4：实现租户、成员、部门、岗位管理和平台治理接口。
-- [ ] Task 5：实现 Casbin domain RBAC、菜单资源、租户功能授权和五类数据范围。
+- [x] Task 5：实现 Casbin domain RBAC、菜单资源、租户功能授权和五类数据范围。
 - [x] Task 6：实现 outbox、Asynq Worker、三类日志、保留策略和异步导出。
 - [x] Task 7：实现三级配置、字典、邮件/短信 Provider 和敏感配置加密。
 - [ ] Task 8：实现本地/OSS 文件上传、校验、下载、引用与异步清理。
