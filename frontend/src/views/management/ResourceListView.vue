@@ -112,7 +112,13 @@ onMounted(load)
         <h1>{{ definition.title }}</h1>
         <span>{{ definition.description }}</span>
       </div>
-      <el-button v-if="!definition.readOnly" type="danger" @click="openCreate">新建</el-button>
+      <el-button
+        v-if="!definition.readOnly"
+        v-permission="`${definition.resource}:create`"
+        type="danger"
+        @click="openCreate"
+        >新建</el-button
+      >
     </header>
     <div class="query-panel">
       <el-input v-model="keyword" clearable placeholder="输入关键词搜索" @keyup.enter="load" />
@@ -139,8 +145,18 @@ onMounted(load)
         </el-table-column>
         <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" width="138">
           <template #default="scope"
-            ><el-button link @click="openEdit(scope.row)">编辑</el-button
-            ><el-button link type="danger" @click="remove(scope.row)">删除</el-button></template
+            ><el-button
+              v-permission="`${definition.resource}:update`"
+              link
+              @click="openEdit(scope.row)"
+              >编辑</el-button
+            ><el-button
+              v-permission="`${definition.resource}:delete`"
+              link
+              type="danger"
+              @click="remove(scope.row)"
+              >删除</el-button
+            ></template
           >
         </el-table-column>
       </el-table>
@@ -160,8 +176,15 @@ onMounted(load)
             >
           </dl>
           <div v-if="!definition.readOnly">
-            <el-button link @click="openEdit(row)">编辑</el-button
-            ><el-button link type="danger" @click="remove(row)">删除</el-button>
+            <el-button v-permission="`${definition.resource}:update`" link @click="openEdit(row)"
+              >编辑</el-button
+            ><el-button
+              v-permission="`${definition.resource}:delete`"
+              link
+              type="danger"
+              @click="remove(row)"
+              >删除</el-button
+            >
           </div>
         </article>
       </div>

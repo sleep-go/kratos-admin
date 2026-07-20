@@ -65,6 +65,35 @@ func NewManagementRepository(data *Data) *ManagementRepository {
 	return &ManagementRepository{db: data.DB}
 }
 
+// Allowed 按 tenant、member、role 的 Casbin domain 关系校验资源动作，并限制在租户功能授权集合内。
+func (r *ManagementRepository) Allowed(ctx context.Context, scope service.ResourceScope, resource, action string) (bool, error) {
+	if scope.PlatformAdmin {
+		return true, nil
+	}
+	var tenantAdmin bool
+	if err := r.db.WithContext(ctx).Table("tenant_members").Select("is_tenant_admin").
+		Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", scope.MemberID, scope.TenantID).
+		Scan(&tenantAdmin).Error; err != nil {
+		return false, err
+	}
+	base := r.db.WithContext(ctx).Table("tenant_resources AS tr").
+		Joins("JOIN resources AS res ON res.id = tr.resource_id AND res.code = ? AND res.status = 1 AND res.deleted_at IS NULL", resource).
+		Where("tr.tenant_id = ?", scope.TenantID)
+	if tenantAdmin {
+		var count int64
+		if err := base.Count(&count).Error; err != nil {
+			return false, err
+		}
+		return count > 0, nil
+	}
+	var count int64
+	err := base.
+		Joins("JOIN casbin_rules AS p ON p.ptype = 'p' AND p.v0 = ? AND p.v2 = res.code AND (p.v3 = ? OR p.v3 = '*')", fmt.Sprint(scope.TenantID), action).
+		Joins("JOIN casbin_rules AS g ON g.ptype = 'g' AND g.v0 = p.v0 AND g.v2 = p.v1 AND g.v1 = ?", fmt.Sprint(scope.MemberID)).
+		Count(&count).Error
+	return count > 0, err
+}
+
 // List 分页查询资源，租户条件始终来自认证上下文。
 func (r *ManagementRepository) List(ctx context.Context, scope service.ResourceScope, resource string, page service.PageQuery) ([]map[string]any, uint64, error) {
 	definition, ok := managementResources[resource]
@@ -177,6 +206,9 @@ func (r *ManagementRepository) Create(ctx context.Context, scope service.Resourc
 				return fmt.Errorf("读取资源自增主键失败: %w", err)
 			}
 		}
+		if err := incrementPermissionVersion(tx, scope, resource, values, id); err != nil {
+			return err
+		}
 		return writeAuditOutbox(tx, scope, "create", resource, fmt.Sprint(id), values)
 	})
 	return id, err
@@ -204,6 +236,9 @@ func (r *ManagementRepository) Update(ctx context.Context, scope service.Resourc
 		if result.RowsAffected != 1 {
 			return errors.New("资源不存在或无权访问")
 		}
+		if err := incrementPermissionVersion(tx, scope, resource, values, id); err != nil {
+			return err
+		}
 		return writeAuditOutbox(tx, scope, "update", resource, fmt.Sprint(id), values)
 	})
 }
@@ -218,6 +253,12 @@ func (r *ManagementRepository) Delete(ctx context.Context, scope service.Resourc
 		return errors.New("该资源只读")
 	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		permissionValues := map[string]any{}
+		if resource == "tenant-resources" {
+			if err := tx.Table(definition.table).Select("tenant_id").Where("id = ?", id).Take(&permissionValues).Error; err != nil {
+				return errors.New("资源不存在或无权访问")
+			}
+		}
 		query := tx.Table(definition.table).Where("id = ?", id)
 		if definition.tenantScoped && !scope.PlatformAdmin {
 			query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
@@ -234,8 +275,36 @@ func (r *ManagementRepository) Delete(ctx context.Context, scope service.Resourc
 		if result.RowsAffected != 1 {
 			return errors.New("资源不存在或无权访问")
 		}
+		if err := incrementPermissionVersion(tx, scope, resource, permissionValues, id); err != nil {
+			return err
+		}
 		return writeAuditOutbox(tx, scope, "delete", resource, fmt.Sprint(id), nil)
 	})
+}
+
+func incrementPermissionVersion(tx *gorm.DB, scope service.ResourceScope, resource string, values map[string]any, resourceID uint64) error {
+	switch resource {
+	case "roles", "casbin-rules", "role-scope-departments":
+		if scope.TenantID == 0 {
+			return nil
+		}
+		return tx.Table("tenants").Where("id = ? AND deleted_at IS NULL", scope.TenantID).
+			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error
+	case "tenant-resources":
+		tenantID := numericID(values["tenant_id"])
+		if tenantID == 0 {
+			if err := tx.Table("tenant_resources").Where("id = ?", resourceID).Pluck("tenant_id", &tenantID).Error; err != nil {
+				return errors.New("租户功能授权缺少租户ID")
+			}
+		}
+		return tx.Table("tenants").Where("id = ? AND deleted_at IS NULL", tenantID).
+			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error
+	case "resources":
+		return tx.Table("tenants").Where("deleted_at IS NULL").
+			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error
+	default:
+		return nil
+	}
 }
 
 func sanitizeResourceWrite(definition resourceDefinition, input map[string]any) (map[string]any, error) {
@@ -308,3 +377,4 @@ func randomEventID() (string, error) {
 }
 
 var _ service.ManagementRepository = (*ManagementRepository)(nil)
+var _ service.ManagementPermissionChecker = (*ManagementRepository)(nil)

@@ -15,6 +15,14 @@ type fakeUserRepository struct {
 	failureCount  uint32
 	lockedUntil   *time.Time
 	resetFailures bool
+	permissions   []string
+}
+
+func (r *fakeUserRepository) ListPermissions(_ context.Context, _, _ uint64, platformAdmin bool) ([]string, error) {
+	if platformAdmin {
+		return []string{"*:*"}, nil
+	}
+	return r.permissions, nil
 }
 
 func (r *fakeUserRepository) FindByIdentifier(_ context.Context, _ string) (*User, error) {
@@ -63,6 +71,7 @@ func TestLoginCreatesTenantBoundSession(t *testing.T) {
 	users := &fakeUserRepository{
 		user:        &User{ID: 100, PasswordHash: passwordHash, Status: UserStatusEnabled},
 		memberships: []Membership{{ID: 300, TenantID: 200, TenantName: "示例租户", Status: MembershipStatusEnabled, PermissionVersion: 9}},
+		permissions: []string{"roles:list", "roles:update"},
 	}
 	sessions := &fakeSessionRepository{}
 	usecase := NewLoginUsecase(users, sessions, hasher, NewTokenManager(privateKey, 15*time.Minute, 7*24*time.Hour, func() time.Time { return now }), func() time.Time { return now })
@@ -85,6 +94,9 @@ func TestLoginCreatesTenantBoundSession(t *testing.T) {
 	}
 	if !users.resetFailures {
 		t.Fatal("successful login must reset failure counter")
+	}
+	if len(result.User.Permissions) != 2 || result.User.Permissions[0] != "roles:list" {
+		t.Fatalf("permissions = %+v", result.User.Permissions)
 	}
 }
 

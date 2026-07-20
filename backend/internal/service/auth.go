@@ -209,7 +209,7 @@ func setRefreshCookie(ctx context.Context, cookie string) {
 }
 
 func mapCurrentUser(user bizauth.UserProfile) *v1.CurrentUser {
-	return &v1.CurrentUser{Id: user.ID, DisplayName: user.DisplayName, AvatarUrl: user.AvatarURL, PlatformAdmin: user.PlatformAdmin}
+	return &v1.CurrentUser{Id: user.ID, DisplayName: user.DisplayName, AvatarUrl: user.AvatarURL, PlatformAdmin: user.PlatformAdmin, Permissions: user.Permissions}
 }
 
 func mapTenantOptions(items []bizauth.TenantOption) []*v1.TenantSummary {

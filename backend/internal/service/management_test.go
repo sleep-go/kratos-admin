@@ -13,6 +13,12 @@ type fakeManagementRepository struct {
 	filters map[string]string
 }
 
+type fakePermissionChecker struct{ allowed bool }
+
+func (c fakePermissionChecker) Allowed(context.Context, ResourceScope, string, string) (bool, error) {
+	return c.allowed, nil
+}
+
 func (r *fakeManagementRepository) List(_ context.Context, scope ResourceScope, _ string, _ PageQuery) ([]map[string]any, uint64, error) {
 	r.scope = scope
 	return []map[string]any{{"id": uint64(1), "name": "示例部门"}}, 1, nil
@@ -53,5 +59,14 @@ func TestManagementServiceRejectsPlatformResourceInTenantContext(t *testing.T) {
 
 	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "tenants"}); err == nil {
 		t.Fatal("tenant context must not access platform tenant governance")
+	}
+}
+
+func TestManagementServiceRejectsMissingCasbinPermission(t *testing.T) {
+	service := NewManagementService(&fakeManagementRepository{}, fakePermissionChecker{allowed: false})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+
+	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "departments"}); err == nil {
+		t.Fatal("missing list permission must be rejected")
 	}
 }

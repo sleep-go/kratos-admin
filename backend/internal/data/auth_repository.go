@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"gorm.io/gorm"
@@ -17,6 +18,40 @@ import (
 type AuthRepository struct {
 	db *gorm.DB
 	q  *query.Query
+}
+
+// ListPermissions 按 Casbin domain 规则加载当前成员在租户授权功能集合内的权限。
+func (r *AuthRepository) ListPermissions(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]string, error) {
+	if platformAdmin && tenantID == 0 {
+		return []string{"*:*"}, nil
+	}
+	var tenantAdmin bool
+	if err := r.db.WithContext(ctx).Table("tenant_members").
+		Select("is_tenant_admin").Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", memberID, tenantID).
+		Scan(&tenantAdmin).Error; err != nil {
+		return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)
+	}
+	permissions := make([]string, 0)
+	if tenantAdmin {
+		if err := r.db.WithContext(ctx).Table("tenant_resources AS tr").
+			Select("DISTINCT CONCAT(res.code, ':*')").
+			Joins("JOIN resources AS res ON res.id = tr.resource_id AND res.status = 1 AND res.deleted_at IS NULL").
+			Where("tr.tenant_id = ?", tenantID).Pluck("CONCAT(res.code, ':*')", &permissions).Error; err != nil {
+			return nil, fmt.Errorf("查询租户管理员权限失败: %w", err)
+		}
+	} else {
+		if err := r.db.WithContext(ctx).Table("casbin_rules AS g").
+			Select("DISTINCT CONCAT(p.v2, ':', p.v3)").
+			Joins("JOIN casbin_rules AS p ON p.ptype = 'p' AND p.v0 = g.v0 AND p.v1 = g.v2").
+			Joins("JOIN resources AS res ON res.code = p.v2 AND res.status = 1 AND res.deleted_at IS NULL").
+			Joins("JOIN tenant_resources AS tr ON tr.tenant_id = ? AND tr.resource_id = res.id", tenantID).
+			Where("g.ptype = 'g' AND g.v0 = ? AND g.v1 = ?", fmt.Sprint(tenantID), fmt.Sprint(memberID)).
+			Pluck("CONCAT(p.v2, ':', p.v3)", &permissions).Error; err != nil {
+			return nil, fmt.Errorf("查询成员权限失败: %w", err)
+		}
+	}
+	sort.Strings(permissions)
+	return permissions, nil
 }
 
 // NewAuthRepository 创建认证仓储。

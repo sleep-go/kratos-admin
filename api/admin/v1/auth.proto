@@ -66,6 +66,7 @@ message CurrentUser {
   string display_name = 2;
   string avatar_url = 3;
   bool platform_admin = 4;
+  repeated string permissions = 5;
 }
 
 message LoginRequest {

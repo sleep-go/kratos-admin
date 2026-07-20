@@ -80,6 +80,7 @@ type Session struct {
 type UserRepository interface {
 	FindByIdentifier(ctx context.Context, identifier string) (*User, error)
 	ListMemberships(ctx context.Context, userID uint64) ([]Membership, error)
+	ListPermissions(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]string, error)
 	UpdateLoginFailure(ctx context.Context, userID uint64, count uint32, lockedUntil *time.Time) error
 	ResetLoginFailures(ctx context.Context, userID uint64) error
 }
@@ -119,6 +120,7 @@ type UserProfile struct {
 	DisplayName   string
 	AvatarURL     string
 	PlatformAdmin bool
+	Permissions   []string
 }
 
 // LoginUsecase 实施账号锁定、密码验证、租户选择与会话创建规则。
@@ -198,12 +200,16 @@ func (u *LoginUsecase) Login(ctx context.Context, input LoginInput) (LoginResult
 	}); err != nil {
 		return LoginResult{}, fmt.Errorf("创建认证会话失败: %w", err)
 	}
+	permissions, err := u.users.ListPermissions(ctx, selected.TenantID, selected.ID, user.PlatformAdmin && selected.TenantID == 0)
+	if err != nil {
+		return LoginResult{}, fmt.Errorf("加载用户权限失败: %w", err)
+	}
 	if err := u.users.ResetLoginFailures(ctx, user.ID); err != nil {
 		return LoginResult{}, fmt.Errorf("重置登录失败次数失败: %w", err)
 	}
 	return LoginResult{
 		Tokens:        tokens,
-		User:          UserProfile{ID: user.ID, DisplayName: user.DisplayName, AvatarURL: user.AvatarURL, PlatformAdmin: user.PlatformAdmin},
+		User:          UserProfile{ID: user.ID, DisplayName: user.DisplayName, AvatarURL: user.AvatarURL, PlatformAdmin: user.PlatformAdmin, Permissions: permissions},
 		CurrentTenant: TenantOption{ID: selected.TenantID, Name: selected.TenantName},
 		Tenants:       options,
 	}, nil

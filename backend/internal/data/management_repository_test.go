@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/sleep-go/kratos-admin/backend/internal/data/model"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
 )
 
@@ -80,5 +81,36 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	ids, err := (&AuditRepository{db: tx}).PendingEventIDs(context.Background(), 10)
 	if err != nil || len(ids) == 0 {
 		t.Fatalf("PendingEventIDs() = %+v, err %v", ids, err)
+	}
+}
+
+func TestPermissionMutationIncrementsTenantVersion(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	tenant := &model.Tenant{Code: "permission-version", Name: "权限版本测试", Status: 1, PermissionVersion: 1}
+	if err := tx.Create(tenant).Error; err != nil {
+		t.Fatal(err)
+	}
+	repository := &ManagementRepository{db: tx}
+
+	if _, err := repository.Create(context.Background(), service.ResourceScope{TenantID: tenant.ID, UserID: 1}, "roles", map[string]any{
+		"code": "auditor", "name": "审计员", "data_scope": float64(4), "status": float64(1),
+	}); err != nil {
+		t.Fatalf("Create(role) error = %v", err)
+	}
+	var version uint64
+	if err := tx.Table("tenants").Where("id = ?", tenant.ID).Pluck("permission_version", &version).Error; err != nil {
+		t.Fatal(err)
+	}
+	if version != 2 {
+		t.Fatalf("permission_version = %d, want 2", version)
 	}
 }

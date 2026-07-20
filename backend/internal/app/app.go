@@ -64,10 +64,11 @@ func NewAPIResources(ctx context.Context, cfg conf.Config) (*APIResources, error
 	sessionUsecase := bizauth.NewSessionUsecase(repository, tokenManager, nil)
 	authService := service.NewAuthService(loginUsecase, cfg.Environment == "production", sessionUsecase)
 	authService.ConfigureAccessSecurity(tokenManager, sessionUsecase)
+	managementRepository := data.NewManagementRepository(dataResources)
 	return &APIResources{
 		Data:              dataResources,
 		AuthService:       authService,
-		ManagementService: service.NewManagementService(data.NewManagementRepository(dataResources)),
+		ManagementService: service.NewManagementService(managementRepository, managementRepository),
 	}, nil
 }
 

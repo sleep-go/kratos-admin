@@ -388,6 +388,10 @@ components:
                     type: string
                 platformAdmin:
                     type: boolean
+                permissions:
+                    type: array
+                    items:
+                        type: string
         admin.v1.DeleteResourceResponse:
             type: object
             properties:

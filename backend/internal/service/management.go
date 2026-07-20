@@ -37,21 +37,34 @@ type ManagementRepository interface {
 	Delete(ctx context.Context, scope ResourceScope, resource string, id uint64) error
 }
 
+// ManagementPermissionChecker 定义后台资源动作的 Casbin 权限检查能力。
+type ManagementPermissionChecker interface {
+	Allowed(ctx context.Context, scope ResourceScope, resource, action string) (bool, error)
+}
+
 // ManagementService 实现统一的后台资源管理 API。
 type ManagementService struct {
 	v1.UnimplementedManagementServiceServer
-	repository ManagementRepository
+	repository  ManagementRepository
+	permissions ManagementPermissionChecker
 }
 
 // NewManagementService 创建后台资源管理服务。
-func NewManagementService(repository ManagementRepository) *ManagementService {
-	return &ManagementService{repository: repository}
+func NewManagementService(repository ManagementRepository, checkers ...ManagementPermissionChecker) *ManagementService {
+	service := &ManagementService{repository: repository}
+	if len(checkers) > 0 {
+		service.permissions = checkers[0]
+	}
+	return service
 }
 
 // ListResources 按可信租户边界分页查询白名单资源。
 func (s *ManagementService) ListResources(ctx context.Context, request *v1.ListResourcesRequest) (*v1.ListResourcesResponse, error) {
 	scope, err := managementScope(ctx, request.GetResource())
 	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, scope, request.GetResource(), "list"); err != nil {
 		return nil, err
 	}
 	page, pageSize := normalizePage(request.GetPage(), request.GetPageSize())
@@ -84,6 +97,9 @@ func (s *ManagementService) CreateResource(ctx context.Context, request *v1.Crea
 	if err != nil {
 		return nil, err
 	}
+	if err := s.authorize(ctx, scope, request.GetResource(), "create"); err != nil {
+		return nil, err
+	}
 	id, err := s.repository.Create(ctx, scope, request.GetResource(), request.GetData().AsMap())
 	if err != nil {
 		return nil, mapManagementError(err)
@@ -95,6 +111,9 @@ func (s *ManagementService) CreateResource(ctx context.Context, request *v1.Crea
 func (s *ManagementService) UpdateResource(ctx context.Context, request *v1.UpdateResourceRequest) (*v1.UpdateResourceResponse, error) {
 	scope, err := managementScope(ctx, request.GetResource())
 	if err != nil {
+		return nil, err
+	}
+	if err := s.authorize(ctx, scope, request.GetResource(), "update"); err != nil {
 		return nil, err
 	}
 	if request.GetId() == 0 {
@@ -112,6 +131,9 @@ func (s *ManagementService) DeleteResource(ctx context.Context, request *v1.Dele
 	if err != nil {
 		return nil, err
 	}
+	if err := s.authorize(ctx, scope, request.GetResource(), "delete"); err != nil {
+		return nil, err
+	}
 	if request.GetId() == 0 {
 		return nil, kratoserrors.BadRequest("MANAGEMENT_ID_REQUIRED", "资源ID不能为空")
 	}
@@ -119,6 +141,20 @@ func (s *ManagementService) DeleteResource(ctx context.Context, request *v1.Dele
 		return nil, mapManagementError(err)
 	}
 	return &v1.DeleteResourceResponse{Id: request.GetId()}, nil
+}
+
+func (s *ManagementService) authorize(ctx context.Context, scope ResourceScope, resource, action string) error {
+	if scope.PlatformAdmin || s.permissions == nil {
+		return nil
+	}
+	allowed, err := s.permissions.Allowed(ctx, scope, resource, action)
+	if err != nil {
+		return kratoserrors.InternalServer("PERMISSION_CHECK_FAILED", "权限校验失败")
+	}
+	if !allowed {
+		return kratoserrors.Forbidden("PERMISSION_DENIED", "没有执行该操作的权限")
+	}
+	return nil
 }
 
 func managementScope(ctx context.Context, resource string) (ResourceScope, error) {

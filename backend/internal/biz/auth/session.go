@@ -46,6 +46,7 @@ type SessionManagerRepository interface {
 	Find(ctx context.Context, sessionID string) (SessionRecord, error)
 	FindUser(ctx context.Context, userID uint64) (User, error)
 	ListMemberships(ctx context.Context, userID uint64) ([]Membership, error)
+	ListPermissions(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]string, error)
 	Rotate(ctx context.Context, sessionID, expectedHash, nextHash string, expiresAt time.Time, tenantID, memberID, permissionVersion uint64) (bool, error)
 	Revoke(ctx context.Context, sessionID string, userID uint64) error
 	FindMembership(ctx context.Context, userID, tenantID uint64) (Membership, error)
@@ -136,6 +137,18 @@ func (u *SessionUsecase) Profile(ctx context.Context, userID, tenantID uint64) (
 	if profile.CurrentTenant.Name == "" {
 		return SessionProfile{}, ErrNoTenantMembership
 	}
+	memberID := uint64(0)
+	for _, membership := range memberships {
+		if membership.TenantID == tenantID {
+			memberID = membership.ID
+			break
+		}
+	}
+	permissions, err := u.repository.ListPermissions(ctx, tenantID, memberID, user.PlatformAdmin && tenantID == 0)
+	if err != nil {
+		return SessionProfile{}, err
+	}
+	profile.User.Permissions = permissions
 	return profile, nil
 }
 

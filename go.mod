@@ -1,6 +1,6 @@
 module github.com/sleep-go/kratos-admin
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/casbin/casbin/v3 v3.10.0

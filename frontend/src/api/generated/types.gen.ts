@@ -18,6 +18,7 @@ export type AdminV1CurrentUser = {
     displayName?: string;
     avatarUrl?: string;
     platformAdmin?: boolean;
+    permissions?: Array<string>;
 };
 
 export type AdminV1DeleteResourceResponse = {

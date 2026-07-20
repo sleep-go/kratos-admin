@@ -14,8 +14,16 @@ type fakeSessionManagerRepository struct {
 	sessions    []DeviceSession
 	memberships map[uint64]Membership
 	user        User
+	permissions []string
 	rotated     bool
 	revoked     bool
+}
+
+func (r *fakeSessionManagerRepository) ListPermissions(_ context.Context, _, _ uint64, platformAdmin bool) ([]string, error) {
+	if platformAdmin {
+		return []string{"*:*"}, nil
+	}
+	return r.permissions, nil
 }
 
 func (r *fakeSessionManagerRepository) FindUser(_ context.Context, _ uint64) (User, error) {
@@ -79,7 +87,7 @@ func newSessionUsecaseFixture(t *testing.T) (*SessionUsecase, *fakeSessionManage
 	repository := &fakeSessionManagerRepository{session: SessionRecord{
 		ID: "session", UserID: 1, TenantID: 10, MemberID: 20,
 		RefreshJTIHash: HashJTI(pair.RefreshJTI), PermissionVersion: 3, ExpiresAt: pair.RefreshExpiresAt,
-	}, user: User{ID: 1, DisplayName: "管理员", Status: UserStatusEnabled, PlatformAdmin: true}, memberships: map[uint64]Membership{
+	}, user: User{ID: 1, DisplayName: "管理员", Status: UserStatusEnabled, PlatformAdmin: true}, permissions: []string{"roles:list"}, memberships: map[uint64]Membership{
 		10: {ID: 20, TenantID: 10, TenantName: "示例租户", Status: MembershipStatusEnabled, PermissionVersion: 3},
 	}}
 	return NewSessionUsecase(repository, manager, func() time.Time { return now }), repository, manager, now
@@ -97,6 +105,9 @@ func TestProfileRestoresUserAndTenantContext(t *testing.T) {
 	}
 	if profile.User.DisplayName != "管理员" || profile.CurrentTenant.Name != "示例租户" || len(profile.Tenants) != 1 {
 		t.Fatalf("Profile() = %+v", profile)
+	}
+	if len(profile.User.Permissions) != 1 || profile.User.Permissions[0] != "roles:list" {
+		t.Fatalf("permissions = %+v", profile.User.Permissions)
 	}
 }
 
