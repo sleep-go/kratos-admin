@@ -158,6 +158,19 @@ func (u *SessionUsecase) SwitchTenant(ctx context.Context, refreshToken string, 
 	if err != nil {
 		return SwitchTenantResult{}, err
 	}
+	if tenantID == 0 {
+		user, userErr := u.repository.FindUser(ctx, claims.UserID)
+		if userErr != nil || user.Status != UserStatusEnabled || !user.PlatformAdmin {
+			return SwitchTenantResult{}, ErrNoTenantMembership
+		}
+		pair, rotateErr := u.rotate(ctx, claims, session, TokenSubject{
+			UserID: claims.UserID, SessionID: session.ID,
+		})
+		if rotateErr != nil {
+			return SwitchTenantResult{}, rotateErr
+		}
+		return SwitchTenantResult{Tokens: pair, Tenant: TenantOption{Name: "平台管理"}}, nil
+	}
 	membership, err := u.repository.FindMembership(ctx, claims.UserID, tenantID)
 	if err != nil || membership.Status != MembershipStatusEnabled {
 		return SwitchTenantResult{}, ErrNoTenantMembership

@@ -387,6 +387,7 @@ type File struct {
 	ContentType      string         `gorm:"size:128;not null"`
 	SizeBytes        uint64         `gorm:"not null"`
 	SHA256           string         `gorm:"type:char(64);not null"`
+	ETag             string         `gorm:"column:etag;size:191;not null"`
 	Status           uint8          `gorm:"not null"`
 	CreatedAt        time.Time      `gorm:"not null"`
 	UpdatedAt        time.Time      `gorm:"not null"`

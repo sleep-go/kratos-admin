@@ -57,7 +57,7 @@ func TestAuthServiceLoginMapsUserAndTenant(t *testing.T) {
 	expiresAt := time.Date(2026, 7, 20, 12, 15, 0, 0, time.UTC)
 	handler := &fakeLoginHandler{result: bizauth.LoginResult{
 		Tokens:        bizauth.TokenPair{AccessToken: "access", RefreshToken: "refresh", AccessExpiresAt: expiresAt, RefreshExpiresAt: expiresAt.Add(7 * 24 * time.Hour)},
-		User:          bizauth.UserProfile{ID: 1, DisplayName: "超级管理员", PlatformAdmin: true},
+		User:          bizauth.UserProfile{ID: 1, DisplayName: "超级管理员", PlatformAdmin: true, Permissions: []string{"files:*"}},
 		CurrentTenant: bizauth.TenantOption{ID: 0, Name: "平台管理"},
 		Tenants:       []bizauth.TenantOption{{ID: 8, Name: "示例租户"}},
 	}}
@@ -69,6 +69,9 @@ func TestAuthServiceLoginMapsUserAndTenant(t *testing.T) {
 	}
 	if reply.AccessToken != "access" || reply.User.GetDisplayName() != "超级管理员" || !reply.User.GetPlatformAdmin() {
 		t.Fatalf("reply = %+v", reply)
+	}
+	if len(reply.User.GetPermissions()) != 1 || reply.User.GetPermissions()[0] != "files:*" {
+		t.Fatalf("permissions = %v", reply.User.GetPermissions())
 	}
 	if reply.CurrentTenant.GetName() != "平台管理" || len(reply.Tenants) != 1 {
 		t.Fatalf("tenant response = %+v / %+v", reply.CurrentTenant, reply.Tenants)

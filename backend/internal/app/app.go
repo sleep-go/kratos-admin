@@ -4,14 +4,19 @@ package app
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
 	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
+	filebiz "github.com/sleep-go/kratos-admin/backend/internal/biz/file"
 	"github.com/sleep-go/kratos-admin/backend/internal/conf"
 	"github.com/sleep-go/kratos-admin/backend/internal/data"
+	"github.com/sleep-go/kratos-admin/backend/internal/provider/storage"
 	"github.com/sleep-go/kratos-admin/backend/internal/server"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
 	workerServer "github.com/sleep-go/kratos-admin/backend/internal/worker"
@@ -39,6 +44,8 @@ type APIResources struct {
 	Data              *data.Data
 	AuthService       *service.AuthService
 	ManagementService *service.ManagementService
+	FileService       *service.FileService
+	LocalStorage      http.Handler
 }
 
 // NewAPIResources 连接基础设施并组装真实认证服务。
@@ -65,10 +72,18 @@ func NewAPIResources(ctx context.Context, cfg conf.Config) (*APIResources, error
 	authService := service.NewAuthService(loginUsecase, cfg.Environment == "production", sessionUsecase)
 	authService.ConfigureAccessSecurity(tokenManager, sessionUsecase)
 	managementRepository := data.NewManagementRepository(dataResources)
+	storageProvider, localHandler, err := buildStorageProvider(cfg)
+	if err != nil {
+		_ = dataResources.Close()
+		return nil, err
+	}
+	fileUsecase := filebiz.NewUsecase(data.NewFileRepository(dataResources), storageProvider, cfg.Storage.MaxFileSize, nil)
 	return &APIResources{
 		Data:              dataResources,
 		AuthService:       authService,
 		ManagementService: service.NewManagementService(managementRepository, managementRepository),
+		FileService:       service.NewFileService(fileUsecase, managementRepository),
+		LocalStorage:      localHandler,
 	}, nil
 }
 
@@ -80,10 +95,43 @@ func NewFullAPIApp(cfg conf.Config, resources *APIResources) *kratos.App {
 	grpcServer := server.NewGRPCServer(cfg.Server, healthService, resources.AuthService)
 	server.RegisterManagementHTTP(httpServer, resources.ManagementService)
 	server.RegisterManagementGRPC(grpcServer, resources.ManagementService)
+	server.RegisterFileHTTP(httpServer, resources.FileService)
+	server.RegisterFileGRPC(grpcServer, resources.FileService)
+	if resources.LocalStorage != nil {
+		httpServer.Handle("/api/v1/files/local/content", resources.LocalStorage)
+	}
 	return kratos.New(
 		kratos.Name("kratos-admin-api"), kratos.Version(version), kratos.Logger(logger),
 		kratos.Server(httpServer, grpcServer),
 	)
+}
+
+func buildStorageProvider(cfg conf.Config) (storage.Provider, http.Handler, error) {
+	switch cfg.Storage.Provider {
+	case "local":
+		signingKey := make([]byte, 32)
+		if cfg.Auth.SecretKey == "" {
+			if _, err := rand.Read(signingKey); err != nil {
+				return nil, nil, fmt.Errorf("生成本地存储签名密钥失败: %w", err)
+			}
+		} else {
+			sum := sha256.Sum256([]byte(cfg.Auth.SecretKey))
+			copy(signingKey, sum[:])
+		}
+		provider, err := storage.NewLocalProvider(
+			cfg.Storage.LocalPath, "/api/v1/files/local/content", signingKey, nil,
+		)
+		return provider, provider, err
+	case "aliyun-oss":
+		provider, err := storage.NewOSSProvider(storage.OSSConfig{
+			Region: cfg.Storage.OSSRegion, Endpoint: cfg.Storage.OSSEndpoint, Bucket: cfg.Storage.OSSBucket,
+			AccessKeyID: cfg.Storage.OSSAccessKeyID, AccessKeySecret: cfg.Storage.OSSAccessKeySecret,
+			SecurityToken: cfg.Storage.OSSSecurityToken,
+		})
+		return provider, nil, err
+	default:
+		return nil, nil, fmt.Errorf("不支持的存储 Provider: %s", cfg.Storage.Provider)
+	}
 }
 
 func buildPrivateKey(cfg conf.Config) (ed25519.PrivateKey, error) {

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthServiceForgotPasswordData, AuthServiceForgotPasswordErrors, AuthServiceForgotPasswordResponses, AuthServiceListSessionsData, AuthServiceListSessionsErrors, AuthServiceListSessionsResponses, AuthServiceLoginData, AuthServiceLoginErrors, AuthServiceLoginResponses, AuthServiceLogoutData, AuthServiceLogoutErrors, AuthServiceLogoutResponses, AuthServiceRefreshData, AuthServiceRefreshErrors, AuthServiceRefreshResponses, AuthServiceResetPasswordData, AuthServiceResetPasswordErrors, AuthServiceResetPasswordResponses, AuthServiceRevokeSessionData, AuthServiceRevokeSessionErrors, AuthServiceRevokeSessionResponses, AuthServiceSwitchTenantData, AuthServiceSwitchTenantErrors, AuthServiceSwitchTenantResponses, AuthServiceVerifyMfaData, AuthServiceVerifyMfaErrors, AuthServiceVerifyMfaResponses, HealthServiceCheckData, HealthServiceCheckErrors, HealthServiceCheckResponses, ManagementServiceCreateResourceData, ManagementServiceCreateResourceErrors, ManagementServiceCreateResourceResponses, ManagementServiceDeleteResourceData, ManagementServiceDeleteResourceErrors, ManagementServiceDeleteResourceResponses, ManagementServiceListResourcesData, ManagementServiceListResourcesErrors, ManagementServiceListResourcesResponses, ManagementServiceUpdateResourceData, ManagementServiceUpdateResourceErrors, ManagementServiceUpdateResourceResponses } from './types.gen';
+import type { AuthServiceForgotPasswordData, AuthServiceForgotPasswordErrors, AuthServiceForgotPasswordResponses, AuthServiceListSessionsData, AuthServiceListSessionsErrors, AuthServiceListSessionsResponses, AuthServiceLoginData, AuthServiceLoginErrors, AuthServiceLoginResponses, AuthServiceLogoutData, AuthServiceLogoutErrors, AuthServiceLogoutResponses, AuthServiceRefreshData, AuthServiceRefreshErrors, AuthServiceRefreshResponses, AuthServiceResetPasswordData, AuthServiceResetPasswordErrors, AuthServiceResetPasswordResponses, AuthServiceRevokeSessionData, AuthServiceRevokeSessionErrors, AuthServiceRevokeSessionResponses, AuthServiceSwitchTenantData, AuthServiceSwitchTenantErrors, AuthServiceSwitchTenantResponses, AuthServiceVerifyMfaData, AuthServiceVerifyMfaErrors, AuthServiceVerifyMfaResponses, FileServiceConfirmUploadData, FileServiceConfirmUploadErrors, FileServiceConfirmUploadResponses, FileServiceCreateUploadData, FileServiceCreateUploadErrors, FileServiceCreateUploadResponses, FileServiceDeleteFileData, FileServiceDeleteFileErrors, FileServiceDeleteFileResponses, FileServiceGetDownloadUrlData, FileServiceGetDownloadUrlErrors, FileServiceGetDownloadUrlResponses, HealthServiceCheckData, HealthServiceCheckErrors, HealthServiceCheckResponses, ManagementServiceCreateResourceData, ManagementServiceCreateResourceErrors, ManagementServiceCreateResourceResponses, ManagementServiceDeleteResourceData, ManagementServiceDeleteResourceErrors, ManagementServiceDeleteResourceResponses, ManagementServiceListResourcesData, ManagementServiceListResourcesErrors, ManagementServiceListResourcesResponses, ManagementServiceUpdateResourceData, ManagementServiceUpdateResourceErrors, ManagementServiceUpdateResourceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -77,6 +77,28 @@ export const authServiceSwitchTenant = <ThrowOnError extends boolean = false>(op
         ...options.headers
     }
 });
+
+export const fileServiceCreateUpload = <ThrowOnError extends boolean = false>(options: Options<FileServiceCreateUploadData, ThrowOnError>): RequestResult<FileServiceCreateUploadResponses, FileServiceCreateUploadErrors, ThrowOnError> => (options.client ?? client).post<FileServiceCreateUploadResponses, FileServiceCreateUploadErrors, ThrowOnError>({
+    url: '/api/v1/files/uploads',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const fileServiceDeleteFile = <ThrowOnError extends boolean = false>(options: Options<FileServiceDeleteFileData, ThrowOnError>): RequestResult<FileServiceDeleteFileResponses, FileServiceDeleteFileErrors, ThrowOnError> => (options.client ?? client).delete<FileServiceDeleteFileResponses, FileServiceDeleteFileErrors, ThrowOnError>({ url: '/api/v1/files/{fileId}', ...options });
+
+export const fileServiceConfirmUpload = <ThrowOnError extends boolean = false>(options: Options<FileServiceConfirmUploadData, ThrowOnError>): RequestResult<FileServiceConfirmUploadResponses, FileServiceConfirmUploadErrors, ThrowOnError> => (options.client ?? client).post<FileServiceConfirmUploadResponses, FileServiceConfirmUploadErrors, ThrowOnError>({
+    url: '/api/v1/files/{fileId}/confirm',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const fileServiceGetDownloadUrl = <ThrowOnError extends boolean = false>(options: Options<FileServiceGetDownloadUrlData, ThrowOnError>): RequestResult<FileServiceGetDownloadUrlResponses, FileServiceGetDownloadUrlErrors, ThrowOnError> => (options.client ?? client).get<FileServiceGetDownloadUrlResponses, FileServiceGetDownloadUrlErrors, ThrowOnError>({ url: '/api/v1/files/{fileId}/download-url', ...options });
 
 /**
  * Check 返回 API 进程当前健康状态。

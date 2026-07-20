@@ -37,6 +37,7 @@ func newFile(db *gorm.DB, opts ...gen.DOOption) file {
 	_file.ContentType = field.NewString(tableName, "content_type")
 	_file.SizeBytes = field.NewUint64(tableName, "size_bytes")
 	_file.SHA256 = field.NewString(tableName, "sha256")
+	_file.ETag = field.NewString(tableName, "etag")
 	_file.Status = field.NewUint8(tableName, "status")
 	_file.CreatedAt = field.NewTime(tableName, "created_at")
 	_file.UpdatedAt = field.NewTime(tableName, "updated_at")
@@ -60,6 +61,7 @@ type file struct {
 	ContentType      field.String
 	SizeBytes        field.Uint64
 	SHA256           field.String
+	ETag             field.String
 	Status           field.Uint8
 	CreatedAt        field.Time
 	UpdatedAt        field.Time
@@ -89,6 +91,7 @@ func (f *file) updateTableName(table string) *file {
 	f.ContentType = field.NewString(table, "content_type")
 	f.SizeBytes = field.NewUint64(table, "size_bytes")
 	f.SHA256 = field.NewString(table, "sha256")
+	f.ETag = field.NewString(table, "etag")
 	f.Status = field.NewUint8(table, "status")
 	f.CreatedAt = field.NewTime(table, "created_at")
 	f.UpdatedAt = field.NewTime(table, "updated_at")
@@ -117,7 +120,7 @@ func (f *file) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (f *file) fillFieldMap() {
-	f.fieldMap = make(map[string]field.Expr, 13)
+	f.fieldMap = make(map[string]field.Expr, 14)
 	f.fieldMap["id"] = f.ID
 	f.fieldMap["tenant_id"] = f.TenantID
 	f.fieldMap["uploader_member_id"] = f.UploaderMemberID
@@ -127,6 +130,7 @@ func (f *file) fillFieldMap() {
 	f.fieldMap["content_type"] = f.ContentType
 	f.fieldMap["size_bytes"] = f.SizeBytes
 	f.fieldMap["sha256"] = f.SHA256
+	f.fieldMap["etag"] = f.ETag
 	f.fieldMap["status"] = f.Status
 	f.fieldMap["created_at"] = f.CreatedAt
 	f.fieldMap["updated_at"] = f.UpdatedAt

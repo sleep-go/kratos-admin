@@ -56,6 +56,31 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function switchTenant(tenantId: string) {
+    loading.value = true
+    try {
+      const switched = await authApi.switchTenant(tenantId)
+      if (!switched.accessToken) throw new Error('租户切换响应缺少访问令牌')
+      accessToken.value = switched.accessToken
+      setAccessToken(switched.accessToken)
+      const response = await authApi.refresh()
+      if (!response.accessToken || !response.user) {
+        throw new Error('切换后刷新响应缺少身份上下文')
+      }
+      accessToken.value = response.accessToken
+      currentUser.value = response.user
+      tenants.value = response.tenants ?? []
+      currentTenant.value = response.currentTenant ?? switched.currentTenant ?? null
+      setAccessToken(response.accessToken)
+    } catch (error) {
+      clearSession()
+      throw error
+    } finally {
+      loading.value = false
+      sessionRestored.value = true
+    }
+  }
+
   async function logout() {
     try {
       await authApi.logout()
@@ -82,6 +107,7 @@ export const useAuthStore = defineStore('auth', () => {
     sessionRestored,
     login,
     restoreSession,
+    switchTenant,
     logout,
     clearSession
   }

@@ -1,5 +1,10 @@
 import { http } from './http'
-import type { LoginRequest, LoginResponse, RefreshResponse } from '@/types/auth'
+import type {
+  LoginRequest,
+  LoginResponse,
+  RefreshResponse,
+  SwitchTenantResponse
+} from '@/types/auth'
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {
   const response = await http.post<LoginResponse>('/auth/login', request)
@@ -12,5 +17,10 @@ export async function logout(): Promise<void> {
 
 export async function refresh(): Promise<RefreshResponse> {
   const response = await http.post<RefreshResponse>('/auth/refresh', {})
+  return response.data
+}
+
+export async function switchTenant(tenantId: string): Promise<SwitchTenantResponse> {
+  const response = await http.post<SwitchTenantResponse>('/auth/switch-tenant', { tenantId })
   return response.data
 }

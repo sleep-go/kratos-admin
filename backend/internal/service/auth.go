@@ -72,11 +72,8 @@ func (s *AuthService) Login(ctx context.Context, request *v1.LoginRequest) (*v1.
 	return &v1.LoginResponse{
 		AccessToken: result.Tokens.AccessToken,
 		ExpiresAt:   timestamppb.New(result.Tokens.AccessExpiresAt),
-		User: &v1.CurrentUser{
-			Id: result.User.ID, DisplayName: result.User.DisplayName,
-			AvatarUrl: result.User.AvatarURL, PlatformAdmin: result.User.PlatformAdmin,
-		},
-		Tenants: tenants,
+		User:        mapCurrentUser(result.User),
+		Tenants:     tenants,
 		CurrentTenant: &v1.TenantSummary{
 			Id: result.CurrentTenant.ID, Name: result.CurrentTenant.Name,
 		},

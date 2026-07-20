@@ -20,7 +20,6 @@ const managementRoutes: Array<[string, string, string]> = [
   ['logs/login', 'login-logs', 'login-logs'],
   ['logs/audit', 'audit-logs', 'audit-logs'],
   ['logs/api', 'api-logs', 'api-logs'],
-  ['files', 'file-management', 'files'],
   ['settings/dictionaries', 'dictionary-types', 'dictionary-types'],
   ['settings/dictionary-items', 'dictionary-items', 'dictionary-items'],
   ['settings/providers', 'provider-management', 'providers'],
@@ -43,6 +42,11 @@ const routes: RouteRecordRaw[] = [
         path: '',
         name: 'dashboard',
         component: () => import('@/views/dashboard/DashboardView.vue')
+      },
+      {
+        path: 'files',
+        name: 'file-management',
+        component: () => import('@/views/files/FileManagementView.vue')
       },
       ...managementRoutes.map(([path, name, resourceKey]) => ({
         path,

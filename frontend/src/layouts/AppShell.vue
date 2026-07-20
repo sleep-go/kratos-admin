@@ -19,8 +19,14 @@ const navigation: NavigationItem[] = [
 const authStore = useAuthStore()
 const { currentTenant, currentUser } = storeToRefs(authStore)
 const mobileOpen = shallowRef(false)
+const tenantDialogOpen = shallowRef(false)
 const tenantName = computed(() => currentTenant.value?.name ?? '请选择租户')
 const userName = computed(() => currentUser.value?.displayName ?? '超级管理员')
+
+async function selectTenant(tenantID: string) {
+  await authStore.switchTenant(tenantID)
+  tenantDialogOpen.value = false
+}
 </script>
 
 <template>
@@ -30,8 +36,46 @@ const userName = computed(() => currentUser.value?.displayName ?? '超级管理�
       :tenant-name="tenantName"
       :user-name="userName"
       @open-mobile="mobileOpen = true"
+      @switch-tenant="tenantDialogOpen = true"
       @logout="authStore.logout()"
     />
+
+    <div v-if="tenantDialogOpen" class="tenant-dialog" role="dialog" aria-label="切换租户">
+      <button
+        class="tenant-dialog__backdrop"
+        aria-label="关闭租户切换"
+        @click="tenantDialogOpen = false"
+      ></button>
+      <section>
+        <header>
+          <div>
+            <small>TENANT CONTEXT</small>
+            <h2>切换租户</h2>
+          </div>
+          <button type="button" aria-label="关闭租户切换" @click="tenantDialogOpen = false">
+            ×
+          </button>
+        </header>
+        <button
+          v-if="currentUser?.platformAdmin"
+          type="button"
+          :class="{ active: String(currentTenant?.id ?? '0') === '0' }"
+          @click="selectTenant('0')"
+        >
+          <strong>平台管理</strong><span>跨租户治理视角</span>
+        </button>
+        <button
+          v-for="tenant in authStore.tenants"
+          :key="String(tenant.id)"
+          type="button"
+          :class="{ active: String(currentTenant?.id) === String(tenant.id) }"
+          @click="selectTenant(String(tenant.id))"
+        >
+          <strong>{{ tenant.name }}</strong
+          ><span>租户 ID {{ tenant.id }}</span>
+        </button>
+      </section>
+    </div>
 
     <div
       class="mobile-navigation"
@@ -146,6 +190,78 @@ const userName = computed(() => currentUser.value?.displayName ?? '超级管理�
   inset: 0;
   border: 0;
   background: rgb(0 0 0 / 38%);
+}
+
+.tenant-dialog {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.tenant-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgb(0 0 0 / 42%);
+}
+
+.tenant-dialog section {
+  position: relative;
+  width: min(440px, calc(100% - 32px));
+  max-height: min(620px, calc(100vh - 48px));
+  padding: 24px;
+  overflow-y: auto;
+  background: #fff;
+  box-shadow: 0 22px 70px rgb(0 0 0 / 28%);
+}
+
+.tenant-dialog header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+
+  small {
+    color: var(--ka-accent);
+    font-weight: 800;
+    letter-spacing: 0.14em;
+  }
+  h2 {
+    margin: 5px 0 0;
+    font-size: 25px;
+  }
+  button {
+    border: 0;
+    background: transparent;
+    font-size: 24px;
+    cursor: pointer;
+  }
+}
+
+.tenant-dialog section > button {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 15px 16px;
+  border: 1px solid var(--ka-border);
+  color: var(--ka-text);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+
+  & + button {
+    margin-top: 10px;
+  }
+  &.active {
+    border-left: 3px solid var(--ka-accent);
+    background: #f7f7f7;
+  }
+  span {
+    color: var(--ka-muted);
+    font-size: 12px;
+  }
 }
 
 @media (min-width: 1041px) {

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package admin.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/sleep-go/kratos-admin/api/admin/v1;v1";
+
+// FileService 提供受租户权限保护的文件直传、确认、下载和删除能力。
+service FileService {
+  rpc CreateUpload(CreateUploadRequest) returns (CreateUploadResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/files/uploads"
+      body: "*"
+    };
+  }
+  rpc ConfirmUpload(ConfirmUploadRequest) returns (ConfirmUploadResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/files/{file_id}/confirm"
+      body: "*"
+    };
+  }
+  rpc GetDownloadURL(GetDownloadURLRequest) returns (GetDownloadURLResponse) {
+    option (google.api.http) = {get: "/api/v1/files/{file_id}/download-url"};
+  }
+  rpc DeleteFile(DeleteFileRequest) returns (DeleteFileResponse) {
+    option (google.api.http) = {delete: "/api/v1/files/{file_id}"};
+  }
+}
+
+message CreateUploadRequest {
+  string original_name = 1;
+  string content_type = 2;
+  uint64 size_bytes = 3;
+  string sha256 = 4;
+}
+
+message SignedFileRequest {
+  string method = 1;
+  string url = 2;
+  map<string, string> headers = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message CreateUploadResponse {
+  string file_id = 1;
+  string provider_name = 2;
+  string object_key = 3;
+  SignedFileRequest upload = 4;
+}
+
+message ConfirmUploadRequest {
+  string file_id = 1;
+}
+
+message ConfirmUploadResponse {
+  string id = 1;
+  string provider_name = 2;
+  string object_key = 3;
+  string original_name = 4;
+  string content_type = 5;
+  uint64 size_bytes = 6;
+  string sha256 = 7;
+  uint32 status = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message GetDownloadURLResponse {
+  SignedFileRequest download = 1;
+}
+
+message GetDownloadURLRequest {
+  string file_id = 1;
+}
+
+message DeleteFileRequest {
+  string file_id = 1;
+}
+
+message DeleteFileResponse {}

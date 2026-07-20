@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -206,6 +207,23 @@ func (r *ManagementRepository) Create(ctx context.Context, scope service.Resourc
 				return fmt.Errorf("读取资源自增主键失败: %w", err)
 			}
 		}
+		if resource == "tenants" {
+			adminUserID := numericID(data["admin_user_id"])
+			if adminUserID == 0 {
+				adminUserID = scope.UserID
+			}
+			var displayName string
+			if err := tx.Table("users").Where("id = ? AND status = 1 AND deleted_at IS NULL", adminUserID).
+				Pluck("display_name", &displayName).Error; err != nil || displayName == "" {
+				return errors.New("指定的租户管理员不存在或已禁用")
+			}
+			if err := tx.Table("tenant_members").Create(map[string]any{
+				"tenant_id": id, "user_id": adminUserID, "display_name": displayName,
+				"status": 1, "is_tenant_admin": true, "joined_at": time.Now().UTC(),
+			}).Error; err != nil {
+				return fmt.Errorf("创建租户管理员成员关系失败: %w", err)
+			}
+		}
 		if err := incrementPermissionVersion(tx, scope, resource, values, id); err != nil {
 			return err
 		}
@@ -351,6 +369,12 @@ func numericID(value any) uint64 {
 		return uint64(id)
 	case float64:
 		return uint64(id)
+	case string:
+		parsed, _ := strconv.ParseUint(id, 10, 64)
+		return parsed
+	case []byte:
+		parsed, _ := strconv.ParseUint(string(id), 10, 64)
+		return parsed
 	}
 	return 0
 }

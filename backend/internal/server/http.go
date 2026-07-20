@@ -35,3 +35,10 @@ func RegisterManagementHTTP(server *khttp.Server, managementService *service.Man
 		v1.RegisterManagementServiceHTTPServer(server, managementService)
 	}
 }
+
+// RegisterFileHTTP 注册租户文件 HTTP API。
+func RegisterFileHTTP(server *khttp.Server, fileService *service.FileService) {
+	if fileService != nil {
+		v1.RegisterFileServiceHTTPServer(server, fileService)
+	}
+}

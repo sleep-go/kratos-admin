@@ -210,6 +210,108 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/files/uploads:
+        post:
+            tags:
+                - FileService
+            operationId: FileService_CreateUpload
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.CreateUploadRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.CreateUploadResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/files/{fileId}:
+        delete:
+            tags:
+                - FileService
+            operationId: FileService_DeleteFile
+            parameters:
+                - name: fileId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.DeleteFileResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/files/{fileId}/confirm:
+        post:
+            tags:
+                - FileService
+            operationId: FileService_ConfirmUpload
+            parameters:
+                - name: fileId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.ConfirmUploadRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.ConfirmUploadResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/files/{fileId}/download-url:
+        get:
+            tags:
+                - FileService
+            operationId: FileService_GetDownloadURL
+            parameters:
+                - name: fileId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.GetDownloadURLResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/v1/health:
         get:
             tags:
@@ -372,11 +474,61 @@ components:
                     type: string
                 service:
                     type: string
+        admin.v1.ConfirmUploadRequest:
+            type: object
+            properties:
+                fileId:
+                    type: string
+        admin.v1.ConfirmUploadResponse:
+            type: object
+            properties:
+                id:
+                    type: string
+                providerName:
+                    type: string
+                objectKey:
+                    type: string
+                originalName:
+                    type: string
+                contentType:
+                    type: string
+                sizeBytes:
+                    type: string
+                sha256:
+                    type: string
+                status:
+                    type: integer
+                    format: uint32
+                createdAt:
+                    type: string
+                    format: date-time
         admin.v1.CreateResourceResponse:
             type: object
             properties:
                 id:
                     type: string
+        admin.v1.CreateUploadRequest:
+            type: object
+            properties:
+                originalName:
+                    type: string
+                contentType:
+                    type: string
+                sizeBytes:
+                    type: string
+                sha256:
+                    type: string
+        admin.v1.CreateUploadResponse:
+            type: object
+            properties:
+                fileId:
+                    type: string
+                providerName:
+                    type: string
+                objectKey:
+                    type: string
+                upload:
+                    $ref: '#/components/schemas/admin.v1.SignedFileRequest'
         admin.v1.CurrentUser:
             type: object
             properties:
@@ -392,6 +544,9 @@ components:
                     type: array
                     items:
                         type: string
+        admin.v1.DeleteFileResponse:
+            type: object
+            properties: {}
         admin.v1.DeleteResourceResponse:
             type: object
             properties:
@@ -412,6 +567,11 @@ components:
                 expiresAt:
                     type: string
                     format: date-time
+        admin.v1.GetDownloadURLResponse:
+            type: object
+            properties:
+                download:
+                    $ref: '#/components/schemas/admin.v1.SignedFileRequest'
         admin.v1.ListResourcesResponse:
             type: object
             properties:
@@ -525,6 +685,20 @@ components:
                     format: date-time
                 current:
                     type: boolean
+        admin.v1.SignedFileRequest:
+            type: object
+            properties:
+                method:
+                    type: string
+                url:
+                    type: string
+                headers:
+                    type: object
+                    additionalProperties:
+                        type: string
+                expiresAt:
+                    type: string
+                    format: date-time
         admin.v1.SwitchTenantRequest:
             type: object
             properties:
@@ -602,6 +776,8 @@ components:
 tags:
     - name: AuthService
       description: AuthService 提供登录、MFA、令牌轮换与会话治理接口。
+    - name: FileService
+      description: FileService 提供受租户权限保护的文件直传、确认、下载和删除能力。
     - name: HealthService
       description: Health 服务提供部署探针使用的健康检查接口。
     - name: ManagementService

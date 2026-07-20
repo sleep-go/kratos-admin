@@ -9,8 +9,38 @@ export type AdminV1CheckResponse = {
     service?: string;
 };
 
+export type AdminV1ConfirmUploadRequest = {
+    fileId?: string;
+};
+
+export type AdminV1ConfirmUploadResponse = {
+    id?: string;
+    providerName?: string;
+    objectKey?: string;
+    originalName?: string;
+    contentType?: string;
+    sizeBytes?: string;
+    sha256?: string;
+    status?: number;
+    createdAt?: string;
+};
+
 export type AdminV1CreateResourceResponse = {
     id?: string;
+};
+
+export type AdminV1CreateUploadRequest = {
+    originalName?: string;
+    contentType?: string;
+    sizeBytes?: string;
+    sha256?: string;
+};
+
+export type AdminV1CreateUploadResponse = {
+    fileId?: string;
+    providerName?: string;
+    objectKey?: string;
+    upload?: AdminV1SignedFileRequest;
 };
 
 export type AdminV1CurrentUser = {
@@ -19,6 +49,10 @@ export type AdminV1CurrentUser = {
     avatarUrl?: string;
     platformAdmin?: boolean;
     permissions?: Array<string>;
+};
+
+export type AdminV1DeleteFileResponse = {
+    [key: string]: unknown;
 };
 
 export type AdminV1DeleteResourceResponse = {
@@ -33,6 +67,10 @@ export type AdminV1ForgotPasswordRequest = {
 export type AdminV1ForgotPasswordResponse = {
     challengeId?: string;
     expiresAt?: string;
+};
+
+export type AdminV1GetDownloadUrlResponse = {
+    download?: AdminV1SignedFileRequest;
 };
 
 export type AdminV1ListResourcesResponse = {
@@ -105,6 +143,15 @@ export type AdminV1Session = {
     createdAt?: string;
     expiresAt?: string;
     current?: boolean;
+};
+
+export type AdminV1SignedFileRequest = {
+    method?: string;
+    url?: string;
+    headers?: {
+        [key: string]: string;
+    };
+    expiresAt?: string;
 };
 
 export type AdminV1SwitchTenantRequest = {
@@ -394,6 +441,112 @@ export type AuthServiceSwitchTenantResponses = {
 };
 
 export type AuthServiceSwitchTenantResponse = AuthServiceSwitchTenantResponses[keyof AuthServiceSwitchTenantResponses];
+
+export type FileServiceCreateUploadData = {
+    body: AdminV1CreateUploadRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/files/uploads';
+};
+
+export type FileServiceCreateUploadErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type FileServiceCreateUploadError = FileServiceCreateUploadErrors[keyof FileServiceCreateUploadErrors];
+
+export type FileServiceCreateUploadResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1CreateUploadResponse;
+};
+
+export type FileServiceCreateUploadResponse = FileServiceCreateUploadResponses[keyof FileServiceCreateUploadResponses];
+
+export type FileServiceDeleteFileData = {
+    body?: never;
+    path: {
+        fileId: string;
+    };
+    query?: never;
+    url: '/api/v1/files/{fileId}';
+};
+
+export type FileServiceDeleteFileErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type FileServiceDeleteFileError = FileServiceDeleteFileErrors[keyof FileServiceDeleteFileErrors];
+
+export type FileServiceDeleteFileResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1DeleteFileResponse;
+};
+
+export type FileServiceDeleteFileResponse = FileServiceDeleteFileResponses[keyof FileServiceDeleteFileResponses];
+
+export type FileServiceConfirmUploadData = {
+    body: AdminV1ConfirmUploadRequest;
+    path: {
+        fileId: string;
+    };
+    query?: never;
+    url: '/api/v1/files/{fileId}/confirm';
+};
+
+export type FileServiceConfirmUploadErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type FileServiceConfirmUploadError = FileServiceConfirmUploadErrors[keyof FileServiceConfirmUploadErrors];
+
+export type FileServiceConfirmUploadResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1ConfirmUploadResponse;
+};
+
+export type FileServiceConfirmUploadResponse = FileServiceConfirmUploadResponses[keyof FileServiceConfirmUploadResponses];
+
+export type FileServiceGetDownloadUrlData = {
+    body?: never;
+    path: {
+        fileId: string;
+    };
+    query?: never;
+    url: '/api/v1/files/{fileId}/download-url';
+};
+
+export type FileServiceGetDownloadUrlErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type FileServiceGetDownloadUrlError = FileServiceGetDownloadUrlErrors[keyof FileServiceGetDownloadUrlErrors];
+
+export type FileServiceGetDownloadUrlResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1GetDownloadUrlResponse;
+};
+
+export type FileServiceGetDownloadUrlResponse = FileServiceGetDownloadUrlResponses[keyof FileServiceGetDownloadUrlResponses];
 
 export type HealthServiceCheckData = {
     body?: never;

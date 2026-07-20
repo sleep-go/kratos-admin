@@ -157,6 +157,21 @@ func TestSwitchTenantRevalidatesMembershipAndRotatesToken(t *testing.T) {
 	}
 }
 
+func TestPlatformAdminCanSwitchBackToPlatformContext(t *testing.T) {
+	usecase, repository, manager, _ := newSessionUsecaseFixture(t)
+	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, SessionID: "session", PermissionVersion: 3})
+	repository.session.RefreshJTIHash = HashJTI(pair.RefreshJTI)
+
+	result, err := usecase.SwitchTenant(context.Background(), pair.RefreshToken, 0)
+	if err != nil {
+		t.Fatalf("SwitchTenant(platform) error = %v", err)
+	}
+	claims, err := manager.Parse(result.Tokens.AccessToken, TokenTypeAccess)
+	if err != nil || claims.TenantID != 0 || claims.MemberID != 0 || result.Tenant.Name != "平台管理" {
+		t.Fatalf("platform result = %+v, claims = %+v, err = %v", result, claims, err)
+	}
+}
+
 func TestLogoutRevokesTokenSession(t *testing.T) {
 	usecase, repository, manager, _ := newSessionUsecaseFixture(t)
 	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, SessionID: "session", PermissionVersion: 3})

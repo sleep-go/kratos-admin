@@ -25,6 +25,11 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     fields: [
       { key: 'code', label: '租户编码', required: true, table: true },
       { key: 'name', label: '租户名称', required: true, table: true },
+      {
+        key: 'admin_user_id',
+        label: '租户管理员用户 ID（留空则为当前平台管理员）',
+        type: 'number'
+      },
       commonStatus,
       { key: 'permission_version', label: '权限版本', table: true },
       createdAt

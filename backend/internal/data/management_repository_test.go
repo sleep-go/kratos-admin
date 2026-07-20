@@ -78,6 +78,13 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	if id == 0 {
 		t.Fatal("Create() must return MySQL auto-increment ID")
 	}
+	var adminCount int64
+	if err := tx.Table("tenant_members").Where("tenant_id = ? AND user_id = ? AND is_tenant_admin = 1", id, 1).Count(&adminCount).Error; err != nil {
+		t.Fatal(err)
+	}
+	if adminCount != 1 {
+		t.Fatalf("tenant admin membership count = %d, want 1", adminCount)
+	}
 	ids, err := (&AuditRepository{db: tx}).PendingEventIDs(context.Background(), 10)
 	if err != nil || len(ids) == 0 {
 		t.Fatalf("PendingEventIDs() = %+v, err %v", ids, err)

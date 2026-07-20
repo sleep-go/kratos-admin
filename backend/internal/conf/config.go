@@ -4,6 +4,7 @@ package conf
 import (
 	"errors"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -44,8 +45,15 @@ type Auth struct {
 
 // Storage 描述文件存储 Provider 的运行配置。
 type Storage struct {
-	Provider  string
-	LocalPath string
+	Provider           string
+	LocalPath          string
+	MaxFileSize        int64
+	OSSRegion          string
+	OSSEndpoint        string
+	OSSBucket          string
+	OSSAccessKeyID     string
+	OSSAccessKeySecret string
+	OSSSecurityToken   string
 }
 
 // LoadFromEnv 从环境变量加载配置，并拒绝缺少密钥的生产配置。
@@ -68,8 +76,15 @@ func LoadFromEnv() (Config, error) {
 			SecretKey:     os.Getenv("KRATOS_ADMIN_SECRET_KEY"),
 		},
 		Storage: Storage{
-			Provider:  valueOrDefault("KRATOS_ADMIN_STORAGE_PROVIDER", "local"),
-			LocalPath: valueOrDefault("KRATOS_ADMIN_STORAGE_LOCAL_PATH", "./data/files"),
+			Provider:           valueOrDefault("KRATOS_ADMIN_STORAGE_PROVIDER", "local"),
+			LocalPath:          valueOrDefault("KRATOS_ADMIN_STORAGE_LOCAL_PATH", "./data/files"),
+			MaxFileSize:        int64ValueOrDefault("KRATOS_ADMIN_STORAGE_MAX_FILE_SIZE", 100*1024*1024),
+			OSSRegion:          os.Getenv("KRATOS_ADMIN_OSS_REGION"),
+			OSSEndpoint:        os.Getenv("KRATOS_ADMIN_OSS_ENDPOINT"),
+			OSSBucket:          os.Getenv("KRATOS_ADMIN_OSS_BUCKET"),
+			OSSAccessKeyID:     os.Getenv("KRATOS_ADMIN_OSS_ACCESS_KEY_ID"),
+			OSSAccessKeySecret: os.Getenv("KRATOS_ADMIN_OSS_ACCESS_KEY_SECRET"),
+			OSSSecurityToken:   os.Getenv("KRATOS_ADMIN_OSS_SECURITY_TOKEN"),
 		},
 	}
 
@@ -78,6 +93,14 @@ func LoadFromEnv() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func int64ValueOrDefault(key string, fallback int64) int64 {
+	value, err := strconv.ParseInt(os.Getenv(key), 10, 64)
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
 }
 
 func valueOrDefault(key, fallback string) string {

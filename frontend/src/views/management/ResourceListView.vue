@@ -34,6 +34,11 @@ async function load() {
   }
 }
 
+function resetQuery() {
+  keyword.value = ''
+  void load()
+}
+
 function openCreate() {
   editingID.value = ''
   for (const key of Object.keys(form)) delete form[key]
@@ -123,13 +128,7 @@ onMounted(load)
     <div class="query-panel">
       <el-input v-model="keyword" clearable placeholder="输入关键词搜索" @keyup.enter="load" />
       <el-button @click="load">查询</el-button>
-      <el-button
-        @click="
-          keyword = ''
-          load()
-        "
-        >重置</el-button
-      >
+      <el-button @click="resetQuery">重置</el-button>
     </div>
     <div class="table-panel">
       <el-table v-loading="loading" :data="items" stripe>

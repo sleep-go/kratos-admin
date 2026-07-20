@@ -34,3 +34,10 @@ func RegisterManagementGRPC(server *kgrpc.Server, managementService *service.Man
 		v1.RegisterManagementServiceServer(server, managementService)
 	}
 }
+
+// RegisterFileGRPC 注册租户文件 gRPC API。
+func RegisterFileGRPC(server *kgrpc.Server, fileService *service.FileService) {
+	if fileService != nil {
+		v1.RegisterFileServiceServer(server, fileService)
+	}
+}
