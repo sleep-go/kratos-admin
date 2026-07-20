@@ -4,6 +4,7 @@
 
 - Admin 应用位于 `app/admin`，Worker 应用位于 `app/worker`。
 - 共享领域、配置、仓储和 Provider 位于根级 `internal`。
+- Admin 与 Worker 配置位于 `configs`，配置契约位于 `internal/conf/conf.proto`。
 - Goose 迁移位于 `migrations`，服务与 Worker 不执行 `AutoMigrate`。
 - `internal/data` 不导入应用 Service/Server，`internal/biz` 不导入 Data 或应用内部包。
 - 仓库不存在实际 `backend/` 目录或运行命令兼容入口。
@@ -22,16 +23,16 @@ app/worker/cmd/worker
 ```bash
 make wire
 make gorm-gen
-make backend-test
-make backend-vet
-make backend-build
+make test
+make vet
+make build
 GOCACHE=/tmp/go-build go test ./app/... ./internal/...
 GOCACHE=/tmp/go-build go vet ./app/... ./internal/...
 ```
 
 ## 生成一致性
 
-依次执行 `make wire`、`make gorm-gen`、`make api` 和 `cd frontend && pnpm api:generate`，随后确认对应生成目录没有 Git 差异。
+依次执行 `make config`、`make wire`、`make gorm-gen`、`make api` 和 `cd frontend && pnpm api:generate`，随后确认对应生成目录没有 Git 差异。
 
 ## 数据库与部署
 

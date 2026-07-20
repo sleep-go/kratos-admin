@@ -22,6 +22,8 @@ Kratos Admin 是基于 go-kratos 与 Vue 3 的前后端分离、多租户通用�
 
 - `app/admin`：Admin HTTP/gRPC 服务、超级管理员初始化和 GORM Gen 命令。
 - `app/worker`：Asynq Worker 独立应用。
+- `configs`：Admin 与 Worker 的 Kratos YAML 运行配置。
+- `internal/conf`：由 Proto 定义并生成的 Bootstrap 配置契约。
 - `internal/biz`：共享领域用例与仓储契约。
 - `internal/data`：MySQL、Redis、Casbin 和 GORM Gen 仓储实现。
 - `internal/provider`：SMTP、阿里云短信、本地文件、阿里云 OSS 和密钥实现。
@@ -31,9 +33,16 @@ Kratos Admin 是基于 go-kratos 与 Vue 3 的前后端分离、多租户通用�
 
 本地与生产部署、备份、升级及故障排查见 [`docs/deployment.md`](docs/deployment.md)。首次 Compose 启动会按 MySQL → Goose → 幂等超级管理员初始化 → API/Worker → Frontend 的顺序执行。
 
-## 不使用 Docker 启动
+## Docker Compose 启动依赖，前后端本地启动
 
-先启动 MySQL 8 和 Redis，并在运行后端命令的终端导出本机连接配置：
+复制环境变量文件，并只启动 MySQL、Redis 与 Mailpit：
+
+```bash
+cp .env.example .env
+make compose-deps-up
+```
+
+Compose 中的应用使用 `mysql:3306`，宿主机运行的 Go 进程必须改用 `127.0.0.1:3306`。在所有后端终端导出本机连接配置，然后执行 Goose 迁移和幂等初始化：
 
 ```bash
 export KRATOS_ADMIN_MYSQL_DSN='kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local'
@@ -41,18 +50,18 @@ export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
 export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
 go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
 goose -dir migrations mysql "$KRATOS_ADMIN_MYSQL_DSN" up
-KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/initadmin
+KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/initadmin --conf ./configs/admin.yaml
 ```
 
 随后分别启动三个常驻开发进程；Admin Server 与 Worker 终端都需要具备上述环境变量：
 
 ```bash
-go run ./app/admin/cmd/server
-go run ./app/worker/cmd/worker
+go run ./app/admin/cmd/server --conf ./configs/admin.yaml
+go run ./app/worker/cmd/worker --conf ./configs/worker.yaml
 cd frontend && pnpm install && pnpm dev
 ```
 
-开发期生成命令为 `make wire`、`make gorm-gen` 和 `make api`。
+也可以分别使用 `make run-admin`、`make run-worker`。YAML 管理配置结构与安全默认值，`${KRATOS_ADMIN_*}` 环境变量只负责部署差异和敏感值。执行 `make help` 可查看官方语义目标及大仓扩展目标；常用生成命令为 `make config`、`make api`、`make wire` 和 `make gorm-gen`。
 
 ## 配置与 Provider
 

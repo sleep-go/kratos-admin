@@ -16,19 +16,25 @@ COPY migrations ./migrations
 
 FROM alpine:3.22 AS admin-server
 RUN addgroup -S kratos && adduser -S kratos -G kratos
+WORKDIR /app
 COPY --from=build /out/admin-server /usr/local/bin/admin-server
+COPY configs ./configs
 USER kratos
 EXPOSE 8000 9000
 ENTRYPOINT ["admin-server"]
 
 FROM alpine:3.22 AS worker
 RUN addgroup -S kratos && adduser -S kratos -G kratos
+WORKDIR /app
 COPY --from=build /out/worker /usr/local/bin/worker
+COPY configs ./configs
 USER kratos
 ENTRYPOINT ["worker"]
 
 FROM alpine:3.22 AS init-admin
 RUN addgroup -S kratos && adduser -S kratos -G kratos
+WORKDIR /app
 COPY --from=build /out/admin-initadmin /usr/local/bin/admin-initadmin
+COPY configs ./configs
 USER kratos
 ENTRYPOINT ["admin-initadmin"]

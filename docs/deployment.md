@@ -19,17 +19,17 @@ export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
 export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
 go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
 goose -dir migrations mysql "$KRATOS_ADMIN_MYSQL_DSN" up
-KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/initadmin
+KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/initadmin --conf ./configs/admin.yaml
 ```
 
 使用三个终端分别启动 Admin Server、Worker 和前端。Admin Server 与 Worker 终端都必须导出相同的 MySQL、Redis 和密钥变量：
 
 ```bash
-go run ./app/admin/cmd/server
+go run ./app/admin/cmd/server --conf ./configs/admin.yaml
 ```
 
 ```bash
-go run ./app/worker/cmd/worker
+go run ./app/worker/cmd/worker --conf ./configs/worker.yaml
 ```
 
 ```bash
@@ -39,6 +39,19 @@ pnpm dev
 ```
 
 GORM Gen 默认输出到 `internal/data/query`，可执行 `go run ./app/admin/cmd/gormgen --out-path internal/data/query`。修改依赖注入后执行 `make wire`，生成的两个 `wire_gen.go` 必须提交。
+
+## Docker Compose 仅启动依赖
+
+需要让前后端在宿主机运行时，可先执行：
+
+```bash
+cp .env.example .env
+make compose-deps-up
+```
+
+该命令只启动 MySQL、Redis 和 Mailpit，不会启动迁移、初始化、API、Worker 或前端。随后按上一节导出宿主机 DSN（主机名必须是 `127.0.0.1`），执行 Goose、初始化命令，并分别启动 Admin、Worker 与前端。停止依赖使用 `make compose-down`。
+
+`configs/admin.yaml` 与 `configs/worker.yaml` 定义配置结构和开发默认值，命令统一通过 `-c/--conf` 指定文件；`${KRATOS_ADMIN_*}` 环境变量用于覆盖地址、密钥及 Provider 凭据。生产 YAML 中不得写入真实敏感值。
 
 ## PolarDB 与 OSS
 
@@ -72,11 +85,12 @@ GORM Gen 默认输出到 `internal/data/query`，可执行 `go run ./app/admin/c
 
 ```bash
 make api
+make config
 make wire
 make gorm-gen
-make backend-test
-make backend-vet
-make backend-build
+make test
+make vet
+make build
 cd frontend && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 cd frontend && E2E_ADMIN_PASSWORD='你的初始化密码' E2E_REDIS_PORT=6379 pnpm e2e
 make compose-config
