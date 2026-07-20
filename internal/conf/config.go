@@ -3,9 +3,13 @@ package conf
 
 import (
 	"errors"
-	"os"
-	"strconv"
+	"fmt"
 	"time"
+
+	"github.com/go-kratos/kratos/v2/config"
+	configenv "github.com/go-kratos/kratos/v2/config/env"
+	configfile "github.com/go-kratos/kratos/v2/config/file"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 const (
@@ -73,78 +77,102 @@ type Storage struct {
 	OSSSecurityToken   string
 }
 
-// LoadFromEnv 从环境变量加载配置，并拒绝缺少密钥的生产配置。
-func LoadFromEnv() (Config, error) {
-	environment := valueOrDefault("KRATOS_ADMIN_ENV", "development")
-	cfg := Config{
-		Environment: environment,
-		Server: Server{
-			HTTPAddr: valueOrDefault("KRATOS_ADMIN_HTTP_ADDR", ":8000"),
-			GRPCAddr: valueOrDefault("KRATOS_ADMIN_GRPC_ADDR", ":9000"),
-		},
-		Data: Data{
-			MySQLDSN:  valueOrDefault("KRATOS_ADMIN_MYSQL_DSN", defaultMySQLDSN),
-			RedisAddr: valueOrDefault("KRATOS_ADMIN_REDIS_ADDR", defaultRedis),
-		},
-		Auth: Auth{
-			AccessTTL:     15 * time.Minute,
-			RefreshTTL:    7 * 24 * time.Hour,
-			JWTPrivateKey: os.Getenv("KRATOS_ADMIN_JWT_PRIVATE_KEY"),
-			SecretKey:     os.Getenv("KRATOS_ADMIN_SECRET_KEY"),
-		},
-		Storage: Storage{
-			Provider:           valueOrDefault("KRATOS_ADMIN_STORAGE_PROVIDER", "local"),
-			LocalPath:          valueOrDefault("KRATOS_ADMIN_STORAGE_LOCAL_PATH", "./data/files"),
-			MaxFileSize:        int64ValueOrDefault("KRATOS_ADMIN_STORAGE_MAX_FILE_SIZE", 100*1024*1024),
-			OSSRegion:          os.Getenv("KRATOS_ADMIN_OSS_REGION"),
-			OSSEndpoint:        os.Getenv("KRATOS_ADMIN_OSS_ENDPOINT"),
-			OSSBucket:          os.Getenv("KRATOS_ADMIN_OSS_BUCKET"),
-			OSSAccessKeyID:     os.Getenv("KRATOS_ADMIN_OSS_ACCESS_KEY_ID"),
-			OSSAccessKeySecret: os.Getenv("KRATOS_ADMIN_OSS_ACCESS_KEY_SECRET"),
-			OSSSecurityToken:   os.Getenv("KRATOS_ADMIN_OSS_SECURITY_TOKEN"),
-		},
-		Messaging: Messaging{
-			SMTPAddress: os.Getenv("KRATOS_ADMIN_SMTP_ADDRESS"), SMTPHost: os.Getenv("KRATOS_ADMIN_SMTP_HOST"),
-			SMTPUsername: os.Getenv("KRATOS_ADMIN_SMTP_USERNAME"), SMTPPassword: os.Getenv("KRATOS_ADMIN_SMTP_PASSWORD"),
-			SMTPFrom: os.Getenv("KRATOS_ADMIN_SMTP_FROM"), SMTPUseTLS: boolValueOrDefault("KRATOS_ADMIN_SMTP_USE_TLS", false),
-			AliyunSMSRegion:          valueOrDefault("KRATOS_ADMIN_ALIYUN_SMS_REGION", "cn-hangzhou"),
-			AliyunSMSEndpoint:        valueOrDefault("KRATOS_ADMIN_ALIYUN_SMS_ENDPOINT", "dysmsapi.aliyuncs.com"),
-			AliyunSMSAccessKeyID:     os.Getenv("KRATOS_ADMIN_ALIYUN_SMS_ACCESS_KEY_ID"),
-			AliyunSMSAccessKeySecret: os.Getenv("KRATOS_ADMIN_ALIYUN_SMS_ACCESS_KEY_SECRET"),
-			AliyunSMSSignName:        os.Getenv("KRATOS_ADMIN_ALIYUN_SMS_SIGN_NAME"),
-			AliyunSMSTemplateCode:    os.Getenv("KRATOS_ADMIN_ALIYUN_SMS_TEMPLATE_CODE"),
-		},
+// Load 从 Kratos YAML 配置文件加载配置，并使用环境变量解析占位符。
+func Load(path string) (Config, error) {
+	source := config.New(config.WithSource(
+		configfile.NewSource(path),
+		configenv.NewSource(),
+	))
+	defer func() { _ = source.Close() }()
+
+	if err := source.Load(); err != nil {
+		return Config{}, fmt.Errorf("加载配置文件 %q: %w", path, err)
 	}
 
-	if environment == "production" && (cfg.Auth.SecretKey == "" || cfg.Auth.JWTPrivateKey == "") {
+	bootstrap := new(Bootstrap)
+	if err := source.Scan(bootstrap); err != nil {
+		return Config{}, fmt.Errorf("解析配置文件 %q: %w", path, err)
+	}
+
+	cfg := fromBootstrap(bootstrap)
+	if cfg.Environment == "production" && (cfg.Auth.SecretKey == "" || cfg.Auth.JWTPrivateKey == "") {
 		return Config{}, errors.New("生产环境必须配置 KRATOS_ADMIN_SECRET_KEY 和 KRATOS_ADMIN_JWT_PRIVATE_KEY")
 	}
 
 	return cfg, nil
 }
 
-func boolValueOrDefault(key string, fallback bool) bool {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
+func fromBootstrap(bootstrap *Bootstrap) Config {
+	environment := stringOrDefault(bootstrap.GetEnvironment(), "development")
+	server := bootstrap.GetServer()
+	data := bootstrap.GetData()
+	auth := bootstrap.GetAuth()
+	storage := bootstrap.GetStorage()
+	messaging := bootstrap.GetMessaging()
+
+	cfg := Config{
+		Environment: environment,
+		Server: Server{
+			HTTPAddr: stringOrDefault(server.GetHttp().GetAddr(), ":8000"),
+			GRPCAddr: stringOrDefault(server.GetGrpc().GetAddr(), ":9000"),
+		},
+		Data: Data{
+			MySQLDSN:  stringOrDefault(data.GetDatabase().GetSource(), defaultMySQLDSN),
+			RedisAddr: stringOrDefault(data.GetRedis().GetAddr(), defaultRedis),
+			RedisDB:   int(data.GetRedis().GetDb()),
+		},
+		Auth: Auth{
+			AccessTTL:     durationOrDefault(auth.GetAccessTtl(), 15*time.Minute),
+			RefreshTTL:    durationOrDefault(auth.GetRefreshTtl(), 7*24*time.Hour),
+			JWTPrivateKey: auth.GetJwtPrivateKey(),
+			SecretKey:     auth.GetSecretKey(),
+		},
+		Storage: Storage{
+			Provider:           stringOrDefault(storage.GetProvider(), "local"),
+			LocalPath:          stringOrDefault(storage.GetLocalPath(), "./data/files"),
+			MaxFileSize:        int64OrDefault(storage.GetMaxFileSize(), 100*1024*1024),
+			OSSRegion:          storage.GetOssRegion(),
+			OSSEndpoint:        storage.GetOssEndpoint(),
+			OSSBucket:          storage.GetOssBucket(),
+			OSSAccessKeyID:     storage.GetOssAccessKeyId(),
+			OSSAccessKeySecret: storage.GetOssAccessKeySecret(),
+			OSSSecurityToken:   storage.GetOssSecurityToken(),
+		},
+		Messaging: Messaging{
+			SMTPAddress:              messaging.GetSmtpAddress(),
+			SMTPHost:                 messaging.GetSmtpHost(),
+			SMTPUsername:             messaging.GetSmtpUsername(),
+			SMTPPassword:             messaging.GetSmtpPassword(),
+			SMTPFrom:                 messaging.GetSmtpFrom(),
+			SMTPUseTLS:               messaging.GetSmtpUseTls(),
+			AliyunSMSRegion:          stringOrDefault(messaging.GetAliyunSmsRegion(), "cn-hangzhou"),
+			AliyunSMSEndpoint:        stringOrDefault(messaging.GetAliyunSmsEndpoint(), "dysmsapi.aliyuncs.com"),
+			AliyunSMSAccessKeyID:     messaging.GetAliyunSmsAccessKeyId(),
+			AliyunSMSAccessKeySecret: messaging.GetAliyunSmsAccessKeySecret(),
+			AliyunSMSSignName:        messaging.GetAliyunSmsSignName(),
+			AliyunSMSTemplateCode:    messaging.GetAliyunSmsTemplateCode(),
+		},
 	}
-	parsed, err := strconv.ParseBool(value)
-	if err != nil {
-		return fallback
-	}
-	return parsed
+
+	return cfg
 }
 
-func int64ValueOrDefault(key string, fallback int64) int64 {
-	value, err := strconv.ParseInt(os.Getenv(key), 10, 64)
-	if err != nil || value <= 0 {
+func durationOrDefault(value *durationpb.Duration, fallback time.Duration) time.Duration {
+	if value == nil || value.AsDuration() <= 0 {
+		return fallback
+	}
+	return value.AsDuration()
+}
+
+func int64OrDefault(value, fallback int64) int64 {
+	if value <= 0 {
 		return fallback
 	}
 	return value
 }
 
-func valueOrDefault(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
+func stringOrDefault(value, fallback string) string {
+	if value != "" {
 		return value
 	}
 	return fallback

@@ -11,6 +11,12 @@ data:
     read_timeout: 2s
     write_timeout: 2s
 
+auth:
+  access_ttl: ${KRATOS_ADMIN_ACCESS_TTL:900s}
+  refresh_ttl: ${KRATOS_ADMIN_REFRESH_TTL:604800s}
+  jwt_private_key: ${KRATOS_ADMIN_JWT_PRIVATE_KEY:}
+  secret_key: ${KRATOS_ADMIN_SECRET_KEY:}
+
 storage:
   provider: ${KRATOS_ADMIN_STORAGE_PROVIDER:local}
   local_path: ${KRATOS_ADMIN_STORAGE_LOCAL_PATH:./data/files}
