@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .superpowers/
+.worktrees/
 .env
 *.local
 
