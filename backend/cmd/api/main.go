@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/sleep-go/kratos-admin/backend/internal/app"
-	"github.com/sleep-go/kratos-admin/backend/internal/conf"
+	"github.com/sleep-go/kratos-admin/internal/conf"
 )
 
 func main() {

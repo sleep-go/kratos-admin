@@ -10,8 +10,8 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	"github.com/sleep-go/kratos-admin/backend/internal/conf"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	"github.com/sleep-go/kratos-admin/internal/conf"
 )
 
 // NewHTTPServer 创建并注册全部 HTTP API。

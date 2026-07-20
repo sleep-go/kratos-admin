@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/sleep-go/kratos-admin/backend/internal/conf"
+	"github.com/sleep-go/kratos-admin/internal/conf"
 )
 
 func TestNewAPIApp(t *testing.T) {

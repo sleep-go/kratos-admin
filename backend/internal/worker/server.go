@@ -12,12 +12,12 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/hibiken/asynq"
 
-	"github.com/sleep-go/kratos-admin/backend/internal/biz/audit"
-	filebiz "github.com/sleep-go/kratos-admin/backend/internal/biz/file"
-	"github.com/sleep-go/kratos-admin/backend/internal/biz/logexport"
-	"github.com/sleep-go/kratos-admin/backend/internal/conf"
-	"github.com/sleep-go/kratos-admin/backend/internal/data"
-	"github.com/sleep-go/kratos-admin/backend/internal/provider/storage"
+	"github.com/sleep-go/kratos-admin/internal/biz/audit"
+	filebiz "github.com/sleep-go/kratos-admin/internal/biz/file"
+	"github.com/sleep-go/kratos-admin/internal/biz/logexport"
+	"github.com/sleep-go/kratos-admin/internal/conf"
+	"github.com/sleep-go/kratos-admin/internal/data"
+	"github.com/sleep-go/kratos-admin/internal/provider/storage"
 )
 
 const (

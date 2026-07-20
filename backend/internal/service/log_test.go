@@ -6,9 +6,9 @@ import (
 	"time"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
-	"github.com/sleep-go/kratos-admin/backend/internal/biz/logexport"
-	"github.com/sleep-go/kratos-admin/backend/internal/provider/storage"
+	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
+	"github.com/sleep-go/kratos-admin/internal/biz/logexport"
+	"github.com/sleep-go/kratos-admin/internal/provider/storage"
 )
 
 type fakeLogHandler struct{ access logexport.Access }

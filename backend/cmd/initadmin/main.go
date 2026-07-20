@@ -8,10 +8,10 @@ import (
 	"log"
 	"os"
 
-	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
-	"github.com/sleep-go/kratos-admin/backend/internal/biz/setup"
-	"github.com/sleep-go/kratos-admin/backend/internal/conf"
-	"github.com/sleep-go/kratos-admin/backend/internal/data"
+	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
+	"github.com/sleep-go/kratos-admin/internal/biz/setup"
+	"github.com/sleep-go/kratos-admin/internal/conf"
+	"github.com/sleep-go/kratos-admin/internal/data"
 )
 
 func main() {

@@ -5,8 +5,8 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	"github.com/sleep-go/kratos-admin/backend/internal/conf"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	"github.com/sleep-go/kratos-admin/internal/conf"
 )
 
 // NewGRPCServer 创建并注册全部内部 gRPC 服务。

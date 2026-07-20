@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
+	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 )
 
 // ResourceScope 是由认证上下文派生的可信数据边界。

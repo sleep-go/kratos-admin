@@ -8,8 +8,8 @@ import (
 
 	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	"github.com/sleep-go/kratos-admin/backend/internal/conf"
 	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	"github.com/sleep-go/kratos-admin/internal/conf"
 )
 
 func TestHTTPServerServesHealthCheck(t *testing.T) {

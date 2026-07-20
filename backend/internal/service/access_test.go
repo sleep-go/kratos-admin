@@ -10,7 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/transport"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
+	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 )
 
 type testHeader map[string][]string

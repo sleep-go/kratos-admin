@@ -4,13 +4,13 @@ package main
 import (
 	"gorm.io/gen"
 
-	"github.com/sleep-go/kratos-admin/backend/internal/data/model"
+	"github.com/sleep-go/kratos-admin/internal/data/model"
 )
 
 func main() {
 	generator := gen.NewGenerator(gen.Config{
 		OutPath:      "backend/internal/data/query",
-		ModelPkgPath: "github.com/sleep-go/kratos-admin/backend/internal/data/model",
+		ModelPkgPath: "github.com/sleep-go/kratos-admin/internal/data/model",
 		Mode:         gen.WithDefaultQuery | gen.WithQueryInterface,
 	})
 	generator.ApplyBasic(
