@@ -13,6 +13,7 @@ export interface ResourceDefinition {
   description: string
   fields: ResourceField[]
   readOnly?: boolean
+  exportLogType?: 'login' | 'audit' | 'api'
 }
 
 const commonStatus: ResourceField = { key: 'status', label: '状态', type: 'status', table: true }
@@ -147,6 +148,7 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     title: '登录日志',
     description: '查看登录成功、失败、锁定与 MFA 事件。',
     readOnly: true,
+    exportLogType: 'login',
     fields: [
       { key: 'identifier', label: '登录标识', table: true },
       { key: 'result', label: '结果', table: true },
@@ -161,6 +163,7 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     title: '操作审计',
     description: '查询由事务 Outbox 可靠生成的业务审计。',
     readOnly: true,
+    exportLogType: 'audit',
     fields: [
       { key: 'summary', label: '操作摘要', table: true },
       { key: 'action', label: '动作', table: true },
@@ -176,6 +179,7 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     title: 'API 访问与异常日志',
     description: '按路由、状态码和请求 ID 排查接口异常。',
     readOnly: true,
+    exportLogType: 'api',
     fields: [
       { key: 'method', label: '方法', table: true },
       { key: 'route', label: '路由', table: true },
@@ -183,6 +187,21 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
       { key: 'duration_ms', label: '耗时(ms)', table: true },
       { key: 'request_id', label: '请求 ID', table: true },
       { key: 'error_reason', label: '异常原因', table: true },
+      createdAt
+    ]
+  },
+  'log-exports': {
+    resource: 'log-exports',
+    title: '日志导出记录',
+    description: '查询异步导出状态并下载已完成的受保护文件。',
+    readOnly: true,
+    fields: [
+      { key: 'log_type', label: '日志类型', table: true },
+      { key: 'status', label: '任务状态', table: true },
+      { key: 'row_count', label: '导出条数', table: true },
+      { key: 'file_id', label: '文件 ID', table: true },
+      { key: 'retry_count', label: '重试次数', table: true },
+      { key: 'failure_reason', label: '失败原因', table: true },
       createdAt
     ]
   },

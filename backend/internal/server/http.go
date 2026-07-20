@@ -57,3 +57,10 @@ func RegisterFileHTTP(server *khttp.Server, fileService *service.FileService) {
 		v1.RegisterFileServiceHTTPServer(server, fileService)
 	}
 }
+
+// RegisterLogHTTP 注册日志异步导出 HTTP API。
+func RegisterLogHTTP(server *khttp.Server, logService *service.LogService) {
+	if logService != nil {
+		v1.RegisterLogServiceHTTPServer(server, logService)
+	}
+}

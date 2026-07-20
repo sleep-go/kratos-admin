@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent } from 'vue'
 
-import { permissionDirective } from './permission'
+import { hasPermission, permissionDirective } from './permission'
 import { useAuthStore } from '@/stores/auth'
 
 describe('权限指令', () => {
@@ -31,5 +31,9 @@ describe('权限指令', () => {
     expect(wrapper.get('#roles-list').attributes('hidden')).toBeUndefined()
     expect(wrapper.get('#departments-create').attributes('hidden')).toBeUndefined()
     expect(wrapper.get('#roles-delete').attributes('hidden')).toBeDefined()
+  })
+
+  it('平台管理员在租户上下文仍可执行跨租户治理操作', () => {
+    expect(hasPermission([], 'api-logs:export', true)).toBe(true)
   })
 })

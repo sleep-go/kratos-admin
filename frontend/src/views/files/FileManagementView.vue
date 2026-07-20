@@ -135,11 +135,12 @@ onMounted(load)
               link
               :disabled="Number(scope.row.status) !== 2"
               @click="download(scope.row)"
-              >下载</el-button
             >
-            <el-button v-permission="'files:delete'" link type="danger" @click="remove(scope.row)"
-              >删除</el-button
-            >
+              下载
+            </el-button>
+            <el-button v-permission="'files:delete'" link type="danger" @click="remove(scope.row)">
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>

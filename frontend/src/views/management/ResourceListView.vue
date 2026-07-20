@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import * as managementApi from '@/api/management'
+import * as logApi from '@/api/logs'
 import { resourceDefinitions } from '@/features/management/resourceDefinitions'
 import type { ResourceRow } from '@/api/management'
+import type { AdminV1LogExport } from '@/api/generated'
 
 const props = defineProps<{ resourceKey: string }>()
 const definition = computed(() => resourceDefinitions[props.resourceKey])
@@ -18,6 +20,9 @@ const keyword = ref('')
 const dialogOpen = ref(false)
 const editingID = ref('')
 const form = reactive<ResourceRow>({})
+const exportTask = ref<AdminV1LogExport>()
+const exporting = ref(false)
+let active = true
 
 async function load() {
   loading.value = true
@@ -94,6 +99,55 @@ async function remove(row: ResourceRow) {
   await load()
 }
 
+async function startExport() {
+  if (!definition.value.exportLogType || exporting.value) return
+  exporting.value = true
+  try {
+    exportTask.value = await logApi.createLogExport({
+      logType: definition.value.exportLogType,
+      keyword: keyword.value
+    })
+    ElMessage.success('导出任务已创建，后台处理中')
+    for (
+      let attempt = 0;
+      attempt < 120 && active && (exportTask.value?.status ?? 0) < 3;
+      attempt++
+    ) {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 1000))
+      if (!active || !exportTask.value?.id) break
+      exportTask.value = await logApi.getLogExport(exportTask.value.id)
+    }
+    if (exportTask.value?.status === 3) ElMessage.success('日志导出完成')
+    if (exportTask.value?.status === 4) ElMessage.error(exportTask.value.failureReason || '日志导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
+async function downloadExport() {
+  if (!exportTask.value?.id) return
+  const result = await logApi.getLogExportDownloadURL(exportTask.value.id)
+  if (!result.url) return
+  const link = globalThis.document.createElement('a')
+  link.href = result.url
+  link.download = ''
+  globalThis.document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
+async function downloadExportRow(row: ResourceRow) {
+  if (Number(row.status) !== 3 || !row.id) return
+  const result = await logApi.getLogExportDownloadURL(String(row.id))
+  if (!result.url) return
+  const link = globalThis.document.createElement('a')
+  link.href = result.url
+  link.download = ''
+  globalThis.document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
 function displayValue(value: unknown, type?: string) {
   if (type === 'status') return Number(value) === 1 ? '启用' : '禁用'
   if (type === 'boolean') return value === true || value === 1 || value === '1' ? '是' : '否'
@@ -108,6 +162,9 @@ watch(
   }
 )
 onMounted(load)
+onBeforeUnmount(() => {
+  active = false
+})
 </script>
 
 <template>
@@ -118,14 +175,40 @@ onMounted(load)
         <h1>{{ definition.title }}</h1>
         <span>{{ definition.description }}</span>
       </div>
-      <el-button
-        v-if="!definition.readOnly"
-        v-permission="`${definition.resource}:create`"
-        type="danger"
-        @click="openCreate"
-        >新建</el-button
-      >
+      <div class="heading-actions">
+        <el-button
+          v-if="definition.exportLogType"
+          v-permission="`${definition.resource}:export`"
+          :loading="exporting"
+          @click="startExport"
+        >
+          异步导出
+        </el-button>
+        <router-link v-if="definition.exportLogType" to="/logs/exports">
+          <el-button>导出记录</el-button>
+        </router-link>
+        <el-button
+          v-if="!definition.readOnly"
+          v-permission="`${definition.resource}:create`"
+          type="danger"
+          @click="openCreate"
+        >
+          新建
+        </el-button>
+      </div>
     </header>
+    <div v-if="exportTask" class="export-status" role="status">
+      <div>
+        <strong>导出任务 {{ exportTask.id }}</strong>
+        <span v-if="exportTask.status === 1">等待 Worker 处理</span>
+        <span v-else-if="exportTask.status === 2">正在生成受保护文件</span>
+        <span v-else-if="exportTask.status === 3">已完成，共 {{ exportTask.rowCount }} 条</span>
+        <span v-else>失败：{{ exportTask.failureReason || '请稍后重试' }}</span>
+      </div>
+      <el-button v-if="exportTask.status === 3" type="danger" @click="downloadExport">
+        下载文件
+      </el-button>
+    </div>
     <div class="query-panel">
       <el-input v-model="keyword" clearable placeholder="输入关键词搜索" @keyup.enter="load" />
       <el-button @click="load">查询</el-button>
@@ -144,48 +227,75 @@ onMounted(load)
           <template #default="scope">{{ displayValue(scope.row[field.key], field.type) }}</template>
         </el-table-column>
         <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" width="138">
-          <template #default="scope"
-            ><el-button
+          <template #default="scope">
+            <el-button
               v-permission="`${definition.resource}:update`"
               link
               @click="openEdit(scope.row)"
-              >编辑</el-button
-            ><el-button
+            >
+              编辑
+            </el-button><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
               @click="remove(scope.row)"
-              >删除</el-button
-            ></template
-          >
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-else-if="definition.resource === 'log-exports'"
+          label="操作"
+          fixed="right"
+          width="100"
+        >
+          <template #default="scope">
+            <el-button
+              :disabled="Number(scope.row.status) !== 3"
+              link
+              type="danger"
+              @click="downloadExportRow(scope.row)"
+            >
+              下载
+            </el-button>
+          </template>
         </el-table-column>
       </el-table>
       <div v-if="!loading && items.length === 0" class="mobile-empty">暂无数据</div>
       <div class="mobile-cards">
         <article v-for="row in items" :key="String(row.id)">
-          <strong
-            >#{{ row.id }} ·
+          <strong>#{{ row.id }} ·
             {{
               row.name ?? row.display_name ?? row.summary ?? row.original_name ?? definition.title
-            }}</strong
-          >
+            }}</strong>
           <dl>
-            <template v-for="field in tableFields.slice(0, 5)" :key="field.key"
-              ><dt>{{ field.label }}</dt>
-              <dd>{{ displayValue(row[field.key], field.type) }}</dd></template
-            >
+            <template v-for="field in tableFields.slice(0, 5)" :key="field.key">
+              <dt>{{ field.label }}</dt>
+              <dd>{{ displayValue(row[field.key], field.type) }}</dd>
+            </template>
           </dl>
           <div v-if="!definition.readOnly">
-            <el-button v-permission="`${definition.resource}:update`" link @click="openEdit(row)"
-              >编辑</el-button
-            ><el-button
+            <el-button v-permission="`${definition.resource}:update`" link @click="openEdit(row)">
+              编辑
+            </el-button><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
               @click="remove(row)"
-              >删除</el-button
             >
+              删除
+            </el-button>
           </div>
+          <el-button
+            v-else-if="definition.resource === 'log-exports'"
+            :disabled="Number(row.status) !== 3"
+            link
+            type="danger"
+            @click="downloadExportRow(row)"
+          >
+            下载文件
+          </el-button>
         </article>
       </div>
       <el-pagination
@@ -219,9 +329,9 @@ onMounted(load)
           :required="field.required"
         >
           <el-switch v-if="field.type === 'boolean'" v-model="form[field.key]" />
-          <el-select v-else-if="field.type === 'status'" v-model="form[field.key]"
-            ><el-option label="启用" :value="1" /><el-option label="禁用" :value="2"
-          /></el-select>
+          <el-select v-else-if="field.type === 'status'" v-model="form[field.key]">
+            <el-option label="启用" :value="1" /><el-option label="禁用" :value="2" />
+          </el-select>
           <el-input-number v-else-if="field.type === 'number'" v-model="form[field.key]" :min="0" />
           <el-input
             v-else
@@ -236,10 +346,9 @@ onMounted(load)
           />
         </el-form-item>
       </el-form>
-      <template #footer
-        ><el-button @click="dialogOpen = false">取消</el-button
-        ><el-button type="danger" @click="save">保存</el-button></template
-      >
+      <template #footer>
+        <el-button @click="dialogOpen = false">取消</el-button><el-button type="danger" @click="save">保存</el-button>
+      </template>
     </el-dialog>
   </section>
 </template>
@@ -272,6 +381,32 @@ onMounted(load)
   color: var(--ka-muted);
   font-size: 13px;
 }
+.heading-actions {
+  display: flex;
+  gap: 10px;
+}
+.export-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--ka-accent);
+  background: #fff;
+  box-shadow: var(--ka-shadow);
+}
+.export-status div {
+  display: grid;
+  gap: 4px;
+}
+.export-status strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.export-status span {
+  color: var(--ka-muted);
+  font-size: 12px;
+}
 .query-panel,
 .table-panel {
   border: 1px solid rgb(0 0 0 / 5%);
@@ -300,6 +435,11 @@ onMounted(load)
   display: none;
 }
 @media (max-width: 640px) {
+  .resource-heading,
+  .export-status {
+    align-items: stretch;
+    flex-direction: column;
+  }
   .query-panel {
     flex-wrap: wrap;
   }

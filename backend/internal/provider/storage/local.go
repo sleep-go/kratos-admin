@@ -51,6 +51,41 @@ func NewLocalProvider(root, basePath string, secret []byte, now func() time.Time
 // Name 返回 Provider 稳定名称。
 func (p *LocalProvider) Name() string { return "local" }
 
+// Put 由服务端写入异步任务生成的对象，禁止覆盖同名对象。
+func (p *LocalProvider) Put(_ context.Context, objectKey string, body io.Reader, meta ObjectMeta) (ObjectMeta, error) {
+	filePath, err := p.objectPath(objectKey)
+	if err != nil {
+		return ObjectMeta{}, err
+	}
+	if meta.Size < 0 {
+		return ObjectMeta{}, errors.New("对象大小无效")
+	}
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o750); err != nil {
+		return ObjectMeta{}, err
+	}
+	object, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o640)
+	if err != nil {
+		return ObjectMeta{}, err
+	}
+	written, copyErr := io.Copy(object, io.LimitReader(body, meta.Size+1))
+	closeErr := object.Close()
+	if copyErr != nil || closeErr != nil || written != meta.Size {
+		_ = os.Remove(filePath)
+		return ObjectMeta{}, errors.New("对象内容大小不匹配")
+	}
+	raw, err := json.Marshal(localObjectMeta{ContentType: meta.ContentType, Size: written, Metadata: meta.Metadata})
+	if err != nil {
+		_ = os.Remove(filePath)
+		return ObjectMeta{}, err
+	}
+	if err := os.WriteFile(filePath+".meta.json", raw, 0o640); err != nil {
+		_ = os.Remove(filePath)
+		return ObjectMeta{}, err
+	}
+	meta.Size = written
+	return meta, nil
+}
+
 // PresignUpload 生成仅允许写入指定对象和大小的短期 URL。
 func (p *LocalProvider) PresignUpload(_ context.Context, objectKey string, meta ObjectMeta, ttl time.Duration) (SignedRequest, error) {
 	if _, err := p.objectPath(objectKey); err != nil {

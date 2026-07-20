@@ -93,3 +93,20 @@ func TestLocalProviderRejectsRepeatedSignedUpload(t *testing.T) {
 		}
 	}
 }
+
+func TestLocalProviderServerSidePut(t *testing.T) {
+	provider, err := NewLocalProvider(t.TempDir(), "/api/v1/files/local/content", []byte("01234567890123456789012345678901"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta, err := provider.Put(context.Background(), "exports/8/report.csv", bytes.NewBufferString("id,name\n1,test\n"), ObjectMeta{
+		ContentType: "text/csv; charset=utf-8", Size: 15, Metadata: map[string]string{"tenant-id": "8"},
+	})
+	if err != nil || meta.Size != 15 {
+		t.Fatalf("Put() = %+v, %v", meta, err)
+	}
+	saved, err := provider.Head(context.Background(), "exports/8/report.csv")
+	if err != nil || saved.Metadata["tenant-id"] != "8" || saved.Size != 15 {
+		t.Fatalf("Head() = %+v, %v", saved, err)
+	}
+}

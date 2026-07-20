@@ -3,6 +3,7 @@ package storage
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -25,6 +26,7 @@ type SignedRequest struct {
 // Provider 定义对象存储上传、校验、下载与删除能力。
 type Provider interface {
 	Name() string
+	Put(ctx context.Context, objectKey string, body io.Reader, meta ObjectMeta) (ObjectMeta, error)
 	PresignUpload(ctx context.Context, objectKey string, meta ObjectMeta, ttl time.Duration) (SignedRequest, error)
 	Head(ctx context.Context, objectKey string) (ObjectMeta, error)
 	PresignDownload(ctx context.Context, objectKey, downloadName string, ttl time.Duration) (SignedRequest, error)

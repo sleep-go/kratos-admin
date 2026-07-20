@@ -26,7 +26,11 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("初始化 Worker 依赖失败: %w", err)
 	}
 	defer resources.Close()
-	if err := app.NewFullWorkerApp(cfg, resources).Run(); err != nil {
+	workerApp, err := app.NewFullWorkerApp(cfg, resources)
+	if err != nil {
+		return fmt.Errorf("初始化 Worker Provider 失败: %w", err)
+	}
+	if err := workerApp.Run(); err != nil {
 		return fmt.Errorf("Worker 进程退出: %w", err)
 	}
 	return nil

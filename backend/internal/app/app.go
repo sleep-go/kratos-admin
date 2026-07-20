@@ -14,6 +14,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	bizauth "github.com/sleep-go/kratos-admin/backend/internal/biz/auth"
 	filebiz "github.com/sleep-go/kratos-admin/backend/internal/biz/file"
+	"github.com/sleep-go/kratos-admin/backend/internal/biz/logexport"
 	"github.com/sleep-go/kratos-admin/backend/internal/conf"
 	"github.com/sleep-go/kratos-admin/backend/internal/data"
 	"github.com/sleep-go/kratos-admin/backend/internal/provider/message"
@@ -46,6 +47,7 @@ type APIResources struct {
 	AuthService       *service.AuthService
 	ManagementService *service.ManagementService
 	FileService       *service.FileService
+	LogService        *service.LogService
 	LocalStorage      http.Handler
 }
 
@@ -98,11 +100,14 @@ func NewAPIResources(ctx context.Context, cfg conf.Config) (*APIResources, error
 		return nil, err
 	}
 	fileUsecase := filebiz.NewUsecase(data.NewFileRepository(dataResources), storageProvider, cfg.Storage.MaxFileSize, nil)
+	logRepository := data.NewLogExportRepository(dataResources)
+	logUsecase := logexport.NewUsecase(logRepository, storageProvider, nil)
 	return &APIResources{
 		Data:              dataResources,
 		AuthService:       authService,
 		ManagementService: service.NewManagementService(managementRepository, managementRepository),
 		FileService:       service.NewFileService(fileUsecase, managementRepository),
+		LogService:        service.NewLogService(logUsecase, managementRepository),
 		LocalStorage:      localHandler,
 	}, nil
 }
@@ -132,6 +137,8 @@ func NewFullAPIApp(cfg conf.Config, resources *APIResources) *kratos.App {
 	server.RegisterManagementGRPC(grpcServer, resources.ManagementService)
 	server.RegisterFileHTTP(httpServer, resources.FileService)
 	server.RegisterFileGRPC(grpcServer, resources.FileService)
+	server.RegisterLogHTTP(httpServer, resources.LogService)
+	server.RegisterLogGRPC(grpcServer, resources.LogService)
 	if resources.LocalStorage != nil {
 		httpServer.Handle("/api/v1/files/local/content", resources.LocalStorage)
 	}
@@ -194,13 +201,17 @@ func NewWorkerApp(_ conf.Config) *kratos.App {
 }
 
 // NewFullWorkerApp 创建连接真实 MySQL、Redis 和 Asynq 的 Worker 应用。
-func NewFullWorkerApp(cfg conf.Config, resources *data.Data) *kratos.App {
+func NewFullWorkerApp(cfg conf.Config, resources *data.Data) (*kratos.App, error) {
 	logger := newLogger("worker")
-	asyncServer := workerServer.NewServer(cfg.Data, resources, logger)
+	storageProvider, _, err := buildStorageProvider(cfg)
+	if err != nil {
+		return nil, err
+	}
+	asyncServer := workerServer.NewServer(cfg.Data, resources, storageProvider, logger)
 	return kratos.New(
 		kratos.Name("kratos-admin-worker"), kratos.Version(version), kratos.Logger(logger),
 		kratos.Server(asyncServer),
-	)
+	), nil
 }
 
 func newLogger(component string) log.Logger {

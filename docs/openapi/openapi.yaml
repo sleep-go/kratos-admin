@@ -349,6 +349,78 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/logs/exports:
+        post:
+            tags:
+                - LogService
+            operationId: LogService_CreateExport
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.CreateExportRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.CreateExportResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/logs/exports/{exportId}:
+        get:
+            tags:
+                - LogService
+            operationId: LogService_GetExport
+            parameters:
+                - name: exportId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.GetExportResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/logs/exports/{exportId}/download-url:
+        get:
+            tags:
+                - LogService
+            operationId: LogService_GetExportDownloadURL
+            parameters:
+                - name: exportId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.GetExportDownloadURLResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/v1/management/{resource}:
         get:
             tags:
@@ -520,6 +592,22 @@ components:
                 createdAt:
                     type: string
                     format: date-time
+        admin.v1.CreateExportRequest:
+            type: object
+            properties:
+                logType:
+                    type: string
+                keyword:
+                    type: string
+                filters:
+                    type: object
+                    additionalProperties:
+                        type: string
+        admin.v1.CreateExportResponse:
+            type: object
+            properties:
+                item:
+                    $ref: '#/components/schemas/admin.v1.LogExport'
         admin.v1.CreateResourceResponse:
             type: object
             properties:
@@ -600,6 +688,19 @@ components:
             properties:
                 download:
                     $ref: '#/components/schemas/admin.v1.SignedFileRequest'
+        admin.v1.GetExportDownloadURLResponse:
+            type: object
+            properties:
+                url:
+                    type: string
+                expiresAt:
+                    type: string
+                    format: date-time
+        admin.v1.GetExportResponse:
+            type: object
+            properties:
+                item:
+                    $ref: '#/components/schemas/admin.v1.LogExport'
         admin.v1.ListResourcesResponse:
             type: object
             properties:
@@ -622,6 +723,32 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/admin.v1.Session'
+        admin.v1.LogExport:
+            type: object
+            properties:
+                id:
+                    type: string
+                logType:
+                    type: string
+                status:
+                    type: integer
+                    format: uint32
+                rowCount:
+                    type: integer
+                    format: uint32
+                fileId:
+                    type: string
+                retryCount:
+                    type: integer
+                    format: uint32
+                failureReason:
+                    type: string
+                createdAt:
+                    type: string
+                    format: date-time
+                finishedAt:
+                    type: string
+                    format: date-time
         admin.v1.LoginRequest:
             type: object
             properties:
@@ -808,5 +935,7 @@ tags:
       description: FileService 提供受租户权限保护的文件直传、确认、下载和删除能力。
     - name: HealthService
       description: Health 服务提供部署探针使用的健康检查接口。
+    - name: LogService
+      description: LogService 提供受权限保护的异步日志导出与下载能力。
     - name: ManagementService
       description: ManagementService 提供白名单后台资源的统一分页与维护接口。

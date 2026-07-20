@@ -21,6 +21,7 @@ const managementRoutes: Array<[string, string, string]> = [
   ['logs/login', 'login-logs', 'login-logs'],
   ['logs/audit', 'audit-logs', 'audit-logs'],
   ['logs/api', 'api-logs', 'api-logs'],
+  ['logs/exports', 'log-exports', 'log-exports'],
   ['settings/dictionaries', 'dictionary-types', 'dictionary-types'],
   ['settings/dictionary-items', 'dictionary-items', 'dictionary-items'],
   ['settings/providers', 'provider-management', 'providers'],

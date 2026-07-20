@@ -41,3 +41,10 @@ func RegisterFileGRPC(server *kgrpc.Server, fileService *service.FileService) {
 		v1.RegisterFileServiceServer(server, fileService)
 	}
 }
+
+// RegisterLogGRPC 注册日志异步导出 gRPC API。
+func RegisterLogGRPC(server *kgrpc.Server, logService *service.LogService) {
+	if logService != nil {
+		v1.RegisterLogServiceServer(server, logService)
+	}
+}

@@ -58,32 +58,21 @@ async function resetPassword() {
           : '验证码 5 分钟内有效，最多可尝试 5 次。'
       }}</span>
       <form v-if="stage === 'request'" @submit.prevent="requestCode">
-        <label
-          ><strong>账号</strong
-          ><input v-model.trim="form.identifier" placeholder="用户名 / 邮箱 / 手机号" required
-        /></label>
-        <label
-          ><strong>验证渠道</strong
-          ><select v-model="form.channel">
-            <option value="email">邮箱</option>
-            <option value="sms">短信</option>
-          </select></label
-        >
+        <label><strong>账号</strong><input v-model.trim="form.identifier" placeholder="用户名 / 邮箱 / 手机号" required /></label>
+        <label><strong>验证渠道</strong><select v-model="form.channel">
+          <option value="email">邮箱</option>
+          <option value="sms">短信</option>
+        </select></label>
         <button type="submit" :disabled="loading">{{ loading ? '发送中…' : '发送验证码' }}</button>
       </form>
       <form v-else @submit.prevent="resetPassword">
-        <label
-          ><strong>验证码</strong
-          ><input v-model.trim="form.code" inputmode="numeric" maxlength="6" required
-        /></label>
-        <label
-          ><strong>新密码</strong
-          ><input
-            v-model="form.newPassword"
-            type="password"
-            autocomplete="new-password"
-            minlength="12"
-            required
+        <label><strong>验证码</strong><input v-model.trim="form.code" inputmode="numeric" maxlength="6" required /></label>
+        <label><strong>新密码</strong><input
+          v-model="form.newPassword"
+          type="password"
+          autocomplete="new-password"
+          minlength="12"
+          required
         /></label>
         <button type="submit" :disabled="loading">{{ loading ? '提交中…' : '重置密码' }}</button>
       </form>

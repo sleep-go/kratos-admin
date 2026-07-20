@@ -25,6 +25,18 @@ export type AdminV1ConfirmUploadResponse = {
     createdAt?: string;
 };
 
+export type AdminV1CreateExportRequest = {
+    logType?: string;
+    keyword?: string;
+    filters?: {
+        [key: string]: string;
+    };
+};
+
+export type AdminV1CreateExportResponse = {
+    item?: AdminV1LogExport;
+};
+
 export type AdminV1CreateResourceResponse = {
     id?: string;
 };
@@ -79,6 +91,15 @@ export type AdminV1GetDownloadUrlResponse = {
     download?: AdminV1SignedFileRequest;
 };
 
+export type AdminV1GetExportDownloadUrlResponse = {
+    url?: string;
+    expiresAt?: string;
+};
+
+export type AdminV1GetExportResponse = {
+    item?: AdminV1LogExport;
+};
+
 export type AdminV1ListResourcesResponse = {
     items?: Array<{
         [key: string]: unknown;
@@ -90,6 +111,18 @@ export type AdminV1ListResourcesResponse = {
 
 export type AdminV1ListSessionsResponse = {
     items?: Array<AdminV1Session>;
+};
+
+export type AdminV1LogExport = {
+    id?: string;
+    logType?: string;
+    status?: number;
+    rowCount?: number;
+    fileId?: string;
+    retryCount?: number;
+    failureReason?: string;
+    createdAt?: string;
+    finishedAt?: string;
 };
 
 export type AdminV1LoginRequest = {
@@ -603,6 +636,85 @@ export type HealthServiceCheckResponses = {
 };
 
 export type HealthServiceCheckResponse = HealthServiceCheckResponses[keyof HealthServiceCheckResponses];
+
+export type LogServiceCreateExportData = {
+    body: AdminV1CreateExportRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/logs/exports';
+};
+
+export type LogServiceCreateExportErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type LogServiceCreateExportError = LogServiceCreateExportErrors[keyof LogServiceCreateExportErrors];
+
+export type LogServiceCreateExportResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1CreateExportResponse;
+};
+
+export type LogServiceCreateExportResponse = LogServiceCreateExportResponses[keyof LogServiceCreateExportResponses];
+
+export type LogServiceGetExportData = {
+    body?: never;
+    path: {
+        exportId: string;
+    };
+    query?: never;
+    url: '/api/v1/logs/exports/{exportId}';
+};
+
+export type LogServiceGetExportErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type LogServiceGetExportError = LogServiceGetExportErrors[keyof LogServiceGetExportErrors];
+
+export type LogServiceGetExportResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1GetExportResponse;
+};
+
+export type LogServiceGetExportResponse = LogServiceGetExportResponses[keyof LogServiceGetExportResponses];
+
+export type LogServiceGetExportDownloadUrlData = {
+    body?: never;
+    path: {
+        exportId: string;
+    };
+    query?: never;
+    url: '/api/v1/logs/exports/{exportId}/download-url';
+};
+
+export type LogServiceGetExportDownloadUrlErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type LogServiceGetExportDownloadUrlError = LogServiceGetExportDownloadUrlErrors[keyof LogServiceGetExportDownloadUrlErrors];
+
+export type LogServiceGetExportDownloadUrlResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1GetExportDownloadUrlResponse;
+};
+
+export type LogServiceGetExportDownloadUrlResponse = LogServiceGetExportDownloadUrlResponses[keyof LogServiceGetExportDownloadUrlResponses];
 
 export type ManagementServiceListResourcesData = {
     body?: never;

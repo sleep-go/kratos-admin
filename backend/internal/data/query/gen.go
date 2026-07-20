@@ -28,6 +28,7 @@ var (
 	FailedTask          *failedTask
 	File                *file
 	FileReference       *fileReference
+	LogExport           *logExport
 	LoginLog            *loginLog
 	MemberDepartment    *memberDepartment
 	Position            *position
@@ -56,6 +57,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	FailedTask = &Q.FailedTask
 	File = &Q.File
 	FileReference = &Q.FileReference
+	LogExport = &Q.LogExport
 	LoginLog = &Q.LoginLog
 	MemberDepartment = &Q.MemberDepartment
 	Position = &Q.Position
@@ -85,6 +87,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		FailedTask:          newFailedTask(db, opts...),
 		File:                newFile(db, opts...),
 		FileReference:       newFileReference(db, opts...),
+		LogExport:           newLogExport(db, opts...),
 		LoginLog:            newLoginLog(db, opts...),
 		MemberDepartment:    newMemberDepartment(db, opts...),
 		Position:            newPosition(db, opts...),
@@ -115,6 +118,7 @@ type Query struct {
 	FailedTask          failedTask
 	File                file
 	FileReference       fileReference
+	LogExport           logExport
 	LoginLog            loginLog
 	MemberDepartment    memberDepartment
 	Position            position
@@ -148,6 +152,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		FailedTask:          q.FailedTask.clone(db),
 		File:                q.File.clone(db),
 		FileReference:       q.FileReference.clone(db),
+		LogExport:           q.LogExport.clone(db),
 		LoginLog:            q.LoginLog.clone(db),
 		MemberDepartment:    q.MemberDepartment.clone(db),
 		Position:            q.Position.clone(db),
@@ -186,6 +191,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		FailedTask:          q.FailedTask.replaceDB(db),
 		File:                q.File.replaceDB(db),
 		FileReference:       q.FileReference.replaceDB(db),
+		LogExport:           q.LogExport.replaceDB(db),
 		LoginLog:            q.LoginLog.replaceDB(db),
 		MemberDepartment:    q.MemberDepartment.replaceDB(db),
 		Position:            q.Position.replaceDB(db),
@@ -214,6 +220,7 @@ type queryCtx struct {
 	FailedTask          IFailedTaskDo
 	File                IFileDo
 	FileReference       IFileReferenceDo
+	LogExport           ILogExportDo
 	LoginLog            ILoginLogDo
 	MemberDepartment    IMemberDepartmentDo
 	Position            IPositionDo
@@ -242,6 +249,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		FailedTask:          q.FailedTask.WithContext(ctx),
 		File:                q.File.WithContext(ctx),
 		FileReference:       q.FileReference.WithContext(ctx),
+		LogExport:           q.LogExport.WithContext(ctx),
 		LoginLog:            q.LoginLog.WithContext(ctx),
 		MemberDepartment:    q.MemberDepartment.WithContext(ctx),
 		Position:            q.Position.WithContext(ctx),

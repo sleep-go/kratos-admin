@@ -20,7 +20,7 @@ func main() {
 		model.AuthSession{}, model.VerificationCode{}, model.LoginLog{}, model.AuditOutbox{},
 		model.AuditLog{}, model.APIAccessLog{}, model.SystemSetting{}, model.DictionaryType{},
 		model.DictionaryItem{}, model.ProviderConfig{}, model.File{}, model.FileReference{},
-		model.FailedTask{},
+		model.FailedTask{}, model.LogExport{},
 	)
 	generator.Execute()
 }

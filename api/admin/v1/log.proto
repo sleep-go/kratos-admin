@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package admin.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/sleep-go/kratos-admin/api/admin/v1;v1";
+
+// LogService 提供受权限保护的异步日志导出与下载能力。
+service LogService {
+  rpc CreateExport(CreateExportRequest) returns (CreateExportResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/logs/exports"
+      body: "*"
+    };
+  }
+  rpc GetExport(GetExportRequest) returns (GetExportResponse) {
+    option (google.api.http) = {get: "/api/v1/logs/exports/{export_id}"};
+  }
+  rpc GetExportDownloadURL(GetExportDownloadURLRequest) returns (GetExportDownloadURLResponse) {
+    option (google.api.http) = {get: "/api/v1/logs/exports/{export_id}/download-url"};
+  }
+}
+
+message CreateExportRequest {
+  string log_type = 1;
+  string keyword = 2;
+  map<string, string> filters = 3;
+}
+
+message CreateExportResponse {
+  LogExport item = 1;
+}
+
+message GetExportRequest {
+  string export_id = 1;
+}
+
+message GetExportResponse {
+  LogExport item = 1;
+}
+
+message GetExportDownloadURLRequest {
+  string export_id = 1;
+}
+
+message LogExport {
+  string id = 1;
+  string log_type = 2;
+  uint32 status = 3;
+  uint32 row_count = 4;
+  string file_id = 5;
+  uint32 retry_count = 6;
+  string failure_reason = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp finished_at = 9;
+}
+
+message GetExportDownloadURLResponse {
+  string url = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}

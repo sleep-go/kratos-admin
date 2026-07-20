@@ -431,3 +431,29 @@ type FailedTask struct {
 
 // TableName 返回失败任务表名。
 func (FailedTask) TableName() string { return "failed_tasks" }
+
+// LogExport 表示最多导出十万条日志的异步任务。
+type LogExport struct {
+	ID             string         `gorm:"type:char(36);primaryKey"`
+	TenantID       uint64         `gorm:"not null"`
+	UserID         uint64         `gorm:"not null"`
+	MemberID       uint64         `gorm:"not null"`
+	LogType        string         `gorm:"size:16;not null"`
+	Keyword        string         `gorm:"size:191;not null"`
+	Filters        datatypes.JSON `gorm:"type:json"`
+	PayloadVersion uint16         `gorm:"not null"`
+	IdempotencyKey string         `gorm:"size:191;not null"`
+	Status         uint8          `gorm:"not null"`
+	RowCount       uint32         `gorm:"not null"`
+	FileID         string         `gorm:"type:char(36);not null"`
+	RetryCount     uint32         `gorm:"not null"`
+	NextRetryAt    *time.Time
+	FailureReason  string     `gorm:"size:1024;not null"`
+	CreatedAt      time.Time  `gorm:"not null"`
+	StartedAt      *time.Time
+	FinishedAt     *time.Time
+	UpdatedAt      time.Time `gorm:"not null"`
+}
+
+// TableName 返回异步日志导出任务表名。
+func (LogExport) TableName() string { return "log_exports" }

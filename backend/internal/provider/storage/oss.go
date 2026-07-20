@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"io"
 	"mime"
 	"time"
 
@@ -44,6 +45,22 @@ func NewOSSProvider(config OSSConfig) (*OSSProvider, error) {
 
 // Name 返回 Provider 稳定名称。
 func (p *OSSProvider) Name() string { return "aliyun-oss" }
+
+// Put 由服务端写入异步任务生成的私有对象，并禁止覆盖同名对象。
+func (p *OSSProvider) Put(ctx context.Context, objectKey string, body io.Reader, meta ObjectMeta) (ObjectMeta, error) {
+	forbidOverwrite := "true"
+	result, err := p.client.PutObject(ctx, &oss.PutObjectRequest{
+		Bucket: &p.bucket, Key: &objectKey, Body: body, ContentLength: &meta.Size,
+		ContentType: &meta.ContentType, Metadata: meta.Metadata, ForbidOverwrite: &forbidOverwrite,
+	})
+	if err != nil {
+		return ObjectMeta{}, err
+	}
+	if result.ETag != nil {
+		meta.ETag = *result.ETag
+	}
+	return meta, nil
+}
 
 // PresignUpload 生成带大小、类型和元数据约束的 OSS V4 PUT URL。
 func (p *OSSProvider) PresignUpload(ctx context.Context, objectKey string, meta ObjectMeta, ttl time.Duration) (SignedRequest, error) {

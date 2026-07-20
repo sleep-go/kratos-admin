@@ -59,8 +59,7 @@ const activities = [
         </div>
         <ul>
           <li v-for="activity in activities" :key="activity[0]">
-            <time>{{ activity[0] }}</time
-            ><span>{{ activity[1] }}</span>
+            <time>{{ activity[0] }}</time><span>{{ activity[1] }}</span>
           </li>
         </ul>
       </article>

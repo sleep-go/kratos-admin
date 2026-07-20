@@ -3,6 +3,7 @@ package file
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -44,6 +45,9 @@ type fakeProvider struct {
 }
 
 func (p *fakeProvider) Name() string { return "fake" }
+func (p *fakeProvider) Put(_ context.Context, _ string, _ io.Reader, _ storage.ObjectMeta) (storage.ObjectMeta, error) {
+	return storage.ObjectMeta{}, nil
+}
 func (p *fakeProvider) PresignUpload(_ context.Context, _ string, _ storage.ObjectMeta, _ time.Duration) (storage.SignedRequest, error) {
 	return storage.SignedRequest{Method: "PUT", URL: "https://upload.example", ExpiresAt: time.Now().Add(time.Minute)}, nil
 }
