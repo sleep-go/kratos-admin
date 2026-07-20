@@ -5,7 +5,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/service"
 	"github.com/sleep-go/kratos-admin/internal/conf"
 )
 

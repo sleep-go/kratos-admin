@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
+	auditbiz "github.com/sleep-go/kratos-admin/internal/biz/audit"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 )
 
@@ -36,23 +37,6 @@ type VerificationHandler interface {
 	VerifyMFA(ctx context.Context, challengeID uint64, code string) (bizauth.User, bizauth.LoginInput, error)
 }
 
-// LoginLogRecord 描述已脱敏的登录安全事件。
-type LoginLogRecord struct {
-	TenantID   uint64
-	UserID     uint64
-	Identifier string
-	Result     uint8
-	Reason     string
-	IP         string
-	UserAgent  string
-	RequestID  string
-}
-
-// LoginLogRecorder 定义登录安全日志持久化能力。
-type LoginLogRecorder interface {
-	RecordLogin(ctx context.Context, record LoginLogRecord) error
-}
-
 // SessionHandler 定义 refresh 轮换、退出和租户切换用例。
 type SessionHandler interface {
 	Refresh(ctx context.Context, refreshToken string) (bizauth.RefreshResult, error)
@@ -72,15 +56,15 @@ type AuthService struct {
 	sessionHandler  SessionHandler
 	tokens          *bizauth.TokenManager
 	accessValidator AccessValidator
-	accessRecorder  AccessLogRecorder
-	loginRecorder   LoginLogRecorder
+	accessRecorder  auditbiz.AccessLogRecorder
+	loginRecorder   auditbiz.LoginLogRecorder
 	captcha         CaptchaHandler
 	verification    VerificationHandler
 	secureCookie    bool
 }
 
 // ConfigureLoginLog 配置登录安全日志记录器。
-func (s *AuthService) ConfigureLoginLog(recorder LoginLogRecorder) {
+func (s *AuthService) ConfigureLoginLog(recorder auditbiz.LoginLogRecorder) {
 	s.loginRecorder = recorder
 }
 
@@ -164,7 +148,7 @@ func (s *AuthService) recordLogin(ctx context.Context, request *v1.LoginRequest,
 	if s.loginRecorder == nil {
 		return
 	}
-	record := LoginLogRecord{Identifier: maskIdentifier(request.GetIdentifier()), Result: 1, RequestID: RequestIDFromContext(ctx)}
+	record := auditbiz.LoginLogRecord{Identifier: maskIdentifier(request.GetIdentifier()), Result: 1, RequestID: RequestIDFromContext(ctx)}
 	if transporter, ok := transport.FromServerContext(ctx); ok {
 		record.UserAgent = transporter.RequestHeader().Get("User-Agent")
 		if httpTransport, isHTTP := transporter.(khttp.Transporter); isHTTP {

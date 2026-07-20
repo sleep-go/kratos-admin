@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/service"
 	"github.com/sleep-go/kratos-admin/internal/conf"
 )
 

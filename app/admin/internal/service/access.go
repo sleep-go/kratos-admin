@@ -15,29 +15,11 @@ import (
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
+	auditbiz "github.com/sleep-go/kratos-admin/internal/biz/audit"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 )
 
 type requestIDContextKey struct{}
-
-// AccessLogRecord 描述不会包含请求正文和敏感字段的 API 访问日志。
-type AccessLogRecord struct {
-	TenantID    uint64
-	UserID      uint64
-	RequestID   string
-	Method      string
-	Route       string
-	StatusCode  int
-	DurationMS  uint32
-	IP          string
-	UserAgent   string
-	ErrorReason string
-}
-
-// AccessLogRecorder 定义 API 访问日志持久化能力。
-type AccessLogRecorder interface {
-	RecordAccess(ctx context.Context, record AccessLogRecord) error
-}
 
 // AccessValidator 重新校验访问令牌对应的账号、租户、会话与权限版本。
 type AccessValidator interface {
@@ -62,7 +44,7 @@ func (s *AuthService) ConfigureAccessSecurity(tokens *bizauth.TokenManager, vali
 }
 
 // ConfigureAccessLog 配置 API 访问与异常日志记录器。
-func (s *AuthService) ConfigureAccessLog(recorder AccessLogRecorder) {
+func (s *AuthService) ConfigureAccessLog(recorder auditbiz.AccessLogRecorder) {
 	s.accessRecorder = recorder
 }
 
@@ -131,7 +113,7 @@ func (s *AuthService) recordAccess(ctx context.Context, startedAt time.Time, cla
 	if !ok {
 		return
 	}
-	record := AccessLogRecord{RequestID: RequestIDFromContext(ctx), Route: transporter.Operation(), StatusCode: http.StatusOK, DurationMS: uint32(time.Since(startedAt).Milliseconds())}
+	record := auditbiz.AccessLogRecord{RequestID: RequestIDFromContext(ctx), Route: transporter.Operation(), StatusCode: http.StatusOK, DurationMS: uint32(time.Since(startedAt).Milliseconds())}
 	if claims != nil {
 		record.TenantID, record.UserID = claims.TenantID, claims.UserID
 	}

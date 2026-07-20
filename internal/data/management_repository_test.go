@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
 	"github.com/sleep-go/kratos-admin/internal/biz/providerconfig"
 	"github.com/sleep-go/kratos-admin/internal/data/model"
 	"github.com/sleep-go/kratos-admin/internal/provider/secret"
@@ -55,7 +55,7 @@ func TestSettingsAndProviderConfigsAreEncryptedAndResolvedInMySQL(t *testing.T) 
 	if err := tx.Create(tenant).Error; err != nil {
 		t.Fatal(err)
 	}
-	platformScope := service.ResourceScope{UserID: 1, PlatformAdmin: true}
+	platformScope := managementbiz.Scope{UserID: 1, PlatformAdmin: true}
 	if _, err := repository.Create(context.Background(), platformScope, "settings", map[string]any{
 		"category": "security", "setting_key": "integration_secret", "value_type": "string",
 		"setting_value": "platform-secret", "allow_tenant_override": true, "is_secret": true,
@@ -68,7 +68,7 @@ func TestSettingsAndProviderConfigsAreEncryptedAndResolvedInMySQL(t *testing.T) 
 	}); err != nil {
 		t.Fatal(err)
 	}
-	tenantScope := service.ResourceScope{TenantID: tenant.ID, UserID: 1, MemberID: 1}
+	tenantScope := managementbiz.Scope{TenantID: tenant.ID, UserID: 1, MemberID: 1}
 	if _, err := repository.Create(context.Background(), tenantScope, "settings", map[string]any{
 		"category": "platform", "setting_key": "site_name", "value_type": "string", "setting_value": "租户标题",
 	}); err != nil {
@@ -109,7 +109,7 @@ func TestSettingsAndProviderConfigsAreEncryptedAndResolvedInMySQL(t *testing.T) 
 	if encrypted == "" || encrypted == "provider-secret" {
 		t.Fatalf("encrypted_config = %q", encrypted)
 	}
-	providerRows, _, err := repository.List(context.Background(), platformScope, "providers", service.PageQuery{Page: 1, PageSize: 20})
+	providerRows, _, err := repository.List(context.Background(), platformScope, "providers", managementbiz.PageQuery{Page: 1, PageSize: 20})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +166,7 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	t.Cleanup(func() { tx.Rollback() })
 	repository := &ManagementRepository{db: tx}
 
-	id, err := repository.Create(context.Background(), service.ResourceScope{UserID: 1, PlatformAdmin: true}, "tenants", map[string]any{
+	id, err := repository.Create(context.Background(), managementbiz.Scope{UserID: 1, PlatformAdmin: true}, "tenants", map[string]any{
 		"code": "integration-id", "name": "自增主键测试", "status": float64(1),
 	})
 	if err != nil {
@@ -205,7 +205,7 @@ func TestPermissionMutationIncrementsTenantVersion(t *testing.T) {
 	}
 	repository := &ManagementRepository{db: tx}
 
-	if _, err := repository.Create(context.Background(), service.ResourceScope{TenantID: tenant.ID, UserID: 1}, "roles", map[string]any{
+	if _, err := repository.Create(context.Background(), managementbiz.Scope{TenantID: tenant.ID, UserID: 1}, "roles", map[string]any{
 		"code": "auditor", "name": "审计员", "data_scope": float64(4), "status": float64(1),
 	}); err != nil {
 		t.Fatalf("Create(role) error = %v", err)
@@ -267,8 +267,8 @@ func TestManagementRepositoryEnforcesRoleDataScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	repository := &ManagementRepository{db: tx}
-	scope := service.ResourceScope{TenantID: tenant.ID, UserID: actor.UserID, MemberID: actor.ID}
-	rows, total, err := repository.List(context.Background(), scope, "members", service.PageQuery{Page: 1, PageSize: 20})
+	scope := managementbiz.Scope{TenantID: tenant.ID, UserID: actor.UserID, MemberID: actor.ID}
+	rows, total, err := repository.List(context.Background(), scope, "members", managementbiz.PageQuery{Page: 1, PageSize: 20})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,12 +309,12 @@ func TestRoleAuthorizationAndTenantFeaturesAreAtomicInMySQL(t *testing.T) {
 		}
 	}
 	repository := &ManagementRepository{db: tx}
-	platformScope := service.ResourceScope{UserID: 1, PlatformAdmin: true}
+	platformScope := managementbiz.Scope{UserID: 1, PlatformAdmin: true}
 	if err := repository.UpdateTenantFeatures(context.Background(), platformScope, tenant.ID, []uint64{resource.ID}); err != nil {
 		t.Fatal(err)
 	}
-	tenantScope := service.ResourceScope{TenantID: tenant.ID, UserID: 1, PlatformAdmin: true}
-	if err := repository.UpdateRoleAuthorization(context.Background(), tenantScope, role.ID, 5, []service.RoleGrant{{
+	tenantScope := managementbiz.Scope{TenantID: tenant.ID, UserID: 1, PlatformAdmin: true}
+	if err := repository.UpdateRoleAuthorization(context.Background(), tenantScope, role.ID, 5, []managementbiz.RoleGrant{{
 		ResourceCode: resource.Code, Actions: []string{"list", "download"},
 	}}, []uint64{department.ID}); err != nil {
 		t.Fatal(err)
@@ -355,9 +355,9 @@ func TestPlatformAdminTenantContextStillEnforcesSelectedTenant(t *testing.T) {
 		t.Fatal(err)
 	}
 	repository := &ManagementRepository{db: tx}
-	rows, total, err := repository.List(context.Background(), service.ResourceScope{
+	rows, total, err := repository.List(context.Background(), managementbiz.Scope{
 		TenantID: first.ID, UserID: 1, PlatformAdmin: true,
-	}, "roles", service.PageQuery{Page: 1, PageSize: 20})
+	}, "roles", managementbiz.PageQuery{Page: 1, PageSize: 20})
 	if err != nil || total != 1 || len(rows) != 1 || rows[0]["code"] != "role-a" {
 		t.Fatalf("tenant-scoped platform list total=%d rows=%#v err=%v", total, rows, err)
 	}

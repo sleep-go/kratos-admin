@@ -10,42 +10,8 @@ import (
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
+	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
 )
-
-// ResourceScope 是由认证上下文派生的可信数据边界。
-type ResourceScope struct {
-	TenantID      uint64
-	UserID        uint64
-	MemberID      uint64
-	PlatformAdmin bool
-}
-
-// PageQuery 描述统一分页、排序、关键词与白名单筛选条件。
-type PageQuery struct {
-	Page     uint32
-	PageSize uint32
-	Keyword  string
-	Sort     string
-	Filters  map[string]string
-}
-
-// RoleGrant 描述角色对单个资源的动作集合。
-type RoleGrant struct {
-	ResourceCode string
-	Actions      []string
-}
-
-// ManagementRepository 定义白名单后台资源的统一持久化接口。
-type ManagementRepository interface {
-	List(ctx context.Context, scope ResourceScope, resource string, query PageQuery) ([]map[string]any, uint64, error)
-	Create(ctx context.Context, scope ResourceScope, resource string, data map[string]any) (uint64, error)
-	Update(ctx context.Context, scope ResourceScope, resource string, id uint64, data map[string]any) error
-	Delete(ctx context.Context, scope ResourceScope, resource string, id uint64) error
-	EffectiveSettings(ctx context.Context, scope ResourceScope, category string) ([]map[string]any, error)
-	TestProviderConnection(ctx context.Context, scope ResourceScope, id uint64) error
-	UpdateRoleAuthorization(ctx context.Context, scope ResourceScope, roleID uint64, dataScope uint32, grants []RoleGrant, departmentIDs []uint64) error
-	UpdateTenantFeatures(ctx context.Context, scope ResourceScope, tenantID uint64, resourceIDs []uint64) error
-}
 
 // GetEffectiveSettings 返回按代码默认、平台默认和租户覆盖解析后的有效设置。
 func (s *ManagementService) GetEffectiveSettings(ctx context.Context, request *v1.GetEffectiveSettingsRequest) (*v1.GetEffectiveSettingsResponse, error) {
@@ -101,9 +67,9 @@ func (s *ManagementService) UpdateRoleAuthorization(ctx context.Context, request
 	if request.GetRoleId() == 0 {
 		return nil, kratoserrors.BadRequest("ROLE_ID_REQUIRED", "角色ID不能为空")
 	}
-	grants := make([]RoleGrant, 0, len(request.GetGrants()))
+	grants := make([]managementbiz.RoleGrant, 0, len(request.GetGrants()))
 	for _, grant := range request.GetGrants() {
-		grants = append(grants, RoleGrant{ResourceCode: grant.GetResourceCode(), Actions: grant.GetActions()})
+		grants = append(grants, managementbiz.RoleGrant{ResourceCode: grant.GetResourceCode(), Actions: grant.GetActions()})
 	}
 	if err := s.repository.UpdateRoleAuthorization(ctx, scope, request.GetRoleId(), request.GetDataScope(), grants, request.GetDepartmentIds()); err != nil {
 		return nil, mapManagementError(err)
@@ -126,20 +92,15 @@ func (s *ManagementService) UpdateTenantFeatures(ctx context.Context, request *v
 	return &v1.UpdateTenantFeaturesResponse{TenantId: request.GetTenantId()}, nil
 }
 
-// ManagementPermissionChecker 定义后台资源动作的 Casbin 权限检查能力。
-type ManagementPermissionChecker interface {
-	Allowed(ctx context.Context, scope ResourceScope, resource, action string) (bool, error)
-}
-
 // ManagementService 实现统一的后台资源管理 API。
 type ManagementService struct {
 	v1.UnimplementedManagementServiceServer
-	repository  ManagementRepository
-	permissions ManagementPermissionChecker
+	repository  managementbiz.Repository
+	permissions managementbiz.PermissionChecker
 }
 
 // NewManagementService 创建后台资源管理服务。
-func NewManagementService(repository ManagementRepository, checkers ...ManagementPermissionChecker) *ManagementService {
+func NewManagementService(repository managementbiz.Repository, checkers ...managementbiz.PermissionChecker) *ManagementService {
 	service := &ManagementService{repository: repository}
 	if len(checkers) > 0 {
 		service.permissions = checkers[0]
@@ -163,7 +124,7 @@ func (s *ManagementService) ListResources(ctx context.Context, request *v1.ListR
 			filters[key] = value
 		}
 	}
-	rows, total, err := s.repository.List(ctx, scope, request.GetResource(), PageQuery{
+	rows, total, err := s.repository.List(ctx, scope, request.GetResource(), managementbiz.PageQuery{
 		Page: page, PageSize: pageSize, Keyword: request.GetKeyword(), Sort: request.GetSort(), Filters: filters,
 	})
 	if err != nil {
@@ -232,7 +193,7 @@ func (s *ManagementService) DeleteResource(ctx context.Context, request *v1.Dele
 	return &v1.DeleteResourceResponse{Id: request.GetId()}, nil
 }
 
-func (s *ManagementService) authorize(ctx context.Context, scope ResourceScope, resource, action string) error {
+func (s *ManagementService) authorize(ctx context.Context, scope managementbiz.Scope, resource, action string) error {
 	if scope.PlatformAdmin || s.permissions == nil {
 		return nil
 	}
@@ -246,16 +207,16 @@ func (s *ManagementService) authorize(ctx context.Context, scope ResourceScope, 
 	return nil
 }
 
-func managementScope(ctx context.Context, resource string) (ResourceScope, error) {
+func managementScope(ctx context.Context, resource string) (managementbiz.Scope, error) {
 	claims, ok := bizauth.ClaimsFromContext(ctx)
 	if !ok {
-		return ResourceScope{}, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
+		return managementbiz.Scope{}, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
 	platformAdmin := claims.PlatformAdmin
 	if (resource == "tenants" || resource == "resources" || resource == "tenant-resources") && !platformAdmin {
-		return ResourceScope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "该资源仅限平台管理员")
+		return managementbiz.Scope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "该资源仅限平台管理员")
 	}
-	return ResourceScope{
+	return managementbiz.Scope{
 		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID, PlatformAdmin: platformAdmin,
 	}, nil
 }

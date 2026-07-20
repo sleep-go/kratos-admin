@@ -16,8 +16,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/sleep-go/kratos-admin/backend/internal/service"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
+	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
 	permissionbiz "github.com/sleep-go/kratos-admin/internal/biz/permission"
 	"github.com/sleep-go/kratos-admin/internal/biz/providerconfig"
 	settingbiz "github.com/sleep-go/kratos-admin/internal/biz/setting"
@@ -85,7 +85,7 @@ func NewManagementRepository(data *Data, codecs ...*providerconfig.Codec) *Manag
 }
 
 // Allowed 按 tenant、member、role 的 Casbin domain 关系校验资源动作，并限制在租户功能授权集合内。
-func (r *ManagementRepository) Allowed(ctx context.Context, scope service.ResourceScope, resource, action string) (bool, error) {
+func (r *ManagementRepository) Allowed(ctx context.Context, scope managementbiz.Scope, resource, action string) (bool, error) {
 	if scope.PlatformAdmin {
 		return true, nil
 	}
@@ -114,7 +114,7 @@ func (r *ManagementRepository) Allowed(ctx context.Context, scope service.Resour
 }
 
 // AllowedRecord 按可信租户和角色数据范围校验单条资源可见性。
-func (r *ManagementRepository) AllowedRecord(ctx context.Context, scope service.ResourceScope, resource, id string) (bool, error) {
+func (r *ManagementRepository) AllowedRecord(ctx context.Context, scope managementbiz.Scope, resource, id string) (bool, error) {
 	definition, ok := managementResources[resource]
 	if !ok || id == "" {
 		return false, nil
@@ -136,7 +136,7 @@ func (r *ManagementRepository) AllowedRecord(ctx context.Context, scope service.
 }
 
 // List 分页查询资源，租户条件始终来自认证上下文。
-func (r *ManagementRepository) List(ctx context.Context, scope service.ResourceScope, resource string, page service.PageQuery) ([]map[string]any, uint64, error) {
+func (r *ManagementRepository) List(ctx context.Context, scope managementbiz.Scope, resource string, page managementbiz.PageQuery) ([]map[string]any, uint64, error) {
 	definition, ok := managementResources[resource]
 	if !ok {
 		return nil, 0, errors.New("资源类型不存在")
@@ -265,7 +265,7 @@ func nonEmptyDatabaseValue(value any) bool {
 }
 
 // Create 在业务写入事务中同步写入审计 Outbox。
-func (r *ManagementRepository) Create(ctx context.Context, scope service.ResourceScope, resource string, data map[string]any) (uint64, error) {
+func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.Scope, resource string, data map[string]any) (uint64, error) {
 	definition, ok := managementResources[resource]
 	if !ok {
 		return 0, errors.New("资源类型不存在")
@@ -338,7 +338,7 @@ func (r *ManagementRepository) Create(ctx context.Context, scope service.Resourc
 	return id, err
 }
 
-func (r *ManagementRepository) validateCreateDataScope(ctx context.Context, scope service.ResourceScope, resource string, values map[string]any) error {
+func (r *ManagementRepository) validateCreateDataScope(ctx context.Context, scope managementbiz.Scope, resource string, values map[string]any) error {
 	if resource != "members" && resource != "departments" {
 		return nil
 	}
@@ -365,7 +365,7 @@ func (r *ManagementRepository) validateCreateDataScope(ctx context.Context, scop
 }
 
 // Update 在可信作用域内更新资源并写入审计 Outbox。
-func (r *ManagementRepository) Update(ctx context.Context, scope service.ResourceScope, resource string, id uint64, data map[string]any) error {
+func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.Scope, resource string, id uint64, data map[string]any) error {
 	definition, ok := managementResources[resource]
 	if !ok {
 		return errors.New("资源类型不存在")
@@ -401,7 +401,7 @@ func (r *ManagementRepository) Update(ctx context.Context, scope service.Resourc
 }
 
 // UpdateRoleAuthorization 在单个事务内替换角色授权、数据范围并递增权限版本。
-func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scope service.ResourceScope, roleID uint64, dataScope uint32, grants []service.RoleGrant, departmentIDs []uint64) error {
+func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scope managementbiz.Scope, roleID uint64, dataScope uint32, grants []managementbiz.RoleGrant, departmentIDs []uint64) error {
 	if scope.TenantID == 0 {
 		return errors.New("角色授权必须在租户上下文执行")
 	}
@@ -505,7 +505,7 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 }
 
 // UpdateTenantFeatures 在单个事务内替换租户可用功能并递增权限版本。
-func (r *ManagementRepository) UpdateTenantFeatures(ctx context.Context, scope service.ResourceScope, tenantID uint64, resourceIDs []uint64) error {
+func (r *ManagementRepository) UpdateTenantFeatures(ctx context.Context, scope managementbiz.Scope, tenantID uint64, resourceIDs []uint64) error {
 	if !scope.PlatformAdmin || tenantID == 0 {
 		return errors.New("仅平台管理员可配置租户功能")
 	}
@@ -563,7 +563,7 @@ func uniqueUint64(values []uint64) []uint64 {
 	return result
 }
 
-func targetTenantID(scope service.ResourceScope, data map[string]any) uint64 {
+func targetTenantID(scope managementbiz.Scope, data map[string]any) uint64 {
 	if scope.PlatformAdmin {
 		if target := numericID(data["target_tenant_id"]); target != 0 {
 			return target
@@ -572,7 +572,7 @@ func targetTenantID(scope service.ResourceScope, data map[string]any) uint64 {
 	return scope.TenantID
 }
 
-func (r *ManagementRepository) prepareCreateValues(resource string, values map[string]any, scope service.ResourceScope) error {
+func (r *ManagementRepository) prepareCreateValues(resource string, values map[string]any, scope managementbiz.Scope) error {
 	switch resource {
 	case "settings":
 		values["updated_by"] = scope.UserID
@@ -586,7 +586,7 @@ func (r *ManagementRepository) prepareCreateValues(resource string, values map[s
 	}
 }
 
-func (r *ManagementRepository) prepareUpdateValues(tx *gorm.DB, query *gorm.DB, resource string, values map[string]any, scope service.ResourceScope) error {
+func (r *ManagementRepository) prepareUpdateValues(tx *gorm.DB, query *gorm.DB, resource string, values map[string]any, scope managementbiz.Scope) error {
 	switch resource {
 	case "settings":
 		var current model.SystemSetting
@@ -723,7 +723,7 @@ func validateSettingOverride(tx *gorm.DB, resource string, values map[string]any
 }
 
 // Delete 在可信作用域内逻辑删除资源并写入审计 Outbox。
-func (r *ManagementRepository) Delete(ctx context.Context, scope service.ResourceScope, resource string, id uint64) error {
+func (r *ManagementRepository) Delete(ctx context.Context, scope managementbiz.Scope, resource string, id uint64) error {
 	definition, ok := managementResources[resource]
 	if !ok {
 		return errors.New("资源类型不存在")
@@ -770,7 +770,7 @@ type resolvedDataScope struct {
 	PrimaryDepartmentID uint64
 }
 
-func (r *ManagementRepository) applyDataScope(ctx context.Context, query *gorm.DB, scope service.ResourceScope, resource string) (*gorm.DB, error) {
+func (r *ManagementRepository) applyDataScope(ctx context.Context, query *gorm.DB, scope managementbiz.Scope, resource string) (*gorm.DB, error) {
 	switch resource {
 	case "members", "departments", "files", "audit-logs", "login-logs", "api-logs":
 	default:
@@ -816,7 +816,7 @@ func (r *ManagementRepository) applyDataScope(ctx context.Context, query *gorm.D
 	return query, nil
 }
 
-func (r *ManagementRepository) resolveDataScope(ctx context.Context, scope service.ResourceScope) (resolvedDataScope, error) {
+func (r *ManagementRepository) resolveDataScope(ctx context.Context, scope managementbiz.Scope) (resolvedDataScope, error) {
 	if scope.PlatformAdmin {
 		return resolvedDataScope{QueryDataScope: permissionbiz.QueryDataScope{All: true}}, nil
 	}
@@ -907,7 +907,7 @@ func (r *ManagementRepository) expandDepartmentDescendants(ctx context.Context, 
 	return result, nil
 }
 
-func incrementPermissionVersion(tx *gorm.DB, scope service.ResourceScope, resource string, values map[string]any, resourceID uint64) error {
+func incrementPermissionVersion(tx *gorm.DB, scope managementbiz.Scope, resource string, values map[string]any, resourceID uint64) error {
 	switch resource {
 	case "roles", "casbin-rules", "role-scope-departments":
 		if scope.TenantID == 0 {
@@ -989,7 +989,7 @@ func numericID(value any) uint64 {
 	return 0
 }
 
-func writeAuditOutbox(tx *gorm.DB, scope service.ResourceScope, action, resource, resourceID string, after map[string]any) error {
+func writeAuditOutbox(tx *gorm.DB, scope managementbiz.Scope, action, resource, resourceID string, after map[string]any) error {
 	payload, err := json.Marshal(map[string]any{"user_id": scope.UserID, "member_id": scope.MemberID, "action": action, "resource_type": resource, "resource_id": resourceID, "after": after})
 	if err != nil {
 		return err
@@ -1030,7 +1030,7 @@ var codeDefaultSettings = []defaultSetting{
 }
 
 // EffectiveSettings 返回代码默认、平台默认与租户覆盖合并后的配置，不回传敏感值。
-func (r *ManagementRepository) EffectiveSettings(ctx context.Context, scope service.ResourceScope, category string) ([]map[string]any, error) {
+func (r *ManagementRepository) EffectiveSettings(ctx context.Context, scope managementbiz.Scope, category string) ([]map[string]any, error) {
 	query := r.db.WithContext(ctx).Where("tenant_id IN ?", []uint64{0, scope.TenantID})
 	if category != "" {
 		query = query.Where("category = ?", category)
@@ -1117,7 +1117,7 @@ func settingValue(item *model.SystemSetting) (*settingbiz.Value, error) {
 }
 
 // TestProviderConnection 解密已保存配置并调用对应 Provider 的连接检查。
-func (r *ManagementRepository) TestProviderConnection(ctx context.Context, scope service.ResourceScope, id uint64) error {
+func (r *ManagementRepository) TestProviderConnection(ctx context.Context, scope managementbiz.Scope, id uint64) error {
 	query := r.db.WithContext(ctx).Where("id = ?", id)
 	if !scope.PlatformAdmin {
 		query = query.Where("tenant_id = ?", scope.TenantID)
@@ -1181,5 +1181,6 @@ func textConfig(config map[string]any, key string) string {
 
 func boolConfig(config map[string]any, key string) bool { return truthyDatabaseValue(config[key]) }
 
-var _ service.ManagementRepository = (*ManagementRepository)(nil)
-var _ service.ManagementPermissionChecker = (*ManagementRepository)(nil)
+var _ managementbiz.Repository = (*ManagementRepository)(nil)
+var _ managementbiz.PermissionChecker = (*ManagementRepository)(nil)
+var _ managementbiz.RecordChecker = (*ManagementRepository)(nil)

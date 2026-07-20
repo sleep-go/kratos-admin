@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	auditbiz "github.com/sleep-go/kratos-admin/internal/biz/audit"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
+	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
 	"github.com/sleep-go/kratos-admin/internal/data/model"
 	"github.com/sleep-go/kratos-admin/internal/data/query"
 )
@@ -124,7 +125,7 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 	if err != nil || len(permissions) != 2 || permissions[0] != "integration-audit-logs:list" || permissions[1] != "integration-menu:list" {
 		t.Fatalf("ListPermissions() = %+v, %v", permissions, err)
 	}
-	allowed, err := (&ManagementRepository{db: tx}).Allowed(context.Background(), service.ResourceScope{
+	allowed, err := (&ManagementRepository{db: tx}).Allowed(context.Background(), managementbiz.Scope{
 		TenantID: tenant.ID, UserID: user.ID, MemberID: member.ID,
 	}, "integration-audit-logs", "list")
 	if err != nil || !allowed {
@@ -149,13 +150,13 @@ func TestAuthRepositoryRecordsSanitizedSecurityLogs(t *testing.T) {
 	t.Cleanup(func() { tx.Rollback() })
 	repository := &AuthRepository{db: tx, q: query.Use(tx)}
 
-	if err := repository.RecordAccess(context.Background(), service.AccessLogRecord{
+	if err := repository.RecordAccess(context.Background(), auditbiz.AccessLogRecord{
 		TenantID: 2, UserID: 3, RequestID: "request-integration", Method: "POST", Route: "/api/v1/auth/login",
 		StatusCode: 401, DurationMS: 12, IP: "127.0.0.1", UserAgent: "integration", ErrorReason: "AUTH_INVALID_CREDENTIALS",
 	}); err != nil {
 		t.Fatalf("RecordAccess() error = %v", err)
 	}
-	if err := repository.RecordLogin(context.Background(), service.LoginLogRecord{
+	if err := repository.RecordLogin(context.Background(), auditbiz.LoginLogRecord{
 		TenantID: 2, UserID: 3, Identifier: "a***@example.com", Result: 2, Reason: "AUTH_INVALID_CREDENTIALS",
 		IP: "127.0.0.1", UserAgent: "integration", RequestID: "request-integration",
 	}); err != nil {

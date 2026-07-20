@@ -13,7 +13,7 @@ import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/sleep-go/kratos-admin/backend/internal/server"
-	"github.com/sleep-go/kratos-admin/backend/internal/service"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/service"
 	workerServer "github.com/sleep-go/kratos-admin/backend/internal/worker"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 	filebiz "github.com/sleep-go/kratos-admin/internal/biz/file"

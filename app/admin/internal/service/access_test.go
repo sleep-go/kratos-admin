@@ -10,6 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/transport"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
+	auditbiz "github.com/sleep-go/kratos-admin/internal/biz/audit"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 )
 
@@ -45,9 +46,9 @@ func (t *testTransport) RequestHeader() transport.Header { return t.request }
 func (t *testTransport) ReplyHeader() transport.Header   { return t.reply }
 
 type fakeAccessValidator struct{ called bool }
-type fakeAccessRecorder struct{ record AccessLogRecord }
+type fakeAccessRecorder struct{ record auditbiz.AccessLogRecord }
 
-func (r *fakeAccessRecorder) RecordAccess(_ context.Context, record AccessLogRecord) error {
+func (r *fakeAccessRecorder) RecordAccess(_ context.Context, record auditbiz.AccessLogRecord) error {
 	r.record = record
 	return nil
 }

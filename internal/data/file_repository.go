@@ -8,8 +8,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/sleep-go/kratos-admin/backend/internal/service"
 	filebiz "github.com/sleep-go/kratos-admin/internal/biz/file"
+	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
 	"github.com/sleep-go/kratos-admin/internal/data/model"
 )
 
@@ -35,7 +35,7 @@ func (r *FileRepository) Create(ctx context.Context, record filebiz.Record) erro
 		if err := tx.Create(row).Error; err != nil {
 			return err
 		}
-		return writeAuditOutbox(tx, service.ResourceScope{
+		return writeAuditOutbox(tx, managementbiz.Scope{
 			TenantID: record.TenantID, MemberID: record.UploaderMemberID,
 		}, "create-upload", "files", record.ID, map[string]any{
 			"provider_name": record.ProviderName, "object_key": record.ObjectKey,
@@ -70,7 +70,7 @@ func (r *FileRepository) Confirm(ctx context.Context, tenantID uint64, fileID, e
 		if result.RowsAffected != 1 {
 			return errors.New("待确认文件不存在")
 		}
-		return writeAuditOutbox(tx, service.ResourceScope{TenantID: tenantID}, "confirm", "files", fileID, map[string]any{"status": filebiz.StatusAvailable})
+		return writeAuditOutbox(tx, managementbiz.Scope{TenantID: tenantID}, "confirm", "files", fileID, map[string]any{"status": filebiz.StatusAvailable})
 	})
 }
 
@@ -96,7 +96,7 @@ func (r *FileRepository) RequestDelete(ctx context.Context, tenantID uint64, fil
 		if result.RowsAffected != 1 {
 			return filebiz.ErrFileUnavailable
 		}
-		return writeAuditOutbox(tx, service.ResourceScope{TenantID: tenantID}, "request-delete", "files", fileID, nil)
+		return writeAuditOutbox(tx, managementbiz.Scope{TenantID: tenantID}, "request-delete", "files", fileID, nil)
 	})
 }
 

@@ -6,10 +6,11 @@ import (
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
+	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
 )
 
 type fakeManagementRepository struct {
-	scope          ResourceScope
+	scope          managementbiz.Scope
 	filters        map[string]string
 	effectiveRows  []map[string]any
 	providerTested uint64
@@ -19,43 +20,43 @@ type fakeManagementRepository struct {
 	featureIDs     []uint64
 }
 
-func (r *fakeManagementRepository) UpdateTenantFeatures(_ context.Context, _ ResourceScope, tenantID uint64, resourceIDs []uint64) error {
+func (r *fakeManagementRepository) UpdateTenantFeatures(_ context.Context, _ managementbiz.Scope, tenantID uint64, resourceIDs []uint64) error {
 	r.tenantID, r.featureIDs = tenantID, resourceIDs
 	return nil
 }
 
-func (r *fakeManagementRepository) UpdateRoleAuthorization(_ context.Context, _ ResourceScope, roleID uint64, dataScope uint32, _ []RoleGrant, _ []uint64) error {
+func (r *fakeManagementRepository) UpdateRoleAuthorization(_ context.Context, _ managementbiz.Scope, roleID uint64, dataScope uint32, _ []managementbiz.RoleGrant, _ []uint64) error {
 	r.roleID, r.roleScope = roleID, dataScope
 	return nil
 }
 
 type fakePermissionChecker struct{ allowed bool }
 
-func (c fakePermissionChecker) Allowed(context.Context, ResourceScope, string, string) (bool, error) {
+func (c fakePermissionChecker) Allowed(context.Context, managementbiz.Scope, string, string) (bool, error) {
 	return c.allowed, nil
 }
 
-func (r *fakeManagementRepository) List(_ context.Context, scope ResourceScope, _ string, _ PageQuery) ([]map[string]any, uint64, error) {
+func (r *fakeManagementRepository) List(_ context.Context, scope managementbiz.Scope, _ string, _ managementbiz.PageQuery) ([]map[string]any, uint64, error) {
 	r.scope = scope
 	return []map[string]any{{"id": uint64(1), "name": "示例部门"}}, 1, nil
 }
-func (r *fakeManagementRepository) Create(context.Context, ResourceScope, string, map[string]any) (uint64, error) {
+func (r *fakeManagementRepository) Create(context.Context, managementbiz.Scope, string, map[string]any) (uint64, error) {
 	return 1, nil
 }
-func (r *fakeManagementRepository) Update(context.Context, ResourceScope, string, uint64, map[string]any) error {
+func (r *fakeManagementRepository) Update(context.Context, managementbiz.Scope, string, uint64, map[string]any) error {
 	return nil
 }
-func (r *fakeManagementRepository) Delete(context.Context, ResourceScope, string, uint64) error {
+func (r *fakeManagementRepository) Delete(context.Context, managementbiz.Scope, string, uint64) error {
 	return nil
 }
 
-func (r *fakeManagementRepository) EffectiveSettings(_ context.Context, scope ResourceScope, category string) ([]map[string]any, error) {
+func (r *fakeManagementRepository) EffectiveSettings(_ context.Context, scope managementbiz.Scope, category string) ([]map[string]any, error) {
 	r.scope = scope
 	r.filters = map[string]string{"category": category}
 	return r.effectiveRows, nil
 }
 
-func (r *fakeManagementRepository) TestProviderConnection(_ context.Context, scope ResourceScope, id uint64) error {
+func (r *fakeManagementRepository) TestProviderConnection(_ context.Context, scope managementbiz.Scope, id uint64) error {
 	r.scope = scope
 	r.providerTested = id
 	return nil

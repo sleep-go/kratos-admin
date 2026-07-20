@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
+	auditbiz "github.com/sleep-go/kratos-admin/internal/biz/audit"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 )
 
@@ -16,9 +17,9 @@ type fakeLoginHandler struct {
 	err    error
 }
 
-type fakeLoginRecorder struct{ record LoginLogRecord }
+type fakeLoginRecorder struct{ record auditbiz.LoginLogRecord }
 
-func (r *fakeLoginRecorder) RecordLogin(_ context.Context, record LoginLogRecord) error {
+func (r *fakeLoginRecorder) RecordLogin(_ context.Context, record auditbiz.LoginLogRecord) error {
 	r.record = record
 	return nil
 }

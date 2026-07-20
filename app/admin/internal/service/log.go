@@ -10,6 +10,7 @@ import (
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 	"github.com/sleep-go/kratos-admin/internal/biz/logexport"
+	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
 	"github.com/sleep-go/kratos-admin/internal/provider/storage"
 )
 
@@ -24,11 +25,11 @@ type LogExportHandler interface {
 type LogService struct {
 	v1.UnimplementedLogServiceServer
 	handler     LogExportHandler
-	permissions ManagementPermissionChecker
+	permissions managementbiz.PermissionChecker
 }
 
 // NewLogService 创建日志导出服务。
-func NewLogService(handler LogExportHandler, checkers ...ManagementPermissionChecker) *LogService {
+func NewLogService(handler LogExportHandler, checkers ...managementbiz.PermissionChecker) *LogService {
 	service := &LogService{handler: handler}
 	if len(checkers) > 0 {
 		service.permissions = checkers[0]
@@ -44,7 +45,7 @@ func (s *LogService) CreateExport(ctx context.Context, request *v1.CreateExportR
 	}
 	resource := request.GetLogType() + "-logs"
 	if !access.PlatformAdmin && s.permissions != nil {
-		allowed, checkErr := s.permissions.Allowed(ctx, ResourceScope{
+		allowed, checkErr := s.permissions.Allowed(ctx, managementbiz.Scope{
 			TenantID: access.TenantID, UserID: access.UserID, MemberID: access.MemberID,
 		}, resource, "export")
 		if checkErr != nil {

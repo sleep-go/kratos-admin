@@ -10,6 +10,7 @@ import (
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 	filebiz "github.com/sleep-go/kratos-admin/internal/biz/file"
+	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
 	"github.com/sleep-go/kratos-admin/internal/provider/storage"
 )
 
@@ -23,25 +24,20 @@ type FileHandler interface {
 	RemoveReference(ctx context.Context, tenantID uint64, fileID, businessType, businessID string) error
 }
 
-// FileDataScopeChecker 定义单个文件的数据范围复核能力。
-type FileDataScopeChecker interface {
-	AllowedRecord(ctx context.Context, scope ResourceScope, resource, id string) (bool, error)
-}
-
 // FileService 实现租户文件 API。
 type FileService struct {
 	v1.UnimplementedFileServiceServer
 	handler     FileHandler
-	permissions ManagementPermissionChecker
-	dataScope   FileDataScopeChecker
+	permissions managementbiz.PermissionChecker
+	dataScope   managementbiz.RecordChecker
 }
 
 // NewFileService 创建文件服务。
-func NewFileService(handler FileHandler, checkers ...ManagementPermissionChecker) *FileService {
+func NewFileService(handler FileHandler, checkers ...managementbiz.PermissionChecker) *FileService {
 	service := &FileService{handler: handler}
 	if len(checkers) > 0 {
 		service.permissions = checkers[0]
-		if dataScope, ok := checkers[0].(FileDataScopeChecker); ok {
+		if dataScope, ok := checkers[0].(managementbiz.RecordChecker); ok {
 			service.dataScope = dataScope
 		}
 	}
@@ -129,28 +125,28 @@ func (s *FileService) RemoveReference(ctx context.Context, request *v1.RemoveRef
 	return &v1.RemoveReferenceResponse{}, nil
 }
 
-func (s *FileService) fileScope(ctx context.Context, action, fileID string) (ResourceScope, error) {
+func (s *FileService) fileScope(ctx context.Context, action, fileID string) (managementbiz.Scope, error) {
 	claims, ok := bizauth.ClaimsFromContext(ctx)
 	if !ok || claims.TenantID == 0 || claims.MemberID == 0 {
-		return ResourceScope{}, kratoserrors.Unauthorized("TENANT_AUTH_REQUIRED", "请先进入租户")
+		return managementbiz.Scope{}, kratoserrors.Unauthorized("TENANT_AUTH_REQUIRED", "请先进入租户")
 	}
-	scope := ResourceScope{TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID}
+	scope := managementbiz.Scope{TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID}
 	if s.permissions != nil {
 		allowed, err := s.permissions.Allowed(ctx, scope, "files", action)
 		if err != nil {
-			return ResourceScope{}, kratoserrors.InternalServer("PERMISSION_CHECK_FAILED", "权限校验失败")
+			return managementbiz.Scope{}, kratoserrors.InternalServer("PERMISSION_CHECK_FAILED", "权限校验失败")
 		}
 		if !allowed {
-			return ResourceScope{}, kratoserrors.Forbidden("PERMISSION_DENIED", "没有执行该操作的权限")
+			return managementbiz.Scope{}, kratoserrors.Forbidden("PERMISSION_DENIED", "没有执行该操作的权限")
 		}
 	}
 	if fileID != "" && s.dataScope != nil {
 		allowed, err := s.dataScope.AllowedRecord(ctx, scope, "files", fileID)
 		if err != nil {
-			return ResourceScope{}, kratoserrors.InternalServer("DATA_SCOPE_CHECK_FAILED", "数据范围校验失败")
+			return managementbiz.Scope{}, kratoserrors.InternalServer("DATA_SCOPE_CHECK_FAILED", "数据范围校验失败")
 		}
 		if !allowed {
-			return ResourceScope{}, kratoserrors.Forbidden("DATA_SCOPE_DENIED", "文件超出当前角色数据范围")
+			return managementbiz.Scope{}, kratoserrors.Forbidden("DATA_SCOPE_DENIED", "文件超出当前角色数据范围")
 		}
 	}
 	return scope, nil
