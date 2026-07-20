@@ -21,5 +21,5 @@ frontend/playwright-report/
 frontend/test-results/
 
 # Runtime data
-data/
+/data/
 deploy/data/

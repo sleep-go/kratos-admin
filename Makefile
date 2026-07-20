@@ -1,8 +1,14 @@
-.PHONY: api backend-test backend-build frontend-install frontend-test frontend-build compose-up compose-down
+.PHONY: api gorm-gen init-admin backend-test backend-build frontend-install frontend-test frontend-build compose-up compose-down
 
 api:
 	buf lint
 	buf generate
+
+gorm-gen:
+	GOCACHE=/tmp/go-build go run ./backend/cmd/gormgen
+
+init-admin:
+	GOCACHE=/tmp/go-build go run ./backend/cmd/initadmin
 
 backend-test:
 	GOCACHE=/tmp/go-build go test -race ./backend/...

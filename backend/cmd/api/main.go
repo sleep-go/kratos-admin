@@ -15,12 +15,17 @@ func main() {
 	}
 }
 
-func run(_ context.Context) error {
+func run(ctx context.Context) error {
 	cfg, err := conf.LoadFromEnv()
 	if err != nil {
 		return fmt.Errorf("加载 API 配置失败: %w", err)
 	}
-	if err := app.NewAPIApp(cfg).Run(); err != nil {
+	resources, err := app.NewAPIResources(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("初始化 API 依赖失败: %w", err)
+	}
+	defer resources.Data.Close()
+	if err := app.NewAPIApp(cfg, resources.AuthService).Run(); err != nil {
 		return fmt.Errorf("API 进程退出: %w", err)
 	}
 	return nil

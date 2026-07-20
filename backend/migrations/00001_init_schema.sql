@@ -22,6 +22,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL COMMENT 'Argon2id密码哈希',
     display_name VARCHAR(128) NOT NULL COMMENT '用户显示名称',
     avatar_url TEXT NULL COMMENT '头像地址',
+    is_platform_admin TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否平台管理员：0否，1是',
     status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '用户状态：1启用，2禁用，3锁定',
     failed_login_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '连续登录失败次数',
     locked_until DATETIME(3) NULL COMMENT '锁定截止时间',
@@ -151,13 +152,13 @@ CREATE TABLE tenant_resources (
 
 CREATE TABLE casbin_rules (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Casbin策略主键',
-    ptype VARCHAR(16) NOT NULL COMMENT '策略类型：p资源策略，g角色继承策略',
-    v0 VARCHAR(191) NOT NULL DEFAULT '' COMMENT '策略值0：租户域ID',
-    v1 VARCHAR(191) NOT NULL DEFAULT '' COMMENT '策略值1：角色或成员ID',
-    v2 VARCHAR(191) NOT NULL DEFAULT '' COMMENT '策略值2：资源编码或角色ID',
-    v3 VARCHAR(191) NOT NULL DEFAULT '' COMMENT '策略值3：资源动作',
-    v4 VARCHAR(191) NOT NULL DEFAULT '' COMMENT '策略值4：预留',
-    v5 VARCHAR(191) NOT NULL DEFAULT '' COMMENT '策略值5：预留',
+    ptype VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '策略类型：p资源策略，g角色继承策略',
+    v0 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值0：租户域ID',
+    v1 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值1：角色或成员ID',
+    v2 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值2：资源编码或角色ID',
+    v3 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值3：资源动作',
+    v4 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值4：预留',
+    v5 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值5：预留',
     PRIMARY KEY (id),
     UNIQUE KEY uk_casbin_rules_policy (ptype, v0, v1, v2, v3, v4, v5),
     KEY idx_casbin_rules_domain (v0, ptype)

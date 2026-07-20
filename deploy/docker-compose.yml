@@ -9,7 +9,7 @@ services:
       TZ: Asia/Shanghai
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     ports:
-      - "3306:3306"
+      - "${KRATOS_ADMIN_MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -22,7 +22,7 @@ services:
     image: redis:7.4-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "${KRATOS_ADMIN_REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:

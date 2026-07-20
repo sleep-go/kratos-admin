@@ -110,3 +110,29 @@ func TestLoginLocksAccountOnFifthFailure(t *testing.T) {
 		t.Fatalf("failure state = count %d, locked until %v", users.failureCount, users.lockedUntil)
 	}
 }
+
+func TestPlatformAdminCanLoginWithoutTenantMembership(t *testing.T) {
+	now := time.Date(2026, 7, 20, 12, 0, 0, 0, time.UTC)
+	hasher := NewPasswordHasher(PasswordParams{Memory: 1024, Iterations: 1, Parallelism: 1, SaltLength: 8, KeyLength: 16})
+	passwordHash, err := hasher.Hash("StrongPassword!2026")
+	if err != nil {
+		t.Fatalf("Hash() error = %v", err)
+	}
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+	users := &fakeUserRepository{user: &User{
+		ID: 1, PasswordHash: passwordHash, Status: UserStatusEnabled, PlatformAdmin: true,
+	}}
+	sessions := &fakeSessionRepository{}
+	usecase := NewLoginUsecase(users, sessions, hasher, NewTokenManager(privateKey, 15*time.Minute, 7*24*time.Hour, func() time.Time { return now }), func() time.Time { return now })
+
+	result, err := usecase.Login(context.Background(), LoginInput{Identifier: "root", Password: "StrongPassword!2026"})
+	if err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	if result.CurrentTenant.ID != 0 || sessions.session.TenantID != 0 || sessions.session.MemberID != 0 {
+		t.Fatalf("platform session = %+v, current tenant = %+v", sessions.session, result.CurrentTenant)
+	}
+}

@@ -10,11 +10,16 @@ import (
 )
 
 // NewHTTPServer 创建并注册全部 HTTP API。
-func NewHTTPServer(cfg conf.Server, healthService *service.HealthService) *khttp.Server {
+func NewHTTPServer(cfg conf.Server, healthService *service.HealthService, authServices ...*service.AuthService) *khttp.Server {
 	server := khttp.NewServer(
 		khttp.Address(cfg.HTTPAddr),
 		khttp.Middleware(recovery.Recovery()),
 	)
 	v1.RegisterHealthServiceHTTPServer(server, healthService)
+	for _, authService := range authServices {
+		if authService != nil {
+			v1.RegisterAuthServiceHTTPServer(server, authService)
+		}
+	}
 	return server
 }

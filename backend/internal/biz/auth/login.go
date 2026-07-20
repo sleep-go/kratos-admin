@@ -43,6 +43,10 @@ const (
 // User 表示认证流程所需的全局用户信息。
 type User struct {
 	ID               uint64
+	Username         string
+	DisplayName      string
+	AvatarURL        string
+	PlatformAdmin    bool
 	PasswordHash     string
 	Status           UserStatus
 	FailedLoginCount uint32
@@ -103,8 +107,17 @@ type TenantOption struct {
 // LoginResult 描述成功登录后签发的令牌与租户上下文。
 type LoginResult struct {
 	Tokens        TokenPair
+	User          UserProfile
 	CurrentTenant TenantOption
 	Tenants       []TenantOption
+}
+
+// UserProfile 描述登录响应中可安全返回的用户资料。
+type UserProfile struct {
+	ID            uint64
+	DisplayName   string
+	AvatarURL     string
+	PlatformAdmin bool
 }
 
 // LoginUsecase 实施账号锁定、密码验证、租户选择与会话创建规则。
@@ -152,7 +165,7 @@ func (u *LoginUsecase) Login(ctx context.Context, input LoginInput) (LoginResult
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("查询租户成员身份失败: %w", err)
 	}
-	selected, options, err := selectMembership(memberships, input.TenantID)
+	selected, options, err := selectMembership(memberships, input.TenantID, user.PlatformAdmin)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -188,6 +201,7 @@ func (u *LoginUsecase) Login(ctx context.Context, input LoginInput) (LoginResult
 	}
 	return LoginResult{
 		Tokens:        tokens,
+		User:          UserProfile{ID: user.ID, DisplayName: user.DisplayName, AvatarURL: user.AvatarURL, PlatformAdmin: user.PlatformAdmin},
 		CurrentTenant: TenantOption{ID: selected.TenantID, Name: selected.TenantName},
 		Tenants:       options,
 	}, nil
@@ -206,9 +220,12 @@ func (u *LoginUsecase) recordFailure(ctx context.Context, user *User, now time.T
 	return nil
 }
 
-func selectMembership(memberships []Membership, requestedTenantID uint64) (Membership, []TenantOption, error) {
+func selectMembership(memberships []Membership, requestedTenantID uint64, platformAdmin bool) (Membership, []TenantOption, error) {
 	options := make([]TenantOption, 0, len(memberships))
 	var selected Membership
+	if platformAdmin && requestedTenantID == 0 {
+		selected = Membership{TenantName: "平台管理", Status: MembershipStatusEnabled}
+	}
 	for _, membership := range memberships {
 		if membership.Status != MembershipStatusEnabled {
 			continue
@@ -218,7 +235,7 @@ func selectMembership(memberships []Membership, requestedTenantID uint64) (Membe
 			selected = membership
 		}
 	}
-	if selected.ID == 0 {
+	if selected.ID == 0 && !(platformAdmin && requestedTenantID == 0) {
 		return Membership{}, nil, ErrNoTenantMembership
 	}
 	return selected, options, nil
