@@ -6,6 +6,7 @@ COPY api ./api
 COPY backend ./backend
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./backend/cmd/api
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/worker ./backend/cmd/worker
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/initadmin ./backend/cmd/initadmin
 
 FROM golang:1.26-alpine AS tools
 RUN go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
@@ -24,3 +25,9 @@ RUN addgroup -S kratos && adduser -S kratos -G kratos
 COPY --from=build /out/worker /usr/local/bin/kratos-admin-worker
 USER kratos
 ENTRYPOINT ["kratos-admin-worker"]
+
+FROM alpine:3.22 AS init-admin
+RUN addgroup -S kratos && adduser -S kratos -G kratos
+COPY --from=build /out/initadmin /usr/local/bin/kratos-admin-initadmin
+USER kratos
+ENTRYPOINT ["kratos-admin-initadmin"]

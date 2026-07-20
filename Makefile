@@ -1,4 +1,4 @@
-.PHONY: api gorm-gen init-admin backend-test backend-build frontend-install frontend-test frontend-build compose-up compose-down
+.PHONY: api gorm-gen init-admin backend-test backend-build frontend-install frontend-test frontend-build frontend-e2e compose-config compose-up compose-down
 
 api:
 	buf lint
@@ -24,6 +24,12 @@ frontend-test:
 
 frontend-build:
 	cd frontend && pnpm build
+
+frontend-e2e:
+	cd frontend && pnpm e2e
+
+compose-config:
+	docker compose --env-file .env -f deploy/docker-compose.yml config --quiet
 
 compose-up:
 	docker compose --env-file .env -f deploy/docker-compose.yml up --build

@@ -20,6 +20,8 @@ Kratos Admin 是基于 go-kratos 与 Vue 3 的前后端分离、多租户通用�
 
 详细设计和实施计划见 `docs/superpowers/`。
 
+本地与生产部署、备份、升级及故障排查见 [`docs/deployment.md`](docs/deployment.md)。首次 Compose 启动会按 MySQL → Goose → 幂等超级管理员初始化 → API/Worker → Frontend 的顺序执行。
+
 ## 配置与 Provider
 
 - 系统设置按代码安全默认、平台默认、租户允许覆盖值三级解析。
