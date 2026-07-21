@@ -5,9 +5,9 @@ import { useAuthStore } from '@/stores/auth'
 export function hasPermission(
   granted: string[] | undefined,
   required: string,
-  platformAdmin = false
+  platformContext = false
 ) {
-  if (platformAdmin) return true
+  if (platformContext) return true
   if (!required) return true
   const [resource] = required.split(':', 1)
   return Boolean(

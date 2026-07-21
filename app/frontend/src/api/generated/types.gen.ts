@@ -70,7 +70,6 @@ export type AdminV1CurrentUser = {
     displayName?: string;
     avatarUrl?: string;
     realm?: string;
-    platformAdmin?: boolean;
     permissions?: Array<string>;
     username?: string;
     email?: string;

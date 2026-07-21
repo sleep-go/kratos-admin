@@ -3,15 +3,15 @@ import { createTestingPinia } from '@pinia/testing'
 import { vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import AppShell from './AppShell.vue'
+import ConsoleShell from './ConsoleShell.vue'
 
-describe('AppShell', () => {
+describe('ConsoleShell', () => {
   it('展示顶部主导航和当前租户', () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div />' } }]
     })
-    const wrapper = mount(AppShell, {
+    const wrapper = mount(ConsoleShell, {
       global: {
         plugins: [
           createTestingPinia({
@@ -56,7 +56,7 @@ describe('AppShell', () => {
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div />' } }]
     })
-    const wrapper = mount(AppShell, {
+    const wrapper = mount(ConsoleShell, {
       global: {
         plugins: [
           createTestingPinia({
@@ -91,7 +91,7 @@ describe('AppShell', () => {
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div />' } }]
     })
-    const wrapper = mount(AppShell, {
+    const wrapper = mount(ConsoleShell, {
       global: {
         plugins: [
           createTestingPinia({
@@ -128,7 +128,7 @@ describe('AppShell', () => {
       history: createMemoryHistory(),
       routes: [{ path: '/', component: { template: '<div />' } }]
     })
-    const wrapper = mount(AppShell, {
+    const wrapper = mount(ConsoleShell, {
       global: {
         plugins: [
           createTestingPinia({

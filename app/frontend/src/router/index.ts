@@ -22,7 +22,6 @@ const consoleManagementRoutes: Array<[string, string, string]> = [
   ['organization/users', 'member-management', 'members'],
   ['organization/departments', 'department-management', 'departments'],
   ['organization/positions', 'position-management', 'positions'],
-  ['permission/resources', 'resource-management', 'resources'],
   ['permission/policies', 'policy-management', 'casbin-rules'],
   ['logs/login', 'login-logs', 'login-logs'],
   ['logs/audit', 'audit-logs', 'audit-logs'],
