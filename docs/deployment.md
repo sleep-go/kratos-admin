@@ -2,35 +2,26 @@
 
 ## 首次启动
 
-1. 执行 `cp .env.example .env`。
-2. 修改 `KRATOS_ADMIN_SECRET_KEY`、`KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD`；生产环境还必须配置持久化的 `KRATOS_ADMIN_JWT_PRIVATE_KEY`、数据库和 RabbitMQ 凭据。
-3. 执行 `make compose-config`，再执行 `make compose-up`。
-4. 访问管理后台 `http://127.0.0.1:8080`、API 健康接口 `http://127.0.0.1:8000/api/v1/health`、RabbitMQ 管理台 `http://127.0.0.1:15672` 或 Mailpit `http://127.0.0.1:8025`。
+1. 修改 `configs/config.docker.yaml` 中的认证、初始化管理员和 Provider 开发值；生产环境必须替换为受控配置文件。
+2. 执行 `make compose-config`，再执行 `make compose-up`。
+3. 访问管理后台 `http://127.0.0.1:8080`、API 健康接口 `http://127.0.0.1:8000/api/v1/health`、RabbitMQ 管理台 `http://127.0.0.1:15672` 或 Mailpit `http://127.0.0.1:8025`。
 
 Compose 启动链路为 MySQL/Redis/RabbitMQ/Mailpit → Admin → init-admin → Frontend。Admin 在启动 HTTP/gRPC 前通过 MySQL 命名锁 `kratos_admin_schema_migration` 串行执行 Goose 迁移；迁移失败会阻止该实例启动。RabbitMQ 不属于 API readiness 前置条件，连接失败只会造成后台任务积压。
 
 ## 不使用 Docker 启动
 
-本机准备 Go 1.26、MySQL 8、Redis 7、RabbitMQ 4、Node.js 和 pnpm，然后导出：
-
-```bash
-export KRATOS_ADMIN_MYSQL_DSN='kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local'
-export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
-export KRATOS_ADMIN_RABBITMQ_URL='amqp://kratos:kratos@127.0.0.1:5672/kratos_admin'
-export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
-```
+本机准备 Go 1.26、MySQL 8、Redis 7、RabbitMQ 4、Node.js 和 pnpm。宿主机配置全部位于 `configs/config.yaml`，无需导出环境变量。
 
 终端一启动 Admin：
 
 ```bash
-go run ./app/admin/cmd/kratos-admin server --conf ./configs/admin.yaml
+go run ./app/admin/cmd/kratos-admin server --conf ./configs/config.yaml
 ```
 
 健康检查通过后，终端二初始化管理员：
 
 ```bash
-KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' \
-  go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
+go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/config.yaml
 ```
 
 终端三启动前端：
@@ -46,7 +37,6 @@ pnpm dev
 ## Docker Compose 仅启动依赖
 
 ```bash
-cp .env.example .env
 make compose-deps-up
 ```
 
@@ -54,7 +44,7 @@ make compose-deps-up
 
 ## 生产与 Kubernetes
 
-- 生产只部署一个 Admin Deployment，不再部署独立 Worker Deployment 或 migrate Job。
+- 生产只部署一个 Admin Deployment，不再部署独立 Worker Deployment 或 migrate Job；通过 `--conf` 指定生产完整 YAML。
 - 每个 Admin Pod 都执行相同的启动迁移检查，MySQL 命名锁确保同一时刻只有一个实例应用迁移；其他实例等待后再次检查。
 - 发布中的迁移必须向前兼容滚动期间同时运行的新旧版本。破坏性变更应拆成“先扩展、再切换、最后清理”的多个版本。
 - RabbitMQ 建议在目标 vhost 上统一默认队列类型为 quorum，并监控三条业务队列、统一死信队列、未确认消息和连接重试日志。
@@ -69,7 +59,7 @@ make compose-deps-up
 
 ## 升级与回滚
 
-1. 备份并记录当前镜像标签、Goose 版本和环境变量摘要。
+1. 备份并记录当前镜像标签、Goose 版本和配置文件摘要。
 2. 部署新 Admin 镜像；各实例在启动阶段通过 MySQL 锁串行检查迁移。
 3. 检查健康接口、登录、权限、RabbitMQ 队列、死信、日志导出和文件清理。
 4. 只有迁移明确提供安全 `Down` 且已验证数据兼容性时，才允许手工执行 Goose 回退。
@@ -94,6 +84,6 @@ make test
 make vet
 make build
 make compose-config
-docker compose --env-file .env.example build api init-admin frontend
+docker compose build api init-admin frontend
 cd app/frontend && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 ```

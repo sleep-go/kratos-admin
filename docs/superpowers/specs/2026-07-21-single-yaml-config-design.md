@@ -28,7 +28,7 @@ Kratos Admin 正在由独立 Admin、Worker 应用调整为单一 Admin Server�
 - MySQL 数据库名、用户名、密码、映射端口以及 Redis、Mailpit、API、gRPC、Frontend 端口直接写入 Compose。
 - Admin Server、迁移和初始化命令统一读取 `/app/configs/config.docker.yaml`，不再启动独立 Worker 服务。
 - Makefile 删除 `COMPOSE_ENV_FILE`、`KRATOS_ADMIN_ENV_FILE` 和 `--env-file`；本地运行、迁移、初始化和服务启动统一引用 `configs/config.yaml`。
-- Goose 仍是唯一数据库迁移入口，不引入 GORM AutoMigrate。
+- Goose 仍是唯一数据库迁移机制，不引入 GORM AutoMigrate。沿用 Worker 合并后已有的嵌入式迁移和 MySQL 命名锁：Admin 启动时迁移，`migrate` 子命令提供人工运维入口，Compose 不新增迁移服务。
 
 ## 文件收口
 

@@ -3,7 +3,7 @@
 ## 目录与依赖
 
 - 后端应用仅位于 `app/admin`，Vue 前端位于 `app/frontend`；仓库不存在 `app/worker`。
-- `kratos-admin` 只提供 `server`、`init-admin`、`gorm-gen` 三个子命令。
+- `kratos-admin` 提供 `server`、`migrate`、`init-admin`、`gorm-gen` 四个业务子命令。
 - Admin 的 Kratos 生命周期同时注册 HTTP、gRPC 和 RabbitMQ task Server。
 - `internal/data` 不导入应用 Service/Server，`internal/biz` 不导入 Data 或应用内部包。
 - 现行 Go 代码不依赖 Asynq，Redis 不承担异步任务队列。
@@ -52,8 +52,8 @@ GOCACHE=/tmp/go-build go test ./internal/data ./app/admin/internal/task \
 
 ```bash
 make compose-config
-docker compose --env-file .env.example config --services
-docker compose --env-file .env.example build api init-admin frontend
+docker compose config --services
+docker compose build api init-admin frontend
 ```
 
 服务集合必须为 `mysql redis rabbitmq mailpit api init-admin frontend`，不得出现 `migrate` 或 `worker`。RabbitMQ 管理端口默认为 `15672`，AMQP 端口默认为 `5672`；Admin 不依赖 RabbitMQ health 才启动。

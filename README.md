@@ -29,7 +29,7 @@ app/
 │   └── internal/{server,service,task}
 └── frontend/                   # Vue 3 前端应用
 api/admin/v1/                   # 业务 API Proto
-configs/                        # Admin Kratos YAML
+configs/                        # 宿主机与 Compose 的完整 Kratos YAML
 internal/
 ├── biz/                        # 领域用例与仓储契约
 ├── conf/                       # Bootstrap 配置 Proto 与加载器
@@ -49,17 +49,12 @@ Admin 是唯一后端应用。RabbitMQ 发布扫描、三类消费者、日志�
 - Docker Desktop（使用 Compose 时）
 - 本地运行依赖时需要 MySQL 8、Redis 7 和 RabbitMQ 4
 
-首次使用先复制环境变量：
+仓库提供两份完整配置：
 
-```bash
-cp .env.example .env
-```
+- `configs/config.yaml`：宿主机开发，依赖地址使用 `127.0.0.1`。
+- `configs/config.docker.yaml`：完整 Compose，依赖地址使用服务名。
 
-至少修改 `.env` 中的：
-
-- `KRATOS_ADMIN_SECRET_KEY`：精确 32 字节。
-- `KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD`：不少于 12 位。
-- `KRATOS_ADMIN_JWT_PRIVATE_KEY`：生产环境必须配置持久化 Ed25519 私钥。
+首次启动前修改对应 YAML 中的 `auth.secret_key`、`auth.jwt_private_key` 和 `setup.admin.initial_password`。仓库值仅用于本地开发，生产密钥不得提交 Git。
 
 ## Docker Compose 完整启动
 
@@ -93,14 +88,7 @@ make compose-down
 make compose-deps-up
 ```
 
-Compose 内部使用 `mysql:3306` 和 `redis:6379`，宿主机 Go 进程必须使用 `127.0.0.1`：
-
-```bash
-export KRATOS_ADMIN_MYSQL_DSN='kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local'
-export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
-export KRATOS_ADMIN_RABBITMQ_URL='amqp://kratos:kratos@127.0.0.1:5672/kratos_admin'
-export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
-```
+宿主机命令默认读取 `configs/config.yaml`，其中 MySQL、Redis、RabbitMQ 和 Mailpit 均使用 `127.0.0.1` 映射端口，无需导出环境变量。
 
 先启动 Admin。Admin 会在 HTTP/gRPC 启动前自动执行尚未应用的迁移：
 
@@ -108,11 +96,10 @@ export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
 make run-admin
 ```
 
-Admin 健康后初始化管理员，再启动前端：
+Admin 健康后初始化管理员，再启动前端。管理员资料和初始密码来自 `configs/config.yaml`：
 
 ```bash
-KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' \
-  go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
+make init-admin
 cd app/frontend
 pnpm install
 pnpm dev
@@ -131,17 +118,19 @@ make build
 
 ```text
 kratos-admin server      启动 Admin HTTP/gRPC
+kratos-admin migrate     使用 Goose 执行数据库迁移
 kratos-admin init-admin  幂等初始化平台超级管理员
 kratos-admin gorm-gen    生成 GORM Gen 查询代码
 ```
 
-Admin 默认读取 `configs/admin.yaml`；可通过 `-c/--conf` 指定其他文件。
+`server`、`migrate` 和 `init-admin` 默认读取 `configs/config.yaml`；可通过 `-c/--conf` 指定另一份完整 YAML。
 
 ## 配置约定
 
 - `internal/conf/conf.proto` 是运行配置结构的真相源。
-- `configs/*.yaml` 保存结构和安全默认值，并使用 `${KRATOS_ADMIN_*}` 占位符接收部署覆盖。
-- 密钥、密码和 Provider 凭据只通过环境变量或外部密钥服务提供，不写入仓库。
+- `configs/config.yaml` 和 `configs/config.docker.yaml` 使用同一个配置契约，仅区分宿主机与容器网络及路径。
+- 应用不读取 `.env` 或系统环境变量；生产发布应替换完整 YAML 并限制文件权限。
+- 仓库仅保存本地开发密钥，真实密码、JWT 私钥和 Provider 凭据不得提交 Git。
 - Goose SQL 是唯一数据库迁移入口；Admin 启动时使用 MySQL `GET_LOCK` 串行执行，不使用 `AutoMigrate`。
 - `make migrate` 仅作为人工排障和受控运维入口，正常部署不依赖独立迁移容器。
 
