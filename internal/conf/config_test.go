@@ -75,6 +75,38 @@ messaging:
 	}
 }
 
+func TestLoadRabbitMQConfig(t *testing.T) {
+	path := writeConfig(t, `
+data:
+  database:
+    source: user:password@tcp(mysql:3306)/admin
+  redis:
+    addr: redis:6379
+  rabbitmq:
+    url: amqp://user:password@rabbitmq:5672/admin
+    prefetch: 20
+    concurrency: 8
+`)
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Data.RabbitMQURL != "amqp://user:password@rabbitmq:5672/admin" || cfg.Data.RabbitMQPrefetch != 20 || cfg.Data.RabbitMQConcurrency != 8 {
+		t.Fatalf("RabbitMQ config = %+v", cfg.Data)
+	}
+}
+
+func TestLoadUsesRabbitMQDefaults(t *testing.T) {
+	cfg, err := Load(writeConfig(t, "environment: development\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Data.RabbitMQURL != "amqp://kratos:kratos@127.0.0.1:5672/kratos_admin" || cfg.Data.RabbitMQPrefetch != 10 || cfg.Data.RabbitMQConcurrency != 10 {
+		t.Fatalf("RabbitMQ defaults = %+v", cfg.Data)
+	}
+}
+
 func TestLoadResolvesEnvironmentPlaceholders(t *testing.T) {
 	t.Setenv("KRATOS_ADMIN_HTTP_ADDR", "127.0.0.1:28000")
 	path := writeConfig(t, `

@@ -15,6 +15,7 @@ import (
 const (
 	defaultMySQLDSN = "kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local"
 	defaultRedis    = "127.0.0.1:6379"
+	defaultRabbitMQ = "amqp://kratos:kratos@127.0.0.1:5672/kratos_admin"
 )
 
 // Config 描述 API 与 Worker 共享的完整运行配置。
@@ -51,9 +52,12 @@ type Server struct {
 
 // Data 描述 MySQL、Redis 与异步任务依赖配置。
 type Data struct {
-	MySQLDSN  string
-	RedisAddr string
-	RedisDB   int
+	MySQLDSN            string
+	RedisAddr           string
+	RedisDB             int
+	RabbitMQURL         string
+	RabbitMQPrefetch    int
+	RabbitMQConcurrency int
 }
 
 // Auth 描述令牌生命周期及敏感数据保护配置。
@@ -106,6 +110,7 @@ func fromBootstrap(bootstrap *Bootstrap) Config {
 	environment := stringOrDefault(bootstrap.GetEnvironment(), "development")
 	server := bootstrap.GetServer()
 	data := bootstrap.GetData()
+	rabbitMQ := data.GetRabbitmq()
 	auth := bootstrap.GetAuth()
 	storage := bootstrap.GetStorage()
 	messaging := bootstrap.GetMessaging()
@@ -117,9 +122,12 @@ func fromBootstrap(bootstrap *Bootstrap) Config {
 			GRPCAddr: stringOrDefault(server.GetGrpc().GetAddr(), ":9000"),
 		},
 		Data: Data{
-			MySQLDSN:  stringOrDefault(data.GetDatabase().GetSource(), defaultMySQLDSN),
-			RedisAddr: stringOrDefault(data.GetRedis().GetAddr(), defaultRedis),
-			RedisDB:   int(data.GetRedis().GetDb()),
+			MySQLDSN:            stringOrDefault(data.GetDatabase().GetSource(), defaultMySQLDSN),
+			RedisAddr:           stringOrDefault(data.GetRedis().GetAddr(), defaultRedis),
+			RedisDB:             int(data.GetRedis().GetDb()),
+			RabbitMQURL:         stringOrDefault(rabbitMQ.GetUrl(), defaultRabbitMQ),
+			RabbitMQPrefetch:    int32OrDefault(rabbitMQ.GetPrefetch(), 10),
+			RabbitMQConcurrency: int32OrDefault(rabbitMQ.GetConcurrency(), 10),
 		},
 		Auth: Auth{
 			AccessTTL:     durationOrDefault(auth.GetAccessTtl(), 15*time.Minute),
@@ -169,6 +177,13 @@ func int64OrDefault(value, fallback int64) int64 {
 		return fallback
 	}
 	return value
+}
+
+func int32OrDefault(value int32, fallback int) int {
+	if value <= 0 {
+		return fallback
+	}
+	return int(value)
 }
 
 func stringOrDefault(value, fallback string) string {
