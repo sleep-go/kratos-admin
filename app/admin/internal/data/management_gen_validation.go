@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
-	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
@@ -336,16 +334,4 @@ func (r *ManagementRepository) prepareUpdateValuesGen(ctx context.Context, q *qu
 	default:
 		return nil
 	}
-}
-
-func createTenantAdministratorGen(ctx context.Context, q *query.Query, tenantID, adminUserID uint64) error {
-	u := q.User
-	user, err := u.WithContext(ctx).Select(u.DisplayName).Where(u.ID.Eq(adminUserID), u.Status.Eq(1), u.DeletedAt.IsNull()).Take()
-	if err != nil || user.DisplayName == "" {
-		return errors.New("指定的租户管理员不存在或已禁用")
-	}
-	return q.TenantMember.WithContext(ctx).Create(&model.TenantMember{
-		TenantID: tenantID, UserID: adminUserID, DisplayName: user.DisplayName,
-		Status: 1, IsTenantAdmin: true, JoinedAt: time.Now().UTC(),
-	})
 }

@@ -267,12 +267,12 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	if id == 0 {
 		t.Fatal("Create() must return MySQL auto-increment ID")
 	}
-	var adminCount int64
-	if err := tx.Table("tenant_members").Where("tenant_id = ? AND user_id = ? AND is_tenant_admin = 1", id, admin.ID).Count(&adminCount).Error; err != nil {
+	var memberCount int64
+	if err := tx.Table("tenant_members").Where("tenant_id = ?", id).Count(&memberCount).Error; err != nil {
 		t.Fatal(err)
 	}
-	if adminCount != 1 {
-		t.Fatalf("tenant admin membership count = %d, want 1", adminCount)
+	if memberCount != 0 {
+		t.Fatalf("tenant member count = %d, want 0", memberCount)
 	}
 	tasks, err := (&TaskRepository{q: query.Use(tx)}).Pending(context.Background(), 10, time.Now().UTC())
 	foundAudit := false

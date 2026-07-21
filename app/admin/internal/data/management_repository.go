@@ -381,15 +381,6 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 			}
 			values["path"] = path
 		}
-		if resource == "tenants" {
-			adminUserID := numericID(data["admin_user_id"])
-			if adminUserID == 0 {
-				adminUserID = scope.UserID
-			}
-			if err := createTenantAdministratorGen(ctx, tx, id, adminUserID); err != nil {
-				return fmt.Errorf("创建租户管理员成员关系失败: %w", err)
-			}
-		}
 		if err := incrementPermissionVersionGen(ctx, tx, scope, resource, values, id); err != nil {
 			return err
 		}

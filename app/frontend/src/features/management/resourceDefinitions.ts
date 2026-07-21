@@ -107,19 +107,15 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
       { key: 'code', label: '租户编码', required: true, table: true },
       { key: 'name', label: '租户名称', required: true, table: true },
       {
-        key: 'admin_user_id',
-        label: '租户管理员',
-        type: 'relation',
-        default: 0,
-        createOnly: true,
-        lookup: {
-          resource: 'users',
-          labelKeys: ['display_name', 'username'],
-          emptyLabel: '当前平台管理员',
-          onlyActive: true
-        }
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        table: true,
+        options: [
+          { label: '启用', value: 1 },
+          { label: '冻结', value: 2 }
+        ]
       },
-      commonStatus,
       { key: 'permission_version', label: '权限版本', table: true },
       createdAt
     ]

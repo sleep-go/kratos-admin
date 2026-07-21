@@ -59,7 +59,6 @@ describe('后台资源页面注册表', () => {
 
   it('可写关联字段使用接口选项或树选择而不是数字输入', () => {
     const expectedTypes: Record<string, Record<string, 'relation' | 'tree'>> = {
-      tenants: { admin_user_id: 'relation' },
       members: {
         user_id: 'relation',
         primary_department_id: 'tree',
@@ -77,6 +76,12 @@ describe('后台资源页面注册表', () => {
         expect(field?.lookup ?? field?.lookupBy, `${resource}.${key} lookup`).toBeDefined()
       }
     }
+  })
+
+  it('创建租户不要求或默认创建管理员', () => {
+    expect(resourceDefinitions.tenants.fields.some((field) => field.key === 'admin_user_id')).toBe(
+      false
+    )
   })
 
   it('业务枚举使用带中文标签的下拉选择', () => {
