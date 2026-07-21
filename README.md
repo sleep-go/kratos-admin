@@ -1,6 +1,6 @@
 # Kratos Admin
 
-基于 go-kratos 与 Vue 3 的前后端分离、多租户通用管理后台。项目采用 `app/*` 大仓结构，后端通过单一 `kratos-admin` Cobra 命令运行 Admin、Worker 和运维工具，数据库迁移统一由 Goose 管理。
+基于 go-kratos 与 Vue 3 的前后端分离、多租户通用管理后台。后端以单一 Admin 进程同时承载 HTTP/gRPC 和 RabbitMQ 后台任务，启动时通过 MySQL 命名锁自动执行 Goose 迁移。
 
 ## 功能
 
@@ -15,7 +15,7 @@
 
 ## 技术栈
 
-- 后端：Go 1.26、go-kratos、GORM Gen、Goose、Casbin、Redis、Asynq
+- 后端：Go 1.26、go-kratos、GORM Gen、Goose、Casbin、Redis、RabbitMQ
 - 前端：Vue 3、Vite、TypeScript、Element Plus、Tailwind CSS、SCSS、Pinia、ECharts
 - 数据库：PolarDB MySQL 8；本地开发使用 MySQL 8.4
 - 部署：Docker Compose、Nginx、阿里云 OSS
@@ -26,12 +26,10 @@
 app/
 ├── admin/
 │   ├── cmd/kratos-admin/       # 统一 Cobra 命令入口
-│   └── internal/{server,service}
-├── worker/
-│   └── internal/{server,service}
+│   └── internal/{server,service,task}
 └── frontend/                   # Vue 3 前端应用
 api/admin/v1/                   # 业务 API Proto
-configs/                        # Admin、Worker Kratos YAML
+configs/                        # Admin Kratos YAML
 internal/
 ├── biz/                        # 领域用例与仓储契约
 ├── conf/                       # Bootstrap 配置 Proto 与加载器
@@ -42,14 +40,14 @@ deploy/Dockerfile.backend       # 后端多阶段镜像
 docker-compose.yml              # 完整本地编排
 ```
 
-API 和 Worker 是独立 Kratos 应用，复用根级 `biz/data/provider`。`kratos-admin` 只是统一运行入口，不会把两个应用合并成同一进程。
+Admin 是唯一后端应用。RabbitMQ 发布扫描、三类消费者、日志维护和连接重试均作为受控协程接入同一 Kratos 生命周期；MySQL 保存任务真相和重试状态。
 
 ## 环境要求
 
 - Go 1.26+
 - Node.js 24+ 与 pnpm 10+
 - Docker Desktop（使用 Compose 时）
-- 本地运行依赖时需要 MySQL 8 和 Redis 7
+- 本地运行依赖时需要 MySQL 8、Redis 7 和 RabbitMQ 4
 
 首次使用先复制环境变量：
 
@@ -65,20 +63,21 @@ cp .env.example .env
 
 ## Docker Compose 完整启动
 
-根目录 Compose 包含 MySQL、Redis、Mailpit、Goose migration、超级管理员初始化、API、Worker 和 Frontend：
+根目录 Compose 包含 MySQL、Redis、RabbitMQ、Mailpit、Admin、超级管理员初始化和 Frontend：
 
 ```bash
 make compose-config
 make compose-up
 ```
 
-启动顺序为：MySQL 健康检查 → Goose 迁移 → 幂等管理员初始化 → API/Worker → Frontend。
+启动顺序为：MySQL/Redis/RabbitMQ/Mailpit → Admin 启动并自动迁移 → 幂等管理员初始化 → Frontend。RabbitMQ 不作为 Admin 健康启动前置条件，暂时不可用时 API 仍可服务，异步任务保留在 MySQL 并在恢复后补投。
 
 访问地址：
 
 - 管理后台：<http://127.0.0.1:8080>
 - API 健康检查：<http://127.0.0.1:8000/api/v1/health>
 - Mailpit：<http://127.0.0.1:8025>
+- RabbitMQ 管理台：<http://127.0.0.1:15672>
 
 停止服务：
 
@@ -88,7 +87,7 @@ make compose-down
 
 ## Compose 启动依赖，前后端本地运行
 
-只启动 MySQL、Redis 和 Mailpit：
+只启动 MySQL、Redis、RabbitMQ 和 Mailpit：
 
 ```bash
 make compose-deps-up
@@ -99,29 +98,21 @@ Compose 内部使用 `mysql:3306` 和 `redis:6379`，宿主机 Go 进程必须�
 ```bash
 export KRATOS_ADMIN_MYSQL_DSN='kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local'
 export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
+export KRATOS_ADMIN_RABBITMQ_URL='amqp://kratos:kratos@127.0.0.1:5672/kratos_admin'
 export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
 ```
 
-安装 Goose、执行迁移并初始化管理员：
-
-```bash
-go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
-goose -dir migrations mysql "$KRATOS_ADMIN_MYSQL_DSN" up
-KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' \
-  go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
-```
-
-分别启动 Admin、Worker 和前端：
+先启动 Admin。Admin 会在 HTTP/gRPC 启动前自动执行尚未应用的迁移：
 
 ```bash
 make run-admin
 ```
 
-```bash
-make run-worker
-```
+Admin 健康后初始化管理员，再启动前端：
 
 ```bash
+KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' \
+  go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
 cd app/frontend
 pnpm install
 pnpm dev
@@ -140,19 +131,19 @@ make build
 
 ```text
 kratos-admin server      启动 Admin HTTP/gRPC
-kratos-admin worker      启动 Asynq Worker
 kratos-admin init-admin  幂等初始化平台超级管理员
 kratos-admin gorm-gen    生成 GORM Gen 查询代码
 ```
 
-Admin 默认读取 `configs/admin.yaml`，Worker 默认读取 `configs/worker.yaml`；可通过 `-c/--conf` 指定其他文件。
+Admin 默认读取 `configs/admin.yaml`；可通过 `-c/--conf` 指定其他文件。
 
 ## 配置约定
 
 - `internal/conf/conf.proto` 是运行配置结构的真相源。
 - `configs/*.yaml` 保存结构和安全默认值，并使用 `${KRATOS_ADMIN_*}` 占位符接收部署覆盖。
 - 密钥、密码和 Provider 凭据只通过环境变量或外部密钥服务提供，不写入仓库。
-- Goose 是唯一数据库迁移入口，API 和 Worker 启动时不会执行 `AutoMigrate`。
+- Goose SQL 是唯一数据库迁移入口；Admin 启动时使用 MySQL `GET_LOCK` 串行执行，不使用 `AutoMigrate`。
+- `make migrate` 仅作为人工排障和受控运维入口，正常部署不依赖独立迁移容器。
 
 ## 常用命令
 
