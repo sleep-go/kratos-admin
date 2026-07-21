@@ -1,10 +1,49 @@
+export interface ResourceOption {
+  label: string
+  value: string | number
+  children?: ResourceOption[]
+}
+
+export interface ResourceLookupDefinition {
+  resource: string
+  valueKey?: string
+  labelKeys: string[]
+  parentKey?: string
+  emptyLabel?: string
+  onlyActive?: boolean
+  excludeCurrentTree?: boolean
+  exclude?: {
+    resource: string
+    valueKey: string
+  }
+}
+
+export interface ResourceLookupByDefinition {
+  field: string
+  values: Record<string, ResourceLookupDefinition>
+}
+
 export interface ResourceField {
   key: string
   label: string
-  type?: 'text' | 'number' | 'status' | 'boolean' | 'textarea' | 'password'
+  type?:
+    | 'text'
+    | 'number'
+    | 'status'
+    | 'boolean'
+    | 'textarea'
+    | 'password'
+    | 'select'
+    | 'relation'
+    | 'tree'
   required?: boolean
   table?: boolean
   default?: string | number | boolean
+  form?: boolean
+  createOnly?: boolean
+  options?: ResourceOption[]
+  lookup?: ResourceLookupDefinition
+  lookupBy?: ResourceLookupByDefinition
 }
 
 export interface ResourceDefinition {
@@ -29,10 +68,26 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
       { key: 'email', label: '邮箱', table: true },
       { key: 'phone', label: '手机号', table: true },
       { key: 'display_name', label: '显示名称', required: true, table: true },
-      { key: 'initial_password', label: '初始密码', type: 'password', required: true },
+      {
+        key: 'initial_password',
+        label: '初始密码',
+        type: 'password',
+        required: true,
+        createOnly: true
+      },
       { key: 'status', label: '状态', type: 'status', default: 1, table: true },
       { key: 'mfa_enabled', label: '启用 MFA', type: 'boolean', default: false, table: true },
-      { key: 'mfa_channel', label: 'MFA 渠道', default: 'email', table: true }
+      {
+        key: 'mfa_channel',
+        label: 'MFA 渠道',
+        type: 'select',
+        default: 'email',
+        table: true,
+        options: [
+          { label: '邮件', value: 'email' },
+          { label: '短信', value: 'sms' }
+        ]
+      }
     ]
   },
   tenants: {
@@ -44,8 +99,16 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
       { key: 'name', label: '租户名称', required: true, table: true },
       {
         key: 'admin_user_id',
-        label: '租户管理员用户 ID（留空则为当前平台管理员）',
-        type: 'number'
+        label: '租户管理员',
+        type: 'relation',
+        default: 0,
+        createOnly: true,
+        lookup: {
+          resource: 'users',
+          labelKeys: ['display_name', 'username'],
+          emptyLabel: '当前平台管理员',
+          onlyActive: true
+        }
       },
       commonStatus,
       { key: 'permission_version', label: '权限版本', table: true },
@@ -57,10 +120,47 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     title: '成员管理',
     description: '维护当前租户成员及组织归属。',
     fields: [
-      { key: 'user_id', label: '用户 ID', type: 'number', required: true, table: true },
+      {
+        key: 'user_id',
+        label: '全局用户',
+        type: 'relation',
+        required: true,
+        table: true,
+        lookup: {
+          resource: 'users',
+          labelKeys: ['display_name', 'username'],
+          onlyActive: true,
+          exclude: { resource: 'members', valueKey: 'user_id' }
+        }
+      },
       { key: 'display_name', label: '显示名称', required: true, table: true },
-      { key: 'primary_department_id', label: '主部门 ID', type: 'number', table: true },
-      { key: 'position_id', label: '岗位 ID', type: 'number', table: true },
+      {
+        key: 'primary_department_id',
+        label: '主部门',
+        type: 'tree',
+        default: 0,
+        table: true,
+        lookup: {
+          resource: 'departments',
+          labelKeys: ['name', 'code'],
+          parentKey: 'parent_id',
+          emptyLabel: '未分配',
+          onlyActive: true
+        }
+      },
+      {
+        key: 'position_id',
+        label: '岗位',
+        type: 'relation',
+        default: 0,
+        table: true,
+        lookup: {
+          resource: 'positions',
+          labelKeys: ['name', 'code'],
+          emptyLabel: '未分配',
+          onlyActive: true
+        }
+      },
       { key: 'is_tenant_admin', label: '租户管理员', type: 'boolean', table: true },
       commonStatus
     ]
@@ -72,8 +172,22 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     fields: [
       { key: 'name', label: '部门名称', required: true, table: true },
       { key: 'code', label: '部门编码', required: true, table: true },
-      { key: 'parent_id', label: '上级部门 ID', type: 'number', table: true },
-      { key: 'path', label: '部门路径', required: true, table: true },
+      {
+        key: 'parent_id',
+        label: '上级部门',
+        type: 'tree',
+        default: 0,
+        table: true,
+        lookup: {
+          resource: 'departments',
+          labelKeys: ['name', 'code'],
+          parentKey: 'parent_id',
+          emptyLabel: '根部门',
+          onlyActive: true,
+          excludeCurrentTree: true
+        }
+      },
+      { key: 'path', label: '部门路径', table: true, form: false },
       { key: 'sort_order', label: '排序', type: 'number' },
       commonStatus
     ]
@@ -96,7 +210,20 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     fields: [
       { key: 'code', label: '角色编码', required: true, table: true },
       { key: 'name', label: '角色名称', required: true, table: true },
-      { key: 'data_scope', label: '数据范围', type: 'number', table: true },
+      {
+        key: 'data_scope',
+        label: '数据范围',
+        type: 'select',
+        default: 4,
+        table: true,
+        options: [
+          { label: '全部数据', value: 1 },
+          { label: '本部门及下级', value: 2 },
+          { label: '本部门', value: 3 },
+          { label: '仅本人', value: 4 },
+          { label: '自定义部门', value: 5 }
+        ]
+      },
       { key: 'is_builtin', label: '内置角色', type: 'boolean', table: true },
       commonStatus
     ]
@@ -108,8 +235,33 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     fields: [
       { key: 'name', label: '资源名称', required: true, table: true },
       { key: 'code', label: '资源编码', required: true, table: true },
-      { key: 'type', label: '类型', type: 'number', table: true },
-      { key: 'parent_id', label: '父资源 ID', type: 'number' },
+      {
+        key: 'type',
+        label: '类型',
+        type: 'select',
+        required: true,
+        table: true,
+        options: [
+          { label: '目录', value: 1 },
+          { label: '菜单', value: 2 },
+          { label: '按钮', value: 3 },
+          { label: 'API', value: 4 }
+        ]
+      },
+      {
+        key: 'parent_id',
+        label: '父资源',
+        type: 'tree',
+        default: 0,
+        lookup: {
+          resource: 'resources',
+          labelKeys: ['name', 'code'],
+          parentKey: 'parent_id',
+          emptyLabel: '根资源',
+          onlyActive: true,
+          excludeCurrentTree: true
+        }
+      },
       { key: 'route_path', label: '路由路径', table: true },
       { key: 'component_key', label: '组件键', table: true },
       { key: 'http_method', label: 'HTTP 方法' },
@@ -124,8 +276,27 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     title: '租户功能授权',
     description: '控制每个租户可使用的功能集合。',
     fields: [
-      { key: 'tenant_id', label: '租户 ID', type: 'number', required: true, table: true },
-      { key: 'resource_id', label: '资源 ID', type: 'number', required: true, table: true },
+      {
+        key: 'tenant_id',
+        label: '租户',
+        type: 'relation',
+        required: true,
+        table: true,
+        lookup: { resource: 'tenants', labelKeys: ['name', 'code'], onlyActive: true }
+      },
+      {
+        key: 'resource_id',
+        label: '权限资源',
+        type: 'tree',
+        required: true,
+        table: true,
+        lookup: {
+          resource: 'resources',
+          labelKeys: ['name', 'code'],
+          parentKey: 'parent_id',
+          onlyActive: true
+        }
+      },
       { key: 'created_by', label: '授权人', table: true },
       createdAt
     ]
@@ -135,9 +306,51 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     title: '按钮与 API 授权',
     description: '维护 Casbin domain 角色和资源策略。',
     fields: [
-      { key: 'ptype', label: '策略类型', required: true, table: true },
-      { key: 'v1', label: '成员 / 角色', required: true, table: true },
-      { key: 'v2', label: '资源 / 角色', required: true, table: true },
+      {
+        key: 'ptype',
+        label: '策略类型',
+        type: 'select',
+        default: 'p',
+        required: true,
+        table: true,
+        options: [
+          { label: '资源授权', value: 'p' },
+          { label: '角色继承', value: 'g' }
+        ]
+      },
+      {
+        key: 'v1',
+        label: '成员 / 角色',
+        type: 'relation',
+        required: true,
+        table: true,
+        lookupBy: {
+          field: 'ptype',
+          values: {
+            p: { resource: 'roles', labelKeys: ['name', 'code'], onlyActive: true },
+            g: { resource: 'members', labelKeys: ['display_name'], onlyActive: true }
+          }
+        }
+      },
+      {
+        key: 'v2',
+        label: '资源 / 角色',
+        type: 'relation',
+        required: true,
+        table: true,
+        lookupBy: {
+          field: 'ptype',
+          values: {
+            p: {
+              resource: 'resources',
+              valueKey: 'code',
+              labelKeys: ['name', 'code'],
+              onlyActive: true
+            },
+            g: { resource: 'roles', labelKeys: ['name', 'code'], onlyActive: true }
+          }
+        }
+      },
       { key: 'v3', label: '动作', table: true },
       { key: 'v4', label: '扩展值 4' },
       { key: 'v5', label: '扩展值 5' }
@@ -235,7 +448,18 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     title: '字典项',
     description: '维护字典项值、标签和排序。',
     fields: [
-      { key: 'type_id', label: '类型 ID', type: 'number', required: true, table: true },
+      {
+        key: 'type_id',
+        label: '字典类型',
+        type: 'relation',
+        required: true,
+        table: true,
+        lookup: {
+          resource: 'dictionary-types',
+          labelKeys: ['name', 'code'],
+          onlyActive: true
+        }
+      },
       { key: 'item_value', label: '字典值', required: true, table: true },
       { key: 'label', label: '显示名称', required: true, table: true },
       { key: 'sort_order', label: '排序', type: 'number', table: true },
