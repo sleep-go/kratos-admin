@@ -12,6 +12,8 @@ import (
 
 const logCleanupBatchSize = 1000
 
+const logMaintenanceLockName = "kratos_admin_log_maintenance"
+
 // LogRetention 描述三类日志的保留天数。
 type LogRetention struct {
 	AuditDays uint32
@@ -64,6 +66,21 @@ func (r *LogMaintenanceRepository) Retention(ctx context.Context) (LogRetention,
 
 // Cleanup 执行单批清理，避免长事务持续锁表。
 func (r *LogMaintenanceRepository) Cleanup(ctx context.Context, now time.Time) (LogCleanupResult, error) {
+	sqlDB, err := r.db.DB()
+	if err != nil {
+		return LogCleanupResult{}, fmt.Errorf("获取日志维护数据库连接池失败: %w", err)
+	}
+	connection, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return LogCleanupResult{}, fmt.Errorf("获取日志维护专用连接失败: %w", err)
+	}
+	defer connection.Close()
+	return runLockedMaintenance(ctx, sqlLockConnection{connection: connection}, func(ctx context.Context) (LogCleanupResult, error) {
+		return r.cleanupUnlocked(ctx, now)
+	})
+}
+
+func (r *LogMaintenanceRepository) cleanupUnlocked(ctx context.Context, now time.Time) (LogCleanupResult, error) {
 	retention, err := r.Retention(ctx)
 	if err != nil {
 		return LogCleanupResult{}, err
@@ -85,6 +102,22 @@ func (r *LogMaintenanceRepository) Cleanup(ctx context.Context, now time.Time) (
 			return result, execution.Error
 		}
 		target.set(uint64(execution.RowsAffected))
+	}
+	return result, nil
+}
+
+func runLockedMaintenance(ctx context.Context, connection lockConnection, cleanup func(context.Context) (LogCleanupResult, error)) (LogCleanupResult, error) {
+	result := LogCleanupResult{}
+	acquired, err := runWithNamedLock(ctx, connection, logMaintenanceLockName, 0, func(ctx context.Context) error {
+		var cleanupErr error
+		result, cleanupErr = cleanup(ctx)
+		return cleanupErr
+	})
+	if err != nil {
+		return LogCleanupResult{}, fmt.Errorf("执行日志维护失败: %w", err)
+	}
+	if !acquired {
+		return LogCleanupResult{}, nil
 	}
 	return result, nil
 }

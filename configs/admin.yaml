@@ -20,6 +20,10 @@ data:
     db: ${KRATOS_ADMIN_REDIS_DB:0}
     read_timeout: 2s
     write_timeout: 2s
+  rabbitmq:
+    url: ${KRATOS_ADMIN_RABBITMQ_URL:amqp://kratos:kratos@127.0.0.1:5672/kratos_admin}
+    prefetch: ${KRATOS_ADMIN_RABBITMQ_PREFETCH:10}
+    concurrency: ${KRATOS_ADMIN_RABBITMQ_CONCURRENCY:10}
 
 auth:
   access_ttl: ${KRATOS_ADMIN_ACCESS_TTL:900s}

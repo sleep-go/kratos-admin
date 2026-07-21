@@ -42,8 +42,14 @@ message DataConfig {
     google.protobuf.Duration read_timeout = 4;
     google.protobuf.Duration write_timeout = 5;
   }
+  message RabbitMQ {
+    string url = 1;
+    int32 prefetch = 2;
+    int32 concurrency = 3;
+  }
   Database database = 1;
   Redis redis = 2;
+  RabbitMQ rabbitmq = 3;
 }
 
 message AuthConfig {

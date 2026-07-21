@@ -59,15 +59,6 @@ func (r *LogExportRepository) Find(ctx context.Context, access logexport.Access,
 	return mapExportRow(row), nil
 }
 
-// PendingIDs 返回已到执行时间的待处理任务ID。
-func (r *LogExportRepository) PendingIDs(ctx context.Context, limit int) ([]string, error) {
-	var ids []string
-	err := r.db.WithContext(ctx).Model(&model.LogExport{}).
-		Where("status = ? AND (next_retry_at IS NULL OR next_retry_at <= ?)", logexport.StatusPending, time.Now().UTC()).
-		Order("created_at ASC").Limit(limit).Pluck("id", &ids).Error
-	return ids, err
-}
-
 // Claim 使用行锁原子领取一个到期任务。
 func (r *LogExportRepository) Claim(ctx context.Context, exportID string) (logexport.Record, bool, error) {
 	var claimed model.LogExport
@@ -153,26 +144,6 @@ func (r *LogExportRepository) Complete(ctx context.Context, record logexport.Rec
 		now := time.Now().UTC()
 		return tx.Model(&model.LogExport{}).Where("id = ? AND status <> ?", record.ID, logexport.StatusCompleted).
 			Updates(map[string]any{"status": logexport.StatusCompleted, "row_count": rowCount, "file_id": fileID, "failure_reason": "", "finished_at": now, "updated_at": now}).Error
-	})
-}
-
-// Retry 记录失败原因并按最大重试次数回到待处理或进入最终失败状态。
-func (r *LogExportRepository) Retry(ctx context.Context, exportID, reason string, nextRetry time.Time, maxRetries uint32) error {
-	if len(reason) > 1024 {
-		reason = reason[:1024]
-	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var row model.LogExport
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", exportID).Take(&row).Error; err != nil {
-			return err
-		}
-		retries := row.RetryCount + 1
-		status := logexport.StatusPending
-		updates := map[string]any{"retry_count": retries, "status": status, "failure_reason": reason, "next_retry_at": nextRetry, "updated_at": time.Now().UTC()}
-		if retries >= maxRetries {
-			updates["status"], updates["finished_at"], updates["next_retry_at"] = logexport.StatusFailed, time.Now().UTC(), nil
-		}
-		return tx.Model(&model.LogExport{}).Where("id = ?", exportID).Updates(updates).Error
 	})
 }
 

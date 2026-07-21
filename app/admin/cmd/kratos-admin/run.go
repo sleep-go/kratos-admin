@@ -9,7 +9,6 @@ import (
 	"gorm.io/gen"
 
 	adminapp "github.com/sleep-go/kratos-admin/app/admin"
-	workerapp "github.com/sleep-go/kratos-admin/app/worker"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 	"github.com/sleep-go/kratos-admin/internal/biz/setup"
 	"github.com/sleep-go/kratos-admin/internal/conf"
@@ -29,34 +28,41 @@ type genOptions struct {
 	OutPath string
 }
 
+type runnableApplication interface {
+	Run() error
+}
+
+type serverDependencies struct {
+	load           func(string) (conf.Config, error)
+	migrate        func(context.Context, string) error
+	newApplication func(context.Context, conf.Config) (runnableApplication, func(), error)
+}
+
 func runServer(ctx context.Context, confPath string) error {
-	cfg, err := conf.Load(confPath)
+	return runServerWith(ctx, confPath, serverDependencies{
+		load:    conf.Load,
+		migrate: data.Migrate,
+		newApplication: func(ctx context.Context, cfg conf.Config) (runnableApplication, func(), error) {
+			return adminapp.NewApplication(ctx, cfg)
+		},
+	})
+}
+
+func runServerWith(ctx context.Context, confPath string, dependencies serverDependencies) error {
+	cfg, err := dependencies.load(confPath)
 	if err != nil {
 		return fmt.Errorf("加载 Admin 配置失败: %w", err)
 	}
-	application, cleanup, err := adminapp.NewApplication(ctx, cfg)
+	if err := dependencies.migrate(ctx, cfg.Data.MySQLDSN); err != nil {
+		return fmt.Errorf("执行数据库启动迁移失败: %w", err)
+	}
+	application, cleanup, err := dependencies.newApplication(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("初始化 Admin 依赖失败: %w", err)
 	}
 	defer cleanup()
 	if err := application.Run(); err != nil {
 		return fmt.Errorf("Admin 进程退出: %w", err)
-	}
-	return nil
-}
-
-func runWorker(ctx context.Context, confPath string) error {
-	cfg, err := conf.Load(confPath)
-	if err != nil {
-		return fmt.Errorf("加载 Worker 配置失败: %w", err)
-	}
-	application, cleanup, err := workerapp.NewApplication(ctx, cfg)
-	if err != nil {
-		return fmt.Errorf("初始化 Worker 依赖失败: %w", err)
-	}
-	defer cleanup()
-	if err := application.Run(); err != nil {
-		return fmt.Errorf("Worker 进程退出: %w", err)
 	}
 	return nil
 }

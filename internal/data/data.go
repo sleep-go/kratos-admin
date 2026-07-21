@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -15,12 +14,11 @@ import (
 	"github.com/sleep-go/kratos-admin/internal/data/query"
 )
 
-// Data 汇集 API 与 Worker 共用的数据基础设施。
+// Data 汇集 Admin API 与后台任务共用的数据基础设施。
 type Data struct {
-	DB          *gorm.DB
-	Query       *query.Query
-	Redis       *redis.Client
-	AsynqClient *asynq.Client
+	DB    *gorm.DB
+	Query *query.Query
+	Redis *redis.Client
 }
 
 // NewData 创建共享数据资源，并返回供 Wire 传播的清理函数。
@@ -50,12 +48,10 @@ func Open(ctx context.Context, cfg conf.Data) (*Data, error) {
 		_ = redisClient.Close()
 		return nil, fmt.Errorf("检查 Redis 连接失败: %w", err)
 	}
-	redisOption := asynq.RedisClientOpt{Addr: cfg.RedisAddr, DB: cfg.RedisDB}
 	return &Data{
-		DB:          db,
-		Query:       query.Use(db),
-		Redis:       redisClient,
-		AsynqClient: asynq.NewClient(redisOption),
+		DB:    db,
+		Query: query.Use(db),
+		Redis: redisClient,
 	}, nil
 }
 
@@ -82,9 +78,6 @@ func (d *Data) Close() error {
 		return nil
 	}
 	var closeErrors []error
-	if d.AsynqClient != nil {
-		closeErrors = append(closeErrors, d.AsynqClient.Close())
-	}
 	if d.Redis != nil {
 		closeErrors = append(closeErrors, d.Redis.Close())
 	}

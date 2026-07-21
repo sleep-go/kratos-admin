@@ -162,6 +162,7 @@ type DataConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Database      *DataConfig_Database   `protobuf:"bytes,1,opt,name=database,proto3" json:"database,omitempty"`
 	Redis         *DataConfig_Redis      `protobuf:"bytes,2,opt,name=redis,proto3" json:"redis,omitempty"`
+	Rabbitmq      *DataConfig_RabbitMQ   `protobuf:"bytes,3,opt,name=rabbitmq,proto3" json:"rabbitmq,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -206,6 +207,13 @@ func (x *DataConfig) GetDatabase() *DataConfig_Database {
 func (x *DataConfig) GetRedis() *DataConfig_Redis {
 	if x != nil {
 		return x.Redis
+	}
+	return nil
+}
+
+func (x *DataConfig) GetRabbitmq() *DataConfig_RabbitMQ {
+	if x != nil {
+		return x.Rabbitmq
 	}
 	return nil
 }
@@ -766,6 +774,66 @@ func (x *DataConfig_Redis) GetWriteTimeout() *durationpb.Duration {
 	return nil
 }
 
+type DataConfig_RabbitMQ struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Prefetch      int32                  `protobuf:"varint,2,opt,name=prefetch,proto3" json:"prefetch,omitempty"`
+	Concurrency   int32                  `protobuf:"varint,3,opt,name=concurrency,proto3" json:"concurrency,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DataConfig_RabbitMQ) Reset() {
+	*x = DataConfig_RabbitMQ{}
+	mi := &file_conf_conf_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DataConfig_RabbitMQ) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DataConfig_RabbitMQ) ProtoMessage() {}
+
+func (x *DataConfig_RabbitMQ) ProtoReflect() protoreflect.Message {
+	mi := &file_conf_conf_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DataConfig_RabbitMQ.ProtoReflect.Descriptor instead.
+func (*DataConfig_RabbitMQ) Descriptor() ([]byte, []int) {
+	return file_conf_conf_proto_rawDescGZIP(), []int{2, 2}
+}
+
+func (x *DataConfig_RabbitMQ) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *DataConfig_RabbitMQ) GetPrefetch() int32 {
+	if x != nil {
+		return x.Prefetch
+	}
+	return 0
+}
+
+func (x *DataConfig_RabbitMQ) GetConcurrency() int32 {
+	if x != nil {
+		return x.Concurrency
+	}
+	return 0
+}
+
 var File_conf_conf_proto protoreflect.FileDescriptor
 
 const file_conf_conf_proto_rawDesc = "" +
@@ -788,11 +856,12 @@ const file_conf_conf_proto_rawDesc = "" +
 	"\x04GRPC\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x123\n" +
-	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\x8d\x03\n" +
+	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\xad\x04\n" +
 	"\n" +
 	"DataConfig\x12B\n" +
 	"\bdatabase\x18\x01 \x01(\v2&.kratos.admin.conf.DataConfig.DatabaseR\bdatabase\x129\n" +
-	"\x05redis\x18\x02 \x01(\v2#.kratos.admin.conf.DataConfig.RedisR\x05redis\x1a:\n" +
+	"\x05redis\x18\x02 \x01(\v2#.kratos.admin.conf.DataConfig.RedisR\x05redis\x12B\n" +
+	"\brabbitmq\x18\x03 \x01(\v2&.kratos.admin.conf.DataConfig.RabbitMQR\brabbitmq\x1a:\n" +
 	"\bDatabase\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x1a\xc3\x01\n" +
@@ -801,7 +870,11 @@ const file_conf_conf_proto_rawDesc = "" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x12\x0e\n" +
 	"\x02db\x18\x03 \x01(\x05R\x02db\x12<\n" +
 	"\fread_timeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationR\vreadTimeout\x12>\n" +
-	"\rwrite_timeout\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\fwriteTimeout\"\xc9\x01\n" +
+	"\rwrite_timeout\x18\x05 \x01(\v2\x19.google.protobuf.DurationR\fwriteTimeout\x1aZ\n" +
+	"\bRabbitMQ\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12\x1a\n" +
+	"\bprefetch\x18\x02 \x01(\x05R\bprefetch\x12 \n" +
+	"\vconcurrency\x18\x03 \x01(\x05R\vconcurrency\"\xc9\x01\n" +
 	"\n" +
 	"AuthConfig\x128\n" +
 	"\n" +
@@ -852,7 +925,7 @@ func file_conf_conf_proto_rawDescGZIP() []byte {
 	return file_conf_conf_proto_rawDescData
 }
 
-var file_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_conf_conf_proto_goTypes = []any{
 	(*Bootstrap)(nil),           // 0: kratos.admin.conf.Bootstrap
 	(*ServerConfig)(nil),        // 1: kratos.admin.conf.ServerConfig
@@ -864,7 +937,8 @@ var file_conf_conf_proto_goTypes = []any{
 	(*ServerConfig_GRPC)(nil),   // 7: kratos.admin.conf.ServerConfig.GRPC
 	(*DataConfig_Database)(nil), // 8: kratos.admin.conf.DataConfig.Database
 	(*DataConfig_Redis)(nil),    // 9: kratos.admin.conf.DataConfig.Redis
-	(*durationpb.Duration)(nil), // 10: google.protobuf.Duration
+	(*DataConfig_RabbitMQ)(nil), // 10: kratos.admin.conf.DataConfig.RabbitMQ
+	(*durationpb.Duration)(nil), // 11: google.protobuf.Duration
 }
 var file_conf_conf_proto_depIdxs = []int32{
 	1,  // 0: kratos.admin.conf.Bootstrap.server:type_name -> kratos.admin.conf.ServerConfig
@@ -876,17 +950,18 @@ var file_conf_conf_proto_depIdxs = []int32{
 	7,  // 6: kratos.admin.conf.ServerConfig.grpc:type_name -> kratos.admin.conf.ServerConfig.GRPC
 	8,  // 7: kratos.admin.conf.DataConfig.database:type_name -> kratos.admin.conf.DataConfig.Database
 	9,  // 8: kratos.admin.conf.DataConfig.redis:type_name -> kratos.admin.conf.DataConfig.Redis
-	10, // 9: kratos.admin.conf.AuthConfig.access_ttl:type_name -> google.protobuf.Duration
-	10, // 10: kratos.admin.conf.AuthConfig.refresh_ttl:type_name -> google.protobuf.Duration
-	10, // 11: kratos.admin.conf.ServerConfig.HTTP.timeout:type_name -> google.protobuf.Duration
-	10, // 12: kratos.admin.conf.ServerConfig.GRPC.timeout:type_name -> google.protobuf.Duration
-	10, // 13: kratos.admin.conf.DataConfig.Redis.read_timeout:type_name -> google.protobuf.Duration
-	10, // 14: kratos.admin.conf.DataConfig.Redis.write_timeout:type_name -> google.protobuf.Duration
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	10, // 9: kratos.admin.conf.DataConfig.rabbitmq:type_name -> kratos.admin.conf.DataConfig.RabbitMQ
+	11, // 10: kratos.admin.conf.AuthConfig.access_ttl:type_name -> google.protobuf.Duration
+	11, // 11: kratos.admin.conf.AuthConfig.refresh_ttl:type_name -> google.protobuf.Duration
+	11, // 12: kratos.admin.conf.ServerConfig.HTTP.timeout:type_name -> google.protobuf.Duration
+	11, // 13: kratos.admin.conf.ServerConfig.GRPC.timeout:type_name -> google.protobuf.Duration
+	11, // 14: kratos.admin.conf.DataConfig.Redis.read_timeout:type_name -> google.protobuf.Duration
+	11, // 15: kratos.admin.conf.DataConfig.Redis.write_timeout:type_name -> google.protobuf.Duration
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_conf_conf_proto_init() }
@@ -900,7 +975,7 @@ func file_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_conf_conf_proto_rawDesc), len(file_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -2,7 +2,7 @@ GOHOSTOS := $(shell go env GOHOSTOS)
 GOPATH := $(shell go env GOPATH)
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 GOCACHE ?= /tmp/go-build
-GO_APP_PACKAGES := ./app/admin/... ./app/worker/...
+GO_APP_PACKAGES := ./app/admin/...
 GO_PACKAGES := $(GO_APP_PACKAGES) ./internal/...
 COMPOSE_ENV_FILE ?= $(if $(wildcard .env),.env,.env.example)
 
@@ -48,8 +48,8 @@ all: ## 生成 API、配置及依赖注入代码
 	$(MAKE) generate
 
 .PHONY: wire
-wire: ## 生成 Admin 与 Worker 的 Wire 依赖注入代码
-	GOCACHE=$(GOCACHE) go tool wire ./app/admin ./app/worker
+wire: ## 生成 Admin 的 Wire 依赖注入代码
+	GOCACHE=$(GOCACHE) go tool wire ./app/admin
 
 .PHONY: gorm-gen
 gorm-gen: ## 生成 GORM Gen 类型安全查询代码
@@ -66,10 +66,6 @@ init-admin: ## 幂等初始化平台超级管理员
 .PHONY: run-admin
 run-admin: ## 启动 Admin HTTP/gRPC 服务
 	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin server --conf ./configs/admin.yaml
-
-.PHONY: run-worker
-run-worker: ## 启动异步任务 Worker
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin worker --conf ./configs/worker.yaml
 
 .PHONY: test
 test: ## 运行后端测试
@@ -100,8 +96,8 @@ compose-config: ## 校验 Docker Compose 配置
 	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) config --quiet
 
 .PHONY: compose-deps-up
-compose-deps-up: ## 仅启动本地 MySQL、Redis 与 Mailpit 依赖
-	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) up -d mysql redis mailpit
+compose-deps-up: ## 仅启动本地 MySQL、Redis、RabbitMQ 与 Mailpit 依赖
+	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) up -d mysql redis rabbitmq mailpit
 
 .PHONY: compose-up
 compose-up: ## 构建并启动完整 Docker Compose 环境

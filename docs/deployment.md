@@ -2,35 +2,38 @@
 
 ## 首次启动
 
-1. 复制配置：`cp .env.example .env`。
-2. 至少修改 `KRATOS_ADMIN_SECRET_KEY`（精确 32 字节）和 `KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD`（不少于 12 位）。生产环境还必须配置持久化 Ed25519 私钥 `KRATOS_ADMIN_JWT_PRIVATE_KEY`。
-3. 执行 `make compose-config` 检查 Compose 配置，再执行 `make compose-up`。Make 默认优先使用根目录 `.env`，缺失时回退到 `.env.example`；也可通过 `COMPOSE_ENV_FILE=/path/to/env` 指定其他文件。
-4. 访问 `http://127.0.0.1:8080`；API 健康检查为 `http://127.0.0.1:8000/api/v1/health`，Mailpit 为 `http://127.0.0.1:8025`。
+1. 执行 `cp .env.example .env`。
+2. 修改 `KRATOS_ADMIN_SECRET_KEY`、`KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD`；生产环境还必须配置持久化的 `KRATOS_ADMIN_JWT_PRIVATE_KEY`、数据库和 RabbitMQ 凭据。
+3. 执行 `make compose-config`，再执行 `make compose-up`。
+4. 访问管理后台 `http://127.0.0.1:8080`、API 健康接口 `http://127.0.0.1:8000/api/v1/health`、RabbitMQ 管理台 `http://127.0.0.1:15672` 或 Mailpit `http://127.0.0.1:8025`。
 
-启动顺序固定为 MySQL 健康检查、Goose 迁移、幂等超级管理员初始化、API/Worker、Frontend。API 和 Worker 不执行 `AutoMigrate`。
+Compose 启动链路为 MySQL/Redis/RabbitMQ/Mailpit → Admin → init-admin → Frontend。Admin 在启动 HTTP/gRPC 前通过 MySQL 命名锁 `kratos_admin_schema_migration` 串行执行 Goose 迁移；迁移失败会阻止该实例启动。RabbitMQ 不属于 API readiness 前置条件，连接失败只会造成后台任务积压。
 
 ## 不使用 Docker 启动
 
-本机需要 Go 1.26、MySQL 8、Redis 7、Node.js 和 pnpm。MySQL 与 Redis 就绪后，在项目根目录执行：
+本机准备 Go 1.26、MySQL 8、Redis 7、RabbitMQ 4、Node.js 和 pnpm，然后导出：
 
 ```bash
 export KRATOS_ADMIN_MYSQL_DSN='kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local'
 export KRATOS_ADMIN_REDIS_ADDR='127.0.0.1:6379'
+export KRATOS_ADMIN_RABBITMQ_URL='amqp://kratos:kratos@127.0.0.1:5672/kratos_admin'
 export KRATOS_ADMIN_SECRET_KEY='0123456789abcdef0123456789abcdef'
-go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
-goose -dir migrations mysql "$KRATOS_ADMIN_MYSQL_DSN" up
-KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
 ```
 
-使用三个终端分别启动 Admin Server、Worker 和前端。Admin Server 与 Worker 终端都必须导出相同的 MySQL、Redis 和密钥变量：
+终端一启动 Admin：
 
 ```bash
 go run ./app/admin/cmd/kratos-admin server --conf ./configs/admin.yaml
 ```
 
+健康检查通过后，终端二初始化管理员：
+
 ```bash
-go run ./app/admin/cmd/kratos-admin worker --conf ./configs/worker.yaml
+KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD='replace-with-strong-password' \
+  go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
 ```
+
+终端三启动前端：
 
 ```bash
 cd app/frontend
@@ -38,48 +41,47 @@ pnpm install
 pnpm dev
 ```
 
-所有后端运行和工具能力由同一个 `kratos-admin` 二进制提供。GORM Gen 默认输出到 `internal/data/query`，可执行 `go run ./app/admin/cmd/kratos-admin gorm-gen --out-path internal/data/query`。修改依赖注入后执行 `make wire`，生成的两个 `wire_gen.go` 必须提交。
+`make migrate` 保留为人工检查、故障排查或受控维护入口，正常启动不需要先手工执行。修改依赖注入后执行 `make wire`，只生成 Admin 的 `wire_gen.go`。
 
 ## Docker Compose 仅启动依赖
-
-需要让前后端在宿主机运行时，可先执行：
 
 ```bash
 cp .env.example .env
 make compose-deps-up
 ```
 
-该命令只启动 MySQL、Redis 和 Mailpit，不会启动迁移、初始化、API、Worker 或前端。随后按上一节导出宿主机 DSN（主机名必须是 `127.0.0.1`），执行 Goose、初始化命令，并分别启动 Admin、Worker 与前端。停止依赖使用 `make compose-down`。
+该命令只启动 MySQL、Redis、RabbitMQ 和 Mailpit。宿主机进程使用 `127.0.0.1` 及映射端口；Compose 内的 Admin 使用服务名 `mysql`、`redis`、`rabbitmq`。停止依赖使用 `make compose-down`。
 
-`configs/admin.yaml` 与 `configs/worker.yaml` 定义配置结构和开发默认值，命令统一通过 `-c/--conf` 指定文件；`${KRATOS_ADMIN_*}` 环境变量用于覆盖地址、密钥及 Provider 凭据。生产 YAML 中不得写入真实敏感值。
+## 生产与 Kubernetes
 
-## PolarDB 与 OSS
-
-- 将 `KRATOS_ADMIN_MYSQL_DSN` 改为 PolarDB MySQL 8 内网地址；账号至少需要目标库 DDL/DML 权限。先在维护窗口独立运行 `migrate` 服务，再滚动启动 API 和 Worker。
-- 将存储 Provider 改为 `aliyun-oss` 并配置 Region、Endpoint、Bucket 和凭据。Bucket 保持私有，浏览器只使用短期直传凭证与短期下载签名。
-- 生产环境不得使用示例密钥、默认数据库密码或临时生成的 JWT 私钥。
+- 生产只部署一个 Admin Deployment，不再部署独立 Worker Deployment 或 migrate Job。
+- 每个 Admin Pod 都执行相同的启动迁移检查，MySQL 命名锁确保同一时刻只有一个实例应用迁移；其他实例等待后再次检查。
+- 发布中的迁移必须向前兼容滚动期间同时运行的新旧版本。破坏性变更应拆成“先扩展、再切换、最后清理”的多个版本。
+- RabbitMQ 建议在目标 vhost 上统一默认队列类型为 quorum，并监控三条业务队列、统一死信队列、未确认消息和连接重试日志。
+- Admin 使用的数据库账号需要目标库 DDL/DML 权限；应用回滚不会自动回退数据库。
+- 对象存储使用私有 Bucket，浏览器仅使用短期直传凭证与下载签名。
 
 ## 备份与恢复
 
-升级前同时备份 MySQL、Redis AOF 和对象存储清单。MySQL 建议使用 PolarDB 备份或 `mysqldump --single-transaction --routines --triggers`；恢复时先恢复数据库，再恢复对象文件，最后启动 Redis、API 与 Worker。Redis 只承载缓存、验证码和队列，恢复失败时可重建，但尚未消费的异步任务需要从业务 outbox 补投。
+升级前备份 MySQL、Redis AOF 和对象存储清单。MySQL 保存异步任务真相、投递时间和重试状态；RabbitMQ 只负责分发。RabbitMQ 数据丢失或短暂不可用时，未完成任务会根据 MySQL 状态重新发布。Redis 仅承载缓存和验证码，不再承担任务队列。
 
-文件元数据与对象必须成对核对。不要只恢复数据库后直接清理“孤儿对象”，应先运行只读清单比对。
+恢复顺序为 MySQL → 对象存储 → Redis/RabbitMQ → Admin。文件元数据与对象必须成对核对，不要只恢复数据库后直接清理“孤儿对象”。
 
 ## 升级与回滚
 
 1. 备份并记录当前镜像标签、Goose 版本和环境变量摘要。
-2. 使用新镜像单独执行 `migrate`，确认完成后再更新 API、Worker 和 Frontend。
-3. 检查健康接口、登录、租户切换、权限、日志和异步任务。
-4. 应用回滚不自动回退数据库。只有迁移文件明确提供安全的 `Down` 且已验证数据兼容性时，才允许执行 Goose 回退。
+2. 部署新 Admin 镜像；各实例在启动阶段通过 MySQL 锁串行检查迁移。
+3. 检查健康接口、登录、权限、RabbitMQ 队列、死信、日志导出和文件清理。
+4. 只有迁移明确提供安全 `Down` 且已验证数据兼容性时，才允许手工执行 Goose 回退。
 
 ## 故障排查
 
-- API 启动失败：检查 DSN、MySQL 字符集、Redis 地址、32 字节配置密钥及生产 JWT 私钥。
-- 登录后立即失效：确认所有 API 实例使用同一 Ed25519 私钥，租户 `permission_version` 未被异常重复递增。
-- 菜单缺失：确认平台已授权租户功能，角色已保存资源动作，并重新刷新令牌。
-- 日志导出停在等待：检查 Worker、Redis/Asynq 和 `async_tasks`；任务具有幂等键，可安全重试。
-- 文件停在等待清理：检查 Worker、Provider 配置和对象权限；失败原因保存在文件状态中，不要直接删除元数据。
-- Goose 迁移失败：停止新版本 API/Worker，保留失败现场并检查 `goose_db_version`，不要手工伪造成功版本。
+- Admin 启动失败：检查 DSN、MySQL DDL 权限、Redis 地址、32 字节配置密钥及生产 JWT 私钥；查看 `goose_db_version`，不要手工伪造迁移成功版本。
+- RabbitMQ 不可用：API 应保持健康；检查连接日志、vhost、权限和 TLS。任务会在 MySQL 积压，恢复后自动补投。
+- 日志导出停在等待：检查 `log_exports` 的 `status`、`dispatched_at`、`next_retry_at`，以及 `kratos.admin.log_export.v1` 队列和死信队列。
+- 审计停滞：检查 `audit_outbox`、`kratos.admin.audit.v1` 和 `failed_tasks`。
+- 文件停在等待清理：检查 `files.cleanup_*` 字段、Provider 权限、`kratos.admin.file_cleanup.v1` 和 `failed_tasks`，不要直接删除元数据。
+- 非法消息：检查 `kratos.admin.dead.v1`；修复生产者后再决定是否重放，避免直接反复入队。
 
 ## 验收命令
 
@@ -91,8 +93,7 @@ make gorm-gen
 make test
 make vet
 make build
-cd app/frontend && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
-cd app/frontend && E2E_ADMIN_PASSWORD='你的初始化密码' E2E_REDIS_PORT=6379 pnpm e2e
 make compose-config
-docker compose --env-file .env build
+docker compose --env-file .env.example build api init-admin frontend
+cd app/frontend && pnpm lint && pnpm typecheck && pnpm test:run && pnpm build
 ```

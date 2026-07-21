@@ -9,6 +9,7 @@ import (
 	"github.com/google/wire"
 	adminserver "github.com/sleep-go/kratos-admin/app/admin/internal/server"
 	adminservice "github.com/sleep-go/kratos-admin/app/admin/internal/service"
+	admintask "github.com/sleep-go/kratos-admin/app/admin/internal/task"
 	"github.com/sleep-go/kratos-admin/internal/conf"
 	"github.com/sleep-go/kratos-admin/internal/data"
 	"github.com/sleep-go/kratos-admin/internal/provider"
@@ -21,6 +22,7 @@ func wireApplication(ctx context.Context, cfg conf.Config) (*kratos.App, func(),
 		adminservice.NewServices,
 		adminserver.NewHTTPServer,
 		adminserver.NewGRPCServer,
+		admintask.NewServer,
 		newLogger,
 		adminserver.NewApp,
 	)

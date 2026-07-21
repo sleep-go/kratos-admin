@@ -9,7 +9,6 @@ import (
 
 type commandRunners struct {
 	server    func(context.Context, string) error
-	worker    func(context.Context, string) error
 	initAdmin func(context.Context, initAdminOptions) error
 	gormGen   func(context.Context, genOptions) error
 }
@@ -23,7 +22,6 @@ func newRootCommand(runners commandRunners) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newServerCommand(runners.server),
-		newWorkerCommand(runners.worker),
 		newInitAdminCommand(runners.initAdmin),
 		newGORMGenCommand(runners.gormGen),
 	)
@@ -44,23 +42,6 @@ func newServerCommand(run func(context.Context, string) error) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&confPath, "conf", "c", confPath, "Admin YAML 配置文件路径")
-	return cmd
-}
-
-func newWorkerCommand(run func(context.Context, string) error) *cobra.Command {
-	confPath := "./configs/worker.yaml"
-	cmd := &cobra.Command{
-		Use:   "worker",
-		Short: "启动异步任务 Worker",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := run(cmd.Context(), confPath); err != nil {
-				return fmt.Errorf("Worker 启动失败: %w", err)
-			}
-			return nil
-		},
-	}
-	cmd.Flags().StringVarP(&confPath, "conf", "c", confPath, "Worker YAML 配置文件路径")
 	return cmd
 }
 

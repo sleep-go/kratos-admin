@@ -89,7 +89,7 @@ func (s *FileService) GetDownloadURL(ctx context.Context, request *v1.GetDownloa
 	return &v1.GetDownloadURLResponse{Download: mapSignedFileRequest(signed)}, nil
 }
 
-// DeleteFile 请求 Worker 异步清理无业务引用的文件对象。
+// DeleteFile 请求后台异步清理无业务引用的文件对象。
 func (s *FileService) DeleteFile(ctx context.Context, request *v1.DeleteFileRequest) (*v1.DeleteFileResponse, error) {
 	scope, err := s.fileScope(ctx, "delete", request.GetFileId())
 	if err != nil {

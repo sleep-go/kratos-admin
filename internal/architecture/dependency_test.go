@@ -34,10 +34,14 @@ func assertFileContains(t *testing.T, path, expected string) {
 
 func TestLayerDependencies(t *testing.T) {
 	t.Parallel()
-	assertNoImports(t, "../data", "/service", "/server", "/app/admin/internal", "/app/worker/internal")
-	assertNoImports(t, "../biz", "/internal/data", "/internal/service", "/internal/server", "/app/admin/internal", "/app/worker/internal")
-	assertNoImports(t, "../../app/admin", "/app/worker/internal")
-	assertNoImports(t, "../../app/worker", "/app/admin/internal")
+	assertNoImports(t, "../data", "/service", "/server", "/app/admin/internal")
+	assertNoImports(t, "../biz", "/internal/data", "/internal/service", "/internal/server", "/app/admin/internal")
+}
+
+func TestSingleAdminProcessHasNoLegacyWorkerDependency(t *testing.T) {
+	t.Parallel()
+	assertPathMissing(t, "../../app/worker")
+	assertNoImports(t, "../..", "github.com/hibiken/asynq", "/app/worker")
 }
 
 func assertNoImports(t *testing.T, root string, forbidden ...string) {

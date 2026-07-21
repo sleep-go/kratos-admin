@@ -193,9 +193,13 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	if adminCount != 1 {
 		t.Fatalf("tenant admin membership count = %d, want 1", adminCount)
 	}
-	ids, err := (&AuditRepository{db: tx}).PendingEventIDs(context.Background(), 10)
-	if err != nil || len(ids) == 0 {
-		t.Fatalf("PendingEventIDs() = %+v, err %v", ids, err)
+	tasks, err := (&TaskRepository{db: tx}).Pending(context.Background(), 10, time.Now().UTC())
+	foundAudit := false
+	for _, task := range tasks {
+		foundAudit = foundAudit || task.Kind == TaskKindAudit
+	}
+	if err != nil || !foundAudit {
+		t.Fatalf("Pending() = %+v, err %v", tasks, err)
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 func main() {
 	runners := commandRunners{
 		server:    runServer,
-		worker:    runWorker,
 		initAdmin: runInitAdmin,
 		gormGen:   runGORMGen,
 	}
