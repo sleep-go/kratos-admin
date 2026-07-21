@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"gorm.io/gen/field"
 	"gorm.io/gorm"
 
 	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
@@ -25,29 +26,39 @@ func (r *AuthRepository) ListPermissions(ctx context.Context, tenantID, memberID
 	if platformAdmin && tenantID == 0 {
 		return []string{"*:*"}, nil
 	}
-	var tenantAdmin bool
-	if err := r.db.WithContext(ctx).Table("tenant_members").
-		Select("is_tenant_admin").Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", memberID, tenantID).
-		Scan(&tenantAdmin).Error; err != nil {
+	tenantAdmin, err := r.isTenantAdmin(ctx, tenantID, memberID)
+	if err != nil {
 		return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)
 	}
 	permissions := make([]string, 0)
 	if tenantAdmin {
-		if err := r.db.WithContext(ctx).Table("tenant_resources AS tr").
-			Select("DISTINCT CONCAT(res.code, ':*')").
-			Joins("JOIN resources AS res ON res.id = tr.resource_id AND res.status = 1 AND res.deleted_at IS NULL").
-			Where("tr.tenant_id = ?", tenantID).Pluck("CONCAT(res.code, ':*')", &permissions).Error; err != nil {
+		tr, resource := r.q.TenantResource, r.q.Resource
+		var codes []string
+		if err := tr.WithContext(ctx).
+			Join(resource, resource.ID.EqCol(tr.ResourceID)).
+			Where(tr.TenantID.Eq(tenantID), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+			Distinct(resource.Code).Pluck(resource.Code, &codes); err != nil {
 			return nil, fmt.Errorf("查询租户管理员权限失败: %w", err)
 		}
+		for _, code := range codes {
+			permissions = append(permissions, code+":*")
+		}
 	} else {
-		if err := r.db.WithContext(ctx).Table("casbin_rules AS g").
-			Select("DISTINCT CONCAT(p.v2, ':', p.v3)").
-			Joins("JOIN casbin_rules AS p ON p.ptype = 'p' AND p.v0 = g.v0 AND p.v1 = g.v2").
-			Joins("JOIN resources AS res ON res.code = p.v2 AND res.status = 1 AND res.deleted_at IS NULL").
-			Joins("JOIN tenant_resources AS tr ON tr.tenant_id = ? AND tr.resource_id = res.id", tenantID).
-			Where("g.ptype = 'g' AND g.v0 = ? AND g.v1 = ?", fmt.Sprint(tenantID), fmt.Sprint(memberID)).
-			Pluck("CONCAT(p.v2, ':', p.v3)", &permissions).Error; err != nil {
+		g := r.q.CasbinRule.As("g")
+		p := r.q.CasbinRule.As("p")
+		resource := r.q.Resource.As("res")
+		tr := r.q.TenantResource.As("tr")
+		var rows []struct{ V2, V3 string }
+		if err := g.WithContext(ctx).
+			Join(p, p.Ptype.Eq("p"), p.V0.EqCol(g.V0), p.V1.EqCol(g.V2)).
+			Join(resource, resource.Code.EqCol(p.V2), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+			Join(tr, tr.TenantID.Eq(tenantID), tr.ResourceID.EqCol(resource.ID)).
+			Where(g.Ptype.Eq("g"), g.V0.Eq(fmt.Sprint(tenantID)), g.V1.Eq(fmt.Sprint(memberID))).
+			Distinct(p.V2, p.V3).Select(p.V2, p.V3).Scan(&rows); err != nil {
 			return nil, fmt.Errorf("查询成员权限失败: %w", err)
+		}
+		for _, row := range rows {
+			permissions = append(permissions, row.V2+":"+row.V3)
 		}
 	}
 	sort.Strings(permissions)
@@ -124,13 +135,13 @@ func (r *AuthRepository) ListMemberships(ctx context.Context, userID uint64) ([]
 		Status            uint8
 		PermissionVersion uint64
 	}
-	err := r.db.WithContext(ctx).
-		Table("tenant_members AS tm").
-		Select("tm.id, tm.tenant_id, t.name AS tenant_name, tm.status, t.permission_version").
-		Joins("JOIN tenants AS t ON t.id = tm.tenant_id AND t.deleted_at IS NULL AND t.status = ?", 1).
-		Where("tm.user_id = ? AND tm.deleted_at IS NULL", userID).
-		Order("tm.id ASC").
-		Scan(&rows).Error
+	tm, tenant := r.q.TenantMember, r.q.Tenant
+	err := tm.WithContext(ctx).
+		Join(tenant, tenant.ID.EqCol(tm.TenantID)).
+		Where(tm.UserID.Eq(userID), tm.DeletedAt.IsNull(), tenant.DeletedAt.IsNull(), tenant.Status.Eq(1)).
+		Select(tm.ID, tm.TenantID, tenant.Name.As("tenant_name"), tm.Status, tenant.PermissionVersion).
+		Order(tm.ID.Asc()).
+		Scan(&rows)
 	if err != nil {
 		return nil, fmt.Errorf("查询用户租户成员身份失败: %w", err)
 	}
@@ -147,40 +158,42 @@ func (r *AuthRepository) ListMemberships(ctx context.Context, userID uint64) ([]
 // UpdateLoginFailure 原子记录连续登录失败次数与锁定截止时间。
 func (r *AuthRepository) UpdateLoginFailure(ctx context.Context, userID uint64, count uint32, lockedUntil *time.Time) error {
 	u := r.q.User
-	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID)).Updates(map[string]any{
-		"failed_login_count": count,
-		"locked_until":       lockedUntil,
-	})
+	assignments := []field.AssignExpr{u.FailedLoginCount.Value(count)}
+	if lockedUntil == nil {
+		assignments = append(assignments, u.LockedUntil.Null())
+	} else {
+		assignments = append(assignments, u.LockedUntil.Value(*lockedUntil))
+	}
+	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID)).UpdateSimple(assignments...)
 	return err
 }
 
 // ResetLoginFailures 清除成功登录用户的失败计数和锁定状态。
 func (r *AuthRepository) ResetLoginFailures(ctx context.Context, userID uint64) error {
 	u := r.q.User
-	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID)).Updates(map[string]any{
-		"failed_login_count": 0,
-		"locked_until":       nil,
-	})
+	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID)).UpdateSimple(
+		u.FailedLoginCount.Value(0),
+		u.LockedUntil.Null(),
+	)
 	return err
 }
 
 // UpdateProfile 更新当前账号允许自行维护的资料字段。
 func (r *AuthRepository) UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) error {
 	u := r.q.User
-	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID), u.DeletedAt.IsNull()).Updates(map[string]any{
-		"display_name": displayName,
-		"avatar_url":   nullableString(avatarURL),
-		"email":        nullableString(email),
-		"phone":        nullableString(phone),
-	})
+	assignments := []field.AssignExpr{u.DisplayName.Value(displayName)}
+	assignments = append(assignments, nullableStringAssignment(u.AvatarURL, avatarURL))
+	assignments = append(assignments, nullableStringAssignment(u.Email, email))
+	assignments = append(assignments, nullableStringAssignment(u.Phone, phone))
+	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID), u.DeletedAt.IsNull()).UpdateSimple(assignments...)
 	return err
 }
 
-func nullableString(value string) any {
+func nullableStringAssignment(column field.String, value string) field.AssignExpr {
 	if value == "" {
-		return nil
+		return column.Null()
 	}
-	return value
+	return column.Value(value)
 }
 
 // Create 持久化 refresh 会话，数据库仅保存 jti 摘要。
@@ -296,31 +309,34 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID 
 		Icon         string
 		SortOrder    uint32
 	}
-	query := r.db.WithContext(ctx).Table("resources AS res").
-		Select("DISTINCT res.id, res.parent_id, res.code, res.name, res.route_path, res.component_key, res.icon, res.sort_order").
-		Where("res.type IN (1, 2) AND res.visible = 1 AND res.status = 1 AND res.deleted_at IS NULL")
+	resource := r.q.Resource.As("res")
+	navigationQuery := resource.WithContext(ctx).Unscoped().
+		Where(resource.Type.In(1, 2), resource.Visible.Is(true), resource.Status.Eq(1), resource.DeletedAt.IsNull())
 	if platformAdmin && tenantID == 0 {
-		query = query.Where("res.code IN ?", []string{
+		navigationQuery = navigationQuery.Where(resource.Code.In(
 			"users", "tenants", "resources", "tenant-resources", "login-logs", "audit-logs",
 			"api-logs", "log-exports", "settings", "providers", "dictionary-types", "dictionary-items",
-		})
+		))
 	}
 	if !platformAdmin {
-		var tenantAdmin bool
-		if err := r.db.WithContext(ctx).Table("tenant_members").Select("is_tenant_admin").
-			Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", memberID, tenantID).
-			Scan(&tenantAdmin).Error; err != nil {
+		tenantAdmin, err := r.isTenantAdmin(ctx, tenantID, memberID)
+		if err != nil {
 			return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)
 		}
-		query = query.Joins("JOIN tenant_resources AS tr ON tr.resource_id = res.id AND tr.tenant_id = ?", tenantID)
+		tr := r.q.TenantResource.As("tr")
+		navigationQuery = navigationQuery.Join(tr, tr.ResourceID.EqCol(resource.ID), tr.TenantID.Eq(tenantID))
 		if !tenantAdmin {
-			query = query.
-				Joins("JOIN casbin_rules AS p ON p.ptype = 'p' AND p.v0 = ? AND p.v2 = res.code", fmt.Sprint(tenantID)).
-				Joins("JOIN casbin_rules AS g ON g.ptype = 'g' AND g.v0 = p.v0 AND g.v2 = p.v1 AND g.v1 = ?", fmt.Sprint(memberID))
+			p := r.q.CasbinRule.As("p")
+			g := r.q.CasbinRule.As("g")
+			navigationQuery = navigationQuery.
+				Join(p, p.Ptype.Eq("p"), p.V0.Eq(fmt.Sprint(tenantID)), p.V2.EqCol(resource.Code)).
+				Join(g, g.Ptype.Eq("g"), g.V0.EqCol(p.V0), g.V2.EqCol(p.V1), g.V1.Eq(fmt.Sprint(memberID)))
 		}
 	}
 	var rows []row
-	if err := query.Order("res.sort_order ASC, res.id ASC").Scan(&rows).Error; err != nil {
+	if err := navigationQuery.Distinct(resource.ID, resource.ParentID, resource.Code, resource.Name, resource.RoutePath, resource.ComponentKey, resource.Icon, resource.SortOrder).
+		Select(resource.ID, resource.ParentID, resource.Code, resource.Name, resource.RoutePath, resource.ComponentKey, resource.Icon, resource.SortOrder).
+		Order(resource.SortOrder.Asc(), resource.ID.Asc()).Scan(&rows); err != nil {
 		return nil, fmt.Errorf("查询授权菜单失败: %w", err)
 	}
 	items := make([]bizauth.NavigationItem, 0, len(rows))
@@ -331,6 +347,21 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID 
 		})
 	}
 	return items, nil
+}
+
+func (r *AuthRepository) isTenantAdmin(ctx context.Context, tenantID, memberID uint64) (bool, error) {
+	m := r.q.TenantMember
+	row, err := m.WithContext(ctx).
+		Select(m.IsTenantAdmin).
+		Where(m.ID.Eq(memberID), m.TenantID.Eq(tenantID), m.Status.Eq(1), m.DeletedAt.IsNull()).
+		Take()
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return row.IsTenantAdmin, nil
 }
 
 var _ bizauth.UserRepository = (*AuthRepository)(nil)
