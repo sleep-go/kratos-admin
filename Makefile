@@ -67,10 +67,6 @@ init-admin: ## 幂等初始化平台超级管理员
 run-admin: ## 启动 Admin HTTP/gRPC 服务
 	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin server --conf ./configs/admin.yaml
 
-.PHONY: run-worker
-run-worker: ## 启动异步任务 Worker
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin worker --conf ./configs/worker.yaml
-
 .PHONY: test
 test: ## 运行后端测试
 	GOCACHE=$(GOCACHE) go test -race $(GO_PACKAGES)
@@ -100,8 +96,8 @@ compose-config: ## 校验 Docker Compose 配置
 	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) config --quiet
 
 .PHONY: compose-deps-up
-compose-deps-up: ## 仅启动本地 MySQL、Redis 与 Mailpit 依赖
-	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) up -d mysql redis mailpit
+compose-deps-up: ## 仅启动本地 MySQL、Redis、RabbitMQ 与 Mailpit 依赖
+	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) up -d mysql redis rabbitmq mailpit
 
 .PHONY: compose-up
 compose-up: ## 构建并启动完整 Docker Compose 环境
