@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+type permanentFailure string
+
+func (e permanentFailure) Error() string { return string(e) }
+func (permanentFailure) Permanent() bool { return true }
+
 func TestTaskRepositoryMergePendingTasks(t *testing.T) {
 	base := time.Date(2026, 7, 21, 9, 0, 0, 0, time.UTC)
 	tasks := mergePendingTasks(3,
@@ -45,6 +50,14 @@ func TestTaskRepositoryFailureState(t *testing.T) {
 	}
 	if len([]rune(state.Reason)) != taskFailureReasonLimit {
 		t.Fatalf("错误长度 = %d，期望 %d", len([]rune(state.Reason)), taskFailureReasonLimit)
+	}
+}
+
+func TestTaskRepositoryPermanentFailureStopsRetrying(t *testing.T) {
+	now := time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC)
+	state := nextTaskFailure(0, permanentFailure("配置永久不匹配"), now)
+	if !state.Final || state.RetryCount != 1 || state.NextRetryAt != nil {
+		t.Fatalf("永久失败状态 = %+v", state)
 	}
 }
 

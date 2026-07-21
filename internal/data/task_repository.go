@@ -173,6 +173,11 @@ type taskFailureState struct {
 func nextTaskFailure(currentRetry uint32, cause error, now time.Time) taskFailureState {
 	retryCount := currentRetry + 1
 	state := taskFailureState{RetryCount: retryCount, Reason: truncateRunes(cause.Error(), taskFailureReasonLimit)}
+	var permanent interface{ Permanent() bool }
+	if errors.As(cause, &permanent) && permanent.Permanent() {
+		state.Final = true
+		return state
+	}
 	if retryCount >= taskMaxRetries {
 		state.Final = true
 		return state

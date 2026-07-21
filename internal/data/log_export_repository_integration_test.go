@@ -42,7 +42,7 @@ func TestLogExportRepositoryProcessesTenantCSVWithMySQL8(t *testing.T) {
 	if err := repository.Create(context.Background(), record); err != nil {
 		t.Fatal(err)
 	}
-	if err := logexport.NewProcessor(repository, provider, nil).Process(context.Background(), record.ID); err != nil {
+	if err := logexport.NewProcessor(repository, provider).Process(context.Background(), record.ID); err != nil {
 		t.Fatal(err)
 	}
 	completed, err := repository.Find(context.Background(), logexport.Access{TenantID: 88, UserID: 99}, record.ID)

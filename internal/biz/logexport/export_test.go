@@ -2,6 +2,7 @@ package logexport
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ type fakeRepository struct {
 	created       Record
 	completed     bool
 	completedRows uint32
+	readErr       error
 }
 
 func (r *fakeRepository) Create(_ context.Context, record Record) error {
@@ -34,7 +36,19 @@ func (r *fakeRepository) Claim(_ context.Context, _ string) (Record, bool, error
 	return r.record, true, nil
 }
 func (r *fakeRepository) ReadRows(context.Context, Record, int) (CSVData, error) {
+	if r.readErr != nil {
+		return CSVData{}, r.readErr
+	}
 	return CSVData{Header: []string{"ID", "请求ID"}, Rows: [][]string{{"1", "request-1"}}}, nil
+}
+
+func TestProcessorReturnsFailureToConsumer(t *testing.T) {
+	want := errors.New("读取日志失败")
+	repository := &fakeRepository{record: Record{ID: "export-1", TenantID: 8, LogType: "api"}, readErr: want}
+	processor := NewProcessor(repository, &fakeProvider{})
+	if err := processor.Process(context.Background(), "export-1"); !errors.Is(err, want) {
+		t.Fatalf("Process() error = %v", err)
+	}
 }
 func (r *fakeRepository) Complete(_ context.Context, record Record, _ storage.ObjectMeta, objectKey, fileID string, rowCount uint32) error {
 	r.completed, r.completedRows = true, rowCount
@@ -43,7 +57,6 @@ func (r *fakeRepository) Complete(_ context.Context, record Record, _ storage.Ob
 	r.record.OriginalName = "日志导出.csv"
 	return nil
 }
-func (r *fakeRepository) Retry(context.Context, string, string, time.Time, uint32) error { return nil }
 
 type fakeProvider struct{ body string }
 
@@ -85,7 +98,7 @@ func TestPlatformAdminExportUsesPlatformScope(t *testing.T) {
 func TestProcessorGeneratesCSVAtMostOnce(t *testing.T) {
 	repository := &fakeRepository{record: Record{ID: "export-1", TenantID: 8, LogType: "api"}}
 	provider := &fakeProvider{}
-	processor := NewProcessor(repository, provider, nil)
+	processor := NewProcessor(repository, provider)
 	if err := processor.Process(context.Background(), "export-1"); err != nil {
 		t.Fatal(err)
 	}

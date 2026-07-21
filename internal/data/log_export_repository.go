@@ -156,26 +156,6 @@ func (r *LogExportRepository) Complete(ctx context.Context, record logexport.Rec
 	})
 }
 
-// Retry 记录失败原因并按最大重试次数回到待处理或进入最终失败状态。
-func (r *LogExportRepository) Retry(ctx context.Context, exportID, reason string, nextRetry time.Time, maxRetries uint32) error {
-	if len(reason) > 1024 {
-		reason = reason[:1024]
-	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var row model.LogExport
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", exportID).Take(&row).Error; err != nil {
-			return err
-		}
-		retries := row.RetryCount + 1
-		status := logexport.StatusPending
-		updates := map[string]any{"retry_count": retries, "status": status, "failure_reason": reason, "next_retry_at": nextRetry, "updated_at": time.Now().UTC()}
-		if retries >= maxRetries {
-			updates["status"], updates["finished_at"], updates["next_retry_at"] = logexport.StatusFailed, time.Now().UTC(), nil
-		}
-		return tx.Model(&model.LogExport{}).Where("id = ?", exportID).Updates(updates).Error
-	})
-}
-
 type exportDefinition struct {
 	table         string
 	columns       []string

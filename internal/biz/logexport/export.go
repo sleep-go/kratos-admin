@@ -19,9 +19,9 @@ import (
 const (
 	// MaxRows 是单个导出任务允许写入的最大日志条数。
 	MaxRows = 100_000
-	// StatusPending 表示任务等待 Worker 执行。
+	// StatusPending 表示任务等待后台处理器执行。
 	StatusPending uint8 = 1
-	// StatusProcessing 表示任务已被 Worker 原子领取。
+	// StatusProcessing 表示任务已被后台处理器原子领取。
 	StatusProcessing uint8 = 2
 	// StatusCompleted 表示导出文件已经生成。
 	StatusCompleted uint8 = 3
@@ -82,7 +82,6 @@ type Repository interface {
 	Claim(ctx context.Context, exportID string) (Record, bool, error)
 	ReadRows(ctx context.Context, record Record, limit int) (CSVData, error)
 	Complete(ctx context.Context, record Record, object storage.ObjectMeta, objectKey, fileID string, rowCount uint32) error
-	Retry(ctx context.Context, exportID, reason string, nextRetry time.Time, maxRetries uint32) error
 }
 
 // Usecase 负责创建任务、查询状态和生成受保护下载链接。
@@ -149,15 +148,11 @@ func (u *Usecase) DownloadURL(ctx context.Context, access Access, exportID strin
 type Processor struct {
 	repository Repository
 	provider   storage.Provider
-	now        func() time.Time
 }
 
-// NewProcessor 创建日志导出 Worker 处理器。
-func NewProcessor(repository Repository, provider storage.Provider, now func() time.Time) *Processor {
-	if now == nil {
-		now = time.Now
-	}
-	return &Processor{repository: repository, provider: provider, now: now}
+// NewProcessor 创建日志导出处理器。
+func NewProcessor(repository Repository, provider storage.Provider) *Processor {
+	return &Processor{repository: repository, provider: provider}
 }
 
 // Process 原子领取任务并生成受保护的 CSV 对象；重复消费已完成任务保持幂等。
@@ -168,15 +163,15 @@ func (p *Processor) Process(ctx context.Context, exportID string) error {
 	}
 	data, err := p.repository.ReadRows(ctx, record, MaxRows)
 	if err != nil {
-		return p.retry(ctx, record, err)
+		return err
 	}
 	content, err := encodeCSV(data)
 	if err != nil {
-		return p.retry(ctx, record, err)
+		return err
 	}
 	fileID, err := randomID()
 	if err != nil {
-		return p.retry(ctx, record, err)
+		return err
 	}
 	objectKey := fmt.Sprintf("exports/%d/%s.csv", record.TenantID, record.ID)
 	meta := storage.ObjectMeta{
@@ -189,19 +184,13 @@ func (p *Processor) Process(ctx context.Context, exportID string) error {
 	if putErr != nil {
 		object, err = p.provider.Head(ctx, objectKey)
 		if err != nil || object.Metadata["export-id"] != record.ID {
-			return p.retry(ctx, record, putErr)
+			return putErr
 		}
 	}
 	if err := p.repository.Complete(ctx, record, object, objectKey, fileID, uint32(len(data.Rows))); err != nil {
-		return p.retry(ctx, record, err)
+		return err
 	}
 	return nil
-}
-
-func (p *Processor) retry(ctx context.Context, record Record, cause error) error {
-	delay := time.Duration(1<<min(record.RetryCount, 6)) * time.Minute
-	_ = p.repository.Retry(ctx, record.ID, cause.Error(), p.now().UTC().Add(delay), 10)
-	return cause
 }
 
 func encodeCSV(data CSVData) ([]byte, error) {

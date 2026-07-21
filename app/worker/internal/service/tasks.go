@@ -66,7 +66,7 @@ func NewService(resources *data.Data, providers *provider.WorkerSet, logger log.
 		repository:      repository,
 		processor:       audit.NewProcessor(repository),
 		logRepository:   logRepository,
-		logProcessor:    logexport.NewProcessor(logRepository, providers.Storage, nil),
+		logProcessor:    logexport.NewProcessor(logRepository, providers.Storage),
 		maintenance:     data.NewLogMaintenanceRepository(resources),
 		fileRepository:  data.NewFileRepository(resources),
 		storageProvider: providers.Storage,
