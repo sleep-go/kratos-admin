@@ -37,11 +37,13 @@ type Message struct {
 type auditPayload struct {
 	Version uint16 `json:"version"`
 	EventID string `json:"event_id"`
+	Attempt uint32 `json:"attempt"`
 }
 
 type logExportPayload struct {
 	Version  uint16 `json:"version"`
 	ExportID string `json:"export_id"`
+	Attempt  uint32 `json:"attempt"`
 }
 
 type fileCleanupPayload struct {
@@ -50,31 +52,32 @@ type fileCleanupPayload struct {
 	FileID       string `json:"file_id"`
 	ProviderName string `json:"provider_name"`
 	ObjectKey    string `json:"object_key"`
+	Attempt      uint32 `json:"attempt"`
 }
 
 // NewAuditMessage 创建版本化审计 Outbox 任务消息。
-func NewAuditMessage(eventID string) (Message, error) {
+func NewAuditMessage(eventID string, attempt uint32) (Message, error) {
 	if eventID == "" {
 		return Message{}, fmt.Errorf("审计任务缺少事件ID")
 	}
-	return newMessage("audit:"+eventID, RoutingAudit, auditPayload{Version: 1, EventID: eventID})
+	return newMessage("audit:"+eventID, RoutingAudit, auditPayload{Version: 1, EventID: eventID, Attempt: attempt})
 }
 
 // NewLogExportMessage 创建版本化日志导出任务消息。
-func NewLogExportMessage(exportID string) (Message, error) {
+func NewLogExportMessage(exportID string, attempt uint32) (Message, error) {
 	if exportID == "" {
 		return Message{}, fmt.Errorf("日志导出任务缺少导出ID")
 	}
-	return newMessage("log-export:"+exportID, RoutingLogExport, logExportPayload{Version: 1, ExportID: exportID})
+	return newMessage("log-export:"+exportID, RoutingLogExport, logExportPayload{Version: 1, ExportID: exportID, Attempt: attempt})
 }
 
 // NewFileCleanupMessage 创建版本化文件对象清理任务消息。
-func NewFileCleanupMessage(tenantID uint64, fileID, providerName, objectKey string) (Message, error) {
+func NewFileCleanupMessage(tenantID uint64, fileID, providerName, objectKey string, attempt uint32) (Message, error) {
 	if tenantID == 0 || fileID == "" || providerName == "" || objectKey == "" {
 		return Message{}, fmt.Errorf("文件清理任务缺少必要字段")
 	}
 	return newMessage("file-cleanup:"+fileID, RoutingFileCleanup, fileCleanupPayload{
-		Version: 1, TenantID: tenantID, FileID: fileID, ProviderName: providerName, ObjectKey: objectKey,
+		Version: 1, TenantID: tenantID, FileID: fileID, ProviderName: providerName, ObjectKey: objectKey, Attempt: attempt,
 	})
 }
 

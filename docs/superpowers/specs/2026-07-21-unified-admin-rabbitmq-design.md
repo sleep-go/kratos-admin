@@ -102,7 +102,7 @@ Goose CLI 和 `make migrate` 继续保留，作为人工排障、查看状态和
 - `delivery_mode`：persistent。
 - body：版本化任务载荷，只保存定位业务记录所需的 ID 和文件清理必要快照。
 
-三类载荷沿用现有字段：审计为 `event_id`，日志导出为 `export_id`，文件清理为 `tenant_id`、`file_id`、`provider_name`、`object_key`，并统一增加 `version: 1`。
+三类载荷沿用现有字段：审计为 `event_id`，日志导出为 `export_id`，文件清理为 `tenant_id`、`file_id`、`provider_name`、`object_key`，并统一增加 `version: 1` 和 `attempt`。`attempt` 等于发布时 MySQL 中的重试次数；旧投递确认或重复消息只有在代次仍匹配时才能更新状态，避免覆盖新一轮重试。
 
 ## 5. MySQL 任务真相与状态机
 

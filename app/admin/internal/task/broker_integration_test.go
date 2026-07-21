@@ -29,7 +29,7 @@ func TestRabbitMQBrokerPublishConsumeAndMandatoryReturn(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventID := uuid.NewString()
-	message, _ := NewAuditMessage(eventID)
+	message, _ := NewAuditMessage(eventID, 0)
 	if err := broker.Publish(ctx, message); err != nil {
 		t.Fatal(err)
 	}

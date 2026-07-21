@@ -61,7 +61,7 @@ func (r *TaskRepository) Pending(ctx context.Context, limit int, now time.Time) 
 
 	var auditRows []model.AuditOutbox
 	if err := r.db.WithContext(ctx).
-		Where("status IN ? AND dispatched_at IS NULL AND (next_retry_at IS NULL OR next_retry_at <= ?)", []uint8{auditStatusPending, auditStatusRetrying}, now).
+		Where("status IN ? AND dispatched_at IS NULL AND (next_retry_at IS NULL OR next_retry_at <= ?)", []int{int(auditStatusPending), int(auditStatusRetrying)}, now).
 		Order("created_at ASC").Limit(limit).Find(&auditRows).Error; err != nil {
 		return nil, fmt.Errorf("查询待投递审计任务失败: %w", err)
 	}
@@ -103,15 +103,15 @@ func (r *TaskRepository) MarkDispatched(ctx context.Context, task PendingTask, a
 	switch task.Kind {
 	case TaskKindAudit:
 		result = r.db.WithContext(ctx).Model(&model.AuditOutbox{}).
-			Where("id = ? AND status IN ? AND dispatched_at IS NULL", task.ID, []uint8{auditStatusPending, auditStatusRetrying}).
+			Where("id = ? AND status IN ? AND retry_count = ? AND dispatched_at IS NULL", task.ID, []int{int(auditStatusPending), int(auditStatusRetrying)}, task.RetryCount).
 			Update("dispatched_at", at)
 	case TaskKindLogExport:
 		result = r.db.WithContext(ctx).Model(&model.LogExport{}).
-			Where("id = ? AND status = ? AND dispatched_at IS NULL", task.ID, logexport.StatusPending).
+			Where("id = ? AND status = ? AND retry_count = ? AND dispatched_at IS NULL", task.ID, logexport.StatusPending, task.RetryCount).
 			Updates(map[string]any{"dispatched_at": at, "updated_at": at})
 	case TaskKindFileCleanup:
 		result = r.db.WithContext(ctx).Model(&model.File{}).
-			Where("id = ? AND tenant_id = ? AND status = ? AND deleted_at IS NULL AND cleanup_dispatched_at IS NULL", task.ID, task.TenantID, filebiz.StatusDeletionPending).
+			Where("id = ? AND tenant_id = ? AND status = ? AND cleanup_retry_count = ? AND deleted_at IS NULL AND cleanup_dispatched_at IS NULL", task.ID, task.TenantID, filebiz.StatusDeletionPending, task.RetryCount).
 			Updates(map[string]any{"cleanup_dispatched_at": at, "updated_at": at})
 	default:
 		return fmt.Errorf("不支持的异步任务类型: %s", task.Kind)
@@ -196,7 +196,7 @@ func recordAuditFailure(tx *gorm.DB, task PendingTask, cause error, now time.Tim
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", task.ID).Take(&row).Error; err != nil {
 		return false, err
 	}
-	if row.Status != auditStatusPending && row.Status != auditStatusRetrying {
+	if (row.Status != auditStatusPending && row.Status != auditStatusRetrying) || !isCurrentTaskAttempt(row.RetryCount, task) {
 		return false, nil
 	}
 	state := nextTaskFailure(row.RetryCount, cause, now)
@@ -204,7 +204,7 @@ func recordAuditFailure(tx *gorm.DB, task PendingTask, cause error, now time.Tim
 	if state.Final {
 		status = auditStatusFailed
 	}
-	if err := tx.Model(&model.AuditOutbox{}).Where("id = ? AND status IN ?", row.ID, []uint8{auditStatusPending, auditStatusRetrying}).
+	if err := tx.Model(&model.AuditOutbox{}).Where("id = ? AND status IN ?", row.ID, []int{int(auditStatusPending), int(auditStatusRetrying)}).
 		Updates(map[string]any{"status": status, "retry_count": state.RetryCount, "next_retry_at": state.NextRetryAt, "dispatched_at": nil, "last_error": state.Reason}).Error; err != nil {
 		return false, err
 	}
@@ -216,7 +216,7 @@ func recordLogExportFailure(tx *gorm.DB, task PendingTask, cause error, now time
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", task.ID).Take(&row).Error; err != nil {
 		return false, err
 	}
-	if row.Status != logexport.StatusPending && row.Status != logexport.StatusProcessing {
+	if (row.Status != logexport.StatusPending && row.Status != logexport.StatusProcessing) || !isCurrentTaskAttempt(row.RetryCount, task) {
 		return false, nil
 	}
 	state := nextTaskFailure(row.RetryCount, cause, now)
@@ -228,7 +228,7 @@ func recordLogExportFailure(tx *gorm.DB, task PendingTask, cause error, now time
 	if state.Final {
 		updates["status"], updates["finished_at"] = logexport.StatusFailed, now
 	}
-	if err := tx.Model(&model.LogExport{}).Where("id = ? AND status IN ?", row.ID, []uint8{logexport.StatusPending, logexport.StatusProcessing}).Updates(updates).Error; err != nil {
+	if err := tx.Model(&model.LogExport{}).Where("id = ? AND status IN ?", row.ID, []int{int(logexport.StatusPending), int(logexport.StatusProcessing)}).Updates(updates).Error; err != nil {
 		return false, err
 	}
 	return state.Final, createFailedTask(tx, task, state, now)
@@ -239,7 +239,7 @@ func recordFileCleanupFailure(tx *gorm.DB, task PendingTask, cause error, now ti
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND tenant_id = ?", task.ID, task.TenantID).Take(&row).Error; err != nil {
 		return false, err
 	}
-	if row.Status != filebiz.StatusDeletionPending || row.DeletedAt.Valid {
+	if row.Status != filebiz.StatusDeletionPending || row.DeletedAt.Valid || !isCurrentTaskAttempt(row.CleanupRetryCount, task) {
 		return false, nil
 	}
 	state := nextTaskFailure(row.CleanupRetryCount, cause, now)
@@ -303,6 +303,10 @@ func taskIdempotencyKey(task PendingTask) string {
 	default:
 		return task.Kind + ":" + task.ID
 	}
+}
+
+func isCurrentTaskAttempt(currentRetry uint32, task PendingTask) bool {
+	return currentRetry == task.RetryCount
 }
 
 func truncateRunes(value string, limit int) string {

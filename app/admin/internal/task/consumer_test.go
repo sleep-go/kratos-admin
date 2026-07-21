@@ -12,6 +12,35 @@ import (
 	"github.com/sleep-go/kratos-admin/internal/data"
 )
 
+type intakeBroker struct {
+	deliveries chan Delivery
+	done       chan error
+}
+
+func (*intakeBroker) Publish(context.Context, Message) error { return nil }
+func (b *intakeBroker) Consume(context.Context, string) (<-chan Delivery, error) {
+	return b.deliveries, nil
+}
+func (b *intakeBroker) Done() <-chan error { return b.done }
+func (*intakeBroker) Close() error         { return nil }
+
+type gracefulHandler struct {
+	started  chan struct{}
+	release  chan struct{}
+	canceled chan struct{}
+}
+
+func (h *gracefulHandler) Handle(ctx context.Context, _ Message) error {
+	close(h.started)
+	select {
+	case <-h.release:
+		return nil
+	case <-ctx.Done():
+		close(h.canceled)
+		return ctx.Err()
+	}
+}
+
 type fakeMessageHandler struct{ err error }
 
 func (h *fakeMessageHandler) Handle(context.Context, Message) error { return h.err }
@@ -50,7 +79,7 @@ func trackedDelivery(message Message, result *deliveryResult) Delivery {
 }
 
 func TestConsumerDeliveryStateMachine(t *testing.T) {
-	valid, _ := NewAuditMessage("a1")
+	valid, _ := NewAuditMessage("a1", 0)
 	tests := []struct {
 		name        string
 		message     Message
@@ -79,5 +108,33 @@ func TestConsumerDeliveryStateMachine(t *testing.T) {
 				t.Fatalf("RecordFailure called = %v", recorder.called)
 			}
 		})
+	}
+}
+
+func TestConsumerStopsIntakeBeforeCancelingInflightTask(t *testing.T) {
+	message, _ := NewAuditMessage("a1", 0)
+	result := &deliveryResult{}
+	broker := &intakeBroker{deliveries: make(chan Delivery, 1), done: make(chan error)}
+	handler := &gracefulHandler{started: make(chan struct{}), release: make(chan struct{}), canceled: make(chan struct{})}
+	consumer := newConsumer(broker, handler, &fakeFailureRecorder{}, 1, log.NewStdLogger(io.Discard))
+	ctx, cancel := context.WithCancel(context.Background())
+	runDone := make(chan error, 1)
+	go func() { runDone <- consumer.Run(ctx, QueueAudit) }()
+	broker.deliveries <- trackedDelivery(message, result)
+	<-handler.started
+	cancel()
+	select {
+	case <-handler.canceled:
+		t.Fatal("优雅停机不应取消在途任务 context")
+	case <-runDone:
+		t.Fatal("在途任务完成前 Consumer 不应退出")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(handler.release)
+	if err := <-runDone; err != nil {
+		t.Fatal(err)
+	}
+	if result.action != "ack" || result.count != 1 {
+		t.Fatalf("确认结果 = %+v", result)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -64,20 +65,32 @@ func (r fakeLockRow) Scan(dest ...any) error {
 }
 
 type fakeLockConnection struct {
-	lockResult int64
-	scanErr    error
-	releaseErr error
-	calls      []string
+	lockResult    int64
+	scanErr       error
+	releaseResult *int64
+	releaseErr    error
+	calls         []string
 }
 
-func (c *fakeLockConnection) QueryRowContext(context.Context, string, ...any) lockRow {
+func (c *fakeLockConnection) QueryRowContext(_ context.Context, query string, _ ...any) lockRow {
+	if strings.Contains(query, "RELEASE_LOCK") {
+		c.calls = append(c.calls, "RELEASE_LOCK")
+		result := int64(1)
+		if c.releaseResult != nil {
+			result = *c.releaseResult
+		}
+		return fakeLockRow{value: result, err: c.releaseErr}
+	}
 	c.calls = append(c.calls, "GET_LOCK")
 	return fakeLockRow{value: c.lockResult, err: c.scanErr}
 }
 
-func (c *fakeLockConnection) ExecContext(context.Context, string, ...any) (sql.Result, error) {
-	c.calls = append(c.calls, "RELEASE_LOCK")
-	return nil, c.releaseErr
+func TestRunLockedMigrationRejectsUnconfirmedRelease(t *testing.T) {
+	notReleased := int64(0)
+	connection := &fakeLockConnection{lockResult: 1, releaseResult: &notReleased}
+	if err := runLockedMigration(context.Background(), connection, func(context.Context) error { return nil }); err == nil {
+		t.Fatal("RELEASE_LOCK 返回 0 时 error = nil")
+	}
 }
 
 func TestRunLockedMigrationRunsAndReleasesInOrder(t *testing.T) {

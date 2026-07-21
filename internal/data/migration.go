@@ -24,7 +24,6 @@ type lockRow interface {
 
 type lockConnection interface {
 	QueryRowContext(context.Context, string, ...any) lockRow
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
 type sqlLockConnection struct {
@@ -33,10 +32,6 @@ type sqlLockConnection struct {
 
 func (c sqlLockConnection) QueryRowContext(ctx context.Context, query string, args ...any) lockRow {
 	return c.connection.QueryRowContext(ctx, query, args...)
-}
-
-func (c sqlLockConnection) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	return c.connection.ExecContext(ctx, query, args...)
 }
 
 // Migrate 使用 MySQL 命名锁串行执行所有尚未应用的 Goose 迁移。
@@ -88,9 +83,12 @@ func runWithNamedLock(ctx context.Context, connection lockConnection, name strin
 	operationErr := operation(ctx)
 	releaseContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
-	_, releaseErr := connection.ExecContext(releaseContext, "SELECT RELEASE_LOCK(?)", name)
+	var released int64
+	releaseErr := connection.QueryRowContext(releaseContext, "SELECT RELEASE_LOCK(?)", name).Scan(&released)
 	if releaseErr != nil {
-		releaseErr = fmt.Errorf("释放数据库命名锁 %s 失败: %w", name, releaseErr)
+		releaseErr = fmt.Errorf("确认释放数据库命名锁 %s 失败: %w", name, releaseErr)
+	} else if released != 1 {
+		releaseErr = fmt.Errorf("数据库命名锁 %s 未确认释放", name)
 	}
 	return true, errors.Join(operationErr, releaseErr)
 }

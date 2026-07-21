@@ -58,11 +58,11 @@ func (p *Publisher) Dispatch(ctx context.Context, now time.Time) error {
 func messageFromPendingTask(task data.PendingTask) (Message, error) {
 	switch task.Kind {
 	case data.TaskKindAudit:
-		return NewAuditMessage(task.ID)
+		return NewAuditMessage(task.ID, task.RetryCount)
 	case data.TaskKindLogExport:
-		return NewLogExportMessage(task.ID)
+		return NewLogExportMessage(task.ID, task.RetryCount)
 	case data.TaskKindFileCleanup:
-		return NewFileCleanupMessage(task.TenantID, task.ID, task.ProviderName, task.ObjectKey)
+		return NewFileCleanupMessage(task.TenantID, task.ID, task.ProviderName, task.ObjectKey, task.RetryCount)
 	default:
 		return Message{}, fmt.Errorf("不支持的待投递任务类型: %s", task.Kind)
 	}

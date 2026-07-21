@@ -87,13 +87,13 @@ func pendingTaskFromMessage(message Message) (data.PendingTask, error) {
 		if err := json.Unmarshal(message.Body, &payload); err != nil || payload.Version != 1 || payload.EventID == "" || message.ID != "audit:"+payload.EventID {
 			return data.PendingTask{}, fmt.Errorf("%w: 审计任务载荷不完整", ErrInvalidMessage)
 		}
-		return data.PendingTask{Kind: data.TaskKindAudit, ID: payload.EventID}, nil
+		return data.PendingTask{Kind: data.TaskKindAudit, ID: payload.EventID, RetryCount: payload.Attempt}, nil
 	case RoutingLogExport:
 		var payload logExportPayload
 		if err := json.Unmarshal(message.Body, &payload); err != nil || payload.Version != 1 || payload.ExportID == "" || message.ID != "log-export:"+payload.ExportID {
 			return data.PendingTask{}, fmt.Errorf("%w: 日志导出任务载荷不完整", ErrInvalidMessage)
 		}
-		return data.PendingTask{Kind: data.TaskKindLogExport, ID: payload.ExportID}, nil
+		return data.PendingTask{Kind: data.TaskKindLogExport, ID: payload.ExportID, RetryCount: payload.Attempt}, nil
 	case RoutingFileCleanup:
 		var payload fileCleanupPayload
 		if err := json.Unmarshal(message.Body, &payload); err != nil || payload.Version != 1 || payload.TenantID == 0 || payload.FileID == "" || payload.ProviderName == "" || payload.ObjectKey == "" || message.ID != "file-cleanup:"+payload.FileID {
@@ -101,7 +101,7 @@ func pendingTaskFromMessage(message Message) (data.PendingTask, error) {
 		}
 		return data.PendingTask{
 			Kind: data.TaskKindFileCleanup, ID: payload.FileID, TenantID: payload.TenantID,
-			ProviderName: payload.ProviderName, ObjectKey: payload.ObjectKey,
+			ProviderName: payload.ProviderName, ObjectKey: payload.ObjectKey, RetryCount: payload.Attempt,
 		}, nil
 	default:
 		return data.PendingTask{}, fmt.Errorf("%w: 不支持的任务类型 %s", ErrInvalidMessage, message.Type)

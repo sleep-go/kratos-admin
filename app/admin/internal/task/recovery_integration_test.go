@@ -26,6 +26,7 @@ func TestRabbitMQRecoveryRedeliversUnackedMessageAfterReconnect(t *testing.T) {
 	eventID := uuid.NewString()
 	repository := &fakeTaskRepository{pending: []data.PendingTask{{Kind: data.TaskKindAudit, ID: eventID}}}
 	recovered := make(chan struct{})
+	stable := make(chan struct{})
 	var once sync.Once
 	var sessionMutex sync.Mutex
 	sessions := 0
@@ -56,6 +57,14 @@ func TestRabbitMQRecoveryRedeliversUnackedMessageAfterReconnect(t *testing.T) {
 				return err
 			}
 			once.Do(func() { close(recovered) })
+			select {
+			case duplicate := <-deliveries:
+				return errors.New("ACK 后收到重复消息: " + duplicate.Message.ID)
+			case <-time.After(500 * time.Millisecond):
+				close(stable)
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 			<-ctx.Done()
 			return nil
 		case <-ctx.Done():
@@ -74,6 +83,11 @@ func TestRabbitMQRecoveryRedeliversUnackedMessageAfterReconnect(t *testing.T) {
 	case <-recovered:
 	case <-ctx.Done():
 		t.Fatal("等待未确认消息重投超时")
+	}
+	select {
+	case <-stable:
+	case <-ctx.Done():
+		t.Fatal("等待 ACK 后稳定观察超时")
 	}
 	stopContext, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer stopCancel()

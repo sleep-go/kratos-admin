@@ -30,7 +30,10 @@ func (*fakeLifecycleBroker) Consume(context.Context, string) (<-chan Delivery, e
 }
 func (b *fakeLifecycleBroker) Done() <-chan error { return b.done }
 func (b *fakeLifecycleBroker) Close() error {
-	b.closeOnce.Do(func() { close(b.closed) })
+	b.closeOnce.Do(func() {
+		close(b.closed)
+		close(b.done)
+	})
 	return nil
 }
 
@@ -117,6 +120,33 @@ func TestServerReconnectsAfterBrokerCloses(t *testing.T) {
 	defer cancel()
 	if err := server.Stop(stopCtx); err != nil {
 		t.Fatal(err)
+	}
+	if err := <-result; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestServerClosesBrokerWhenGracefulStopTimesOut(t *testing.T) {
+	broker := newFakeLifecycleBroker()
+	connector := &fakeConnector{brokers: []Broker{broker}}
+	runner := func(context.Context, Broker) error {
+		<-broker.closed
+		return nil
+	}
+	server := newServer(conf.Config{}, connector, runner, nil, log.NewStdLogger(io.Discard))
+	result := make(chan error, 1)
+	go func() { result <- server.Start(context.Background()) }()
+	waitForCondition(t, func() bool { return connector.callCount() == 1 })
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if err := server.Stop(stopCtx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Stop() error = %v，期望 context deadline exceeded", err)
+	}
+	select {
+	case <-broker.closed:
+	case <-time.After(time.Second):
+		t.Fatal("优雅停机超时后未强制关闭 Broker")
 	}
 	if err := <-result; err != nil {
 		t.Fatal(err)

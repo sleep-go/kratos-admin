@@ -49,6 +49,16 @@ func (c *Consumer) Run(ctx context.Context, queue string) error {
 	if err != nil {
 		return err
 	}
+	taskContext, cancelTasks := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancelTasks()
+	go func() {
+		select {
+		case <-c.broker.Done():
+			// 连接中断或强制关闭时取消在途任务，使消息由 RabbitMQ 重新投递。
+			cancelTasks()
+		case <-taskContext.Done():
+		}
+	}()
 	var workers sync.WaitGroup
 	defer workers.Wait()
 	for {
@@ -68,7 +78,7 @@ func (c *Consumer) Run(ctx context.Context, queue string) error {
 			go func() {
 				defer workers.Done()
 				defer func() { <-c.semaphore }()
-				c.handleDelivery(ctx, delivery)
+				c.handleDelivery(taskContext, delivery)
 			}()
 		}
 	}

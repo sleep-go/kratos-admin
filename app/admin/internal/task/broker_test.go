@@ -92,3 +92,14 @@ func TestDeclareTopologyCreatesDurableTaskAndDeadQueues(t *testing.T) {
 		t.Fatalf("bindings = %v", channel.bindings)
 	}
 }
+
+func TestBrokerDoneReportsPublisherChannelClosure(t *testing.T) {
+	connectionClosed := make(chan *amqp.Error)
+	publisherClosed := make(chan *amqp.Error, 1)
+	want := &amqp.Error{Code: 406, Reason: "publisher channel closed"}
+	done := mergeBrokerCloseNotifications(connectionClosed, publisherClosed)
+	publisherClosed <- want
+	if got := <-done; got == nil || got.Error() != want.Error() {
+		t.Fatalf("Done() error = %v", got)
+	}
+}

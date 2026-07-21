@@ -76,14 +76,10 @@ func (*AMQPConnector) Connect(_ context.Context, cfg conf.Data) (Broker, error) 
 		return closeOnError(fmt.Errorf("启用 RabbitMQ 发布确认失败: %w", err))
 	}
 
-	done := make(chan error, 1)
-	closed := connection.NotifyClose(make(chan *amqp.Error, 1))
-	go func() {
-		defer close(done)
-		if closeErr, ok := <-closed; ok && closeErr != nil {
-			done <- closeErr
-		}
-	}()
+	done := mergeBrokerCloseNotifications(
+		connection.NotifyClose(make(chan *amqp.Error, 1)),
+		publisherChannel.NotifyClose(make(chan *amqp.Error, 1)),
+	)
 	return &amqpBroker{
 		connection: connection,
 		publisher: &confirmedPublishingChannel{
@@ -93,6 +89,22 @@ func (*AMQPConnector) Connect(_ context.Context, cfg conf.Data) (Broker, error) 
 		prefetch: cfg.RabbitMQPrefetch,
 		done:     done,
 	}, nil
+}
+
+func mergeBrokerCloseNotifications(connectionClosed, publisherClosed <-chan *amqp.Error) <-chan error {
+	done := make(chan error, 1)
+	go func() {
+		defer close(done)
+		var closeErr *amqp.Error
+		select {
+		case closeErr = <-connectionClosed:
+		case closeErr = <-publisherClosed:
+		}
+		if closeErr != nil {
+			done <- closeErr
+		}
+	}()
+	return done
 }
 
 type topologyChannel interface {
@@ -220,7 +232,6 @@ func (b *amqpBroker) Consume(ctx context.Context, queue string) (<-chan Delivery
 	deliveries := make(chan Delivery, b.prefetch)
 	go func() {
 		defer close(deliveries)
-		defer channel.Close()
 		for sourceDelivery := range source {
 			delivery := sourceDelivery
 			adapted := Delivery{

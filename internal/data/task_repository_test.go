@@ -76,3 +76,12 @@ func TestTaskRepositoryIdempotencyKey(t *testing.T) {
 		}
 	}
 }
+
+func TestTaskRepositoryOnlyRecordsCurrentAttempt(t *testing.T) {
+	if !isCurrentTaskAttempt(2, PendingTask{RetryCount: 2}) {
+		t.Fatal("当前投递代次应允许记录失败")
+	}
+	if isCurrentTaskAttempt(3, PendingTask{RetryCount: 2}) {
+		t.Fatal("过期重复消息不得再次增加失败次数")
+	}
+}

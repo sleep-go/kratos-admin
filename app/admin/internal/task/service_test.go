@@ -62,15 +62,15 @@ func TestServiceHandlesThreeTaskKinds(t *testing.T) {
 	storage := &fakeStorage{name: "local"}
 	service := &Service{auditProcessor: auditProcessor, logProcessor: logProcessor, fileCleaner: cleaner, storageProvider: storage}
 
-	auditMessage, _ := NewAuditMessage("a1")
+	auditMessage, _ := NewAuditMessage("a1", 0)
 	if err := service.Handle(context.Background(), auditMessage); err != nil || auditProcessor.id != "a1" {
 		t.Fatalf("审计处理 id=%s error=%v", auditProcessor.id, err)
 	}
-	logMessage, _ := NewLogExportMessage("l1")
+	logMessage, _ := NewLogExportMessage("l1", 0)
 	if err := service.Handle(context.Background(), logMessage); err != nil || logProcessor.id != "l1" {
 		t.Fatalf("日志导出处理 id=%s error=%v", logProcessor.id, err)
 	}
-	fileMessage, _ := NewFileCleanupMessage(8, "f1", "local", "tenant/8/f1")
+	fileMessage, _ := NewFileCleanupMessage(8, "f1", "local", "tenant/8/f1", 0)
 	if err := service.Handle(context.Background(), fileMessage); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestServiceHandlesThreeTaskKinds(t *testing.T) {
 
 func TestServiceTreatsProviderMismatchAsPermanent(t *testing.T) {
 	service := &Service{storageProvider: &fakeStorage{name: "local"}, fileCleaner: &fakeFileCleaner{}}
-	message, _ := NewFileCleanupMessage(8, "f1", "oss", "tenant/8/f1")
+	message, _ := NewFileCleanupMessage(8, "f1", "oss", "tenant/8/f1", 0)
 	err := service.Handle(context.Background(), message)
 	if !errors.Is(err, ErrPermanentTask) {
 		t.Fatalf("error = %v", err)
@@ -93,7 +93,7 @@ func TestServiceTreatsCompletedFileAsSuccess(t *testing.T) {
 		storageProvider: &fakeStorage{name: "local"},
 		fileCleaner:     &fakeFileCleaner{err: filebiz.ErrFileUnavailable},
 	}
-	message, _ := NewFileCleanupMessage(8, "f1", "local", "tenant/8/f1")
+	message, _ := NewFileCleanupMessage(8, "f1", "local", "tenant/8/f1", 0)
 	if err := service.Handle(context.Background(), message); err != nil {
 		t.Fatalf("error = %v", err)
 	}
