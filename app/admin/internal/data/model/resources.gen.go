@@ -17,6 +17,7 @@ type Resource struct {
 	ID           uint64         `gorm:"column:id;type:bigint unsigned;primaryKey;autoIncrement:true;comment:权限资源主键" json:"id"`                                                // 权限资源主键
 	ParentID     uint64         `gorm:"column:parent_id;type:bigint unsigned;not null;index:idx_resources_parent,priority:1;default:0;comment:父资源ID，0表示根资源" json:"parent_id"` // 父资源ID，0表示根资源
 	Type         uint8          `gorm:"column:type;type:tinyint unsigned;not null;index:idx_resources_parent,priority:2;comment:资源类型：1目录，2菜单，3按钮，4API" json:"type"`           // 资源类型：1目录，2菜单，3按钮，4API
+	ScopeMask    uint8          `gorm:"column:scope_mask;type:tinyint unsigned;not null;default:3;comment:资源适用范围位标记：1仅平台，2仅租户，3平台与租户共用" json:"scope_mask"`                    // 资源适用范围位标记：1仅平台，2仅租户，3平台与租户共用
 	Code         string         `gorm:"column:code;type:varchar(128);not null;uniqueIndex:uk_resources_code,priority:1;comment:全局唯一资源编码" json:"code"`                         // 全局唯一资源编码
 	Name         string         `gorm:"column:name;type:varchar(128);not null;comment:资源名称" json:"name"`                                                                      // 资源名称
 	RoutePath    string         `gorm:"column:route_path;type:varchar(255);not null;comment:前端路由路径" json:"route_path"`                                                        // 前端路由路径

@@ -63,11 +63,11 @@ func TestMigrationLockSerializesConcurrentMySQLMigrations(t *testing.T) {
 	}
 	defer func() { _ = db.Close() }()
 	var applied int
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT version_id) FROM goose_db_version WHERE is_applied = 1 AND version_id BETWEEN 1 AND 6").Scan(&applied); err != nil {
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT version_id) FROM goose_db_version WHERE is_applied = 1 AND version_id BETWEEN 1 AND 7").Scan(&applied); err != nil {
 		t.Fatal(err)
 	}
-	if applied != 6 {
-		t.Fatalf("已应用迁移数量 = %d，期望 6", applied)
+	if applied != 7 {
+		t.Fatalf("已应用迁移数量 = %d，期望 7", applied)
 	}
 }
 

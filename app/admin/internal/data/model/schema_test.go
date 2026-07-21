@@ -49,6 +49,13 @@ func TestGeneratedModelCoreTypes(t *testing.T) {
 	}
 }
 
+func TestResourceScopeMaskGenerated(t *testing.T) {
+	field, ok := reflect.TypeOf(Resource{}).FieldByName("ScopeMask")
+	if !ok || field.Type.Kind() != reflect.Uint8 {
+		t.Fatal("Resource.ScopeMask 必须生成为 uint8")
+	}
+}
+
 func TestRabbitMQTaskStateFields(t *testing.T) {
 	tests := []struct {
 		model  any

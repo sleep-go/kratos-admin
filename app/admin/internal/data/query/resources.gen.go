@@ -31,6 +31,7 @@ func newResource(db *gorm.DB, opts ...gen.DOOption) resource {
 	_resource.ID = field.NewUint64(tableName, "id")
 	_resource.ParentID = field.NewUint64(tableName, "parent_id")
 	_resource.Type = field.NewUint8(tableName, "type")
+	_resource.ScopeMask = field.NewUint8(tableName, "scope_mask")
 	_resource.Code = field.NewString(tableName, "code")
 	_resource.Name = field.NewString(tableName, "name")
 	_resource.RoutePath = field.NewString(tableName, "route_path")
@@ -58,6 +59,7 @@ type resource struct {
 	ID           field.Uint64 // 权限资源主键
 	ParentID     field.Uint64 // 父资源ID，0表示根资源
 	Type         field.Uint8  // 资源类型：1目录，2菜单，3按钮，4API
+	ScopeMask    field.Uint8  // 资源适用范围位标记：1仅平台，2仅租户，3平台与租户共用
 	Code         field.String // 全局唯一资源编码
 	Name         field.String // 资源名称
 	RoutePath    field.String // 前端路由路径
@@ -90,6 +92,7 @@ func (r *resource) updateTableName(table string) *resource {
 	r.ID = field.NewUint64(table, "id")
 	r.ParentID = field.NewUint64(table, "parent_id")
 	r.Type = field.NewUint8(table, "type")
+	r.ScopeMask = field.NewUint8(table, "scope_mask")
 	r.Code = field.NewString(table, "code")
 	r.Name = field.NewString(table, "name")
 	r.RoutePath = field.NewString(table, "route_path")
@@ -127,10 +130,11 @@ func (r *resource) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (r *resource) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 16)
+	r.fieldMap = make(map[string]field.Expr, 17)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["parent_id"] = r.ParentID
 	r.fieldMap["type"] = r.Type
+	r.fieldMap["scope_mask"] = r.ScopeMask
 	r.fieldMap["code"] = r.Code
 	r.fieldMap["name"] = r.Name
 	r.fieldMap["route_path"] = r.RoutePath
