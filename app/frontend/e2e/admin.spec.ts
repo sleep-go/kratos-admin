@@ -86,6 +86,27 @@ async function openTenantDialog(page: Page) {
   await expect(page.getByRole('dialog', { name: '切换租户' })).toBeVisible()
 }
 
+async function expectLogNavigation(page: Page) {
+  const desktopGroup = page.getByTestId('navigation-group-日志中心')
+  if (await desktopGroup.isVisible()) {
+    await desktopGroup.hover()
+    await expect(desktopGroup.getByRole('menuitem', { name: '登录日志' })).toBeVisible()
+    await expect(desktopGroup.getByRole('menuitem', { name: '操作审计' })).toBeVisible()
+    await expect(desktopGroup.getByRole('menuitem', { name: 'API 日志' })).toBeVisible()
+    await expect(desktopGroup.getByRole('menuitem', { name: '日志导出' })).toBeVisible()
+    return
+  }
+
+  await page.getByRole('button', { name: '打开导航菜单' }).click()
+  const mobileNavigation = page.getByTestId('mobile-navigation')
+  await expect(mobileNavigation.getByText('日志中心', { exact: true })).toBeVisible()
+  await expect(mobileNavigation.getByText('登录日志', { exact: true })).toBeVisible()
+  await expect(mobileNavigation.getByText('操作审计', { exact: true })).toBeVisible()
+  await expect(mobileNavigation.getByText('API 日志', { exact: true })).toBeVisible()
+  await expect(mobileNavigation.getByText('日志导出', { exact: true })).toBeVisible()
+  await mobileNavigation.getByRole('button', { name: '关闭导航菜单' }).click()
+}
+
 async function ensureTenantAndFeatures(page: Page) {
   await page.goto('/platform/tenants')
   await expect(page.getByRole('heading', { name: '租户管理' })).toBeVisible()
@@ -180,4 +201,37 @@ test('管理员核心链路：登录、租户、权限、日志、文件和会�
   })
   await expect(page.getByText(filename)).toBeVisible()
   await expect(page.getByText('可用').last()).toBeVisible()
+})
+
+test('顶部二级导航、日志筛选和系统设置中文化', async ({ page }) => {
+  await loginThroughUI(page)
+
+  await openTenantDialog(page)
+  await page.getByRole('button', { name: /平台管理.*跨租户治理视角/ }).click()
+  await expect(page.getByRole('heading', { name: '工作台' })).toBeVisible()
+  await expectLogNavigation(page)
+
+  await page.goto('/logs/login')
+  await expect(page.getByRole('heading', { name: '登录日志' })).toBeVisible()
+  const filteredRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes('/api/v1/management/login-logs') &&
+      decodeURIComponent(request.url()).includes('filters[result]=2')
+  )
+  await page.locator('.query-panel .el-select').first().click()
+  await page.getByRole('option', { name: '失败', exact: true }).click()
+  await page.getByRole('button', { name: '查询' }).click()
+  await filteredRequest
+
+  await page.goto('/logs/audit')
+  await expect(page.getByRole('heading', { name: '操作审计' })).toBeVisible()
+  await page.goto('/logs/api')
+  await expect(page.getByRole('heading', { name: 'API 访问与异常日志' })).toBeVisible()
+
+  await page.goto('/settings')
+  await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '平台设置' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '安全策略' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '日志保留' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '文件设置' })).toBeVisible()
 })
