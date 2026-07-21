@@ -15,6 +15,7 @@ require (
 	github.com/google/wire v0.7.0
 	github.com/hibiken/asynq v0.26.0
 	github.com/pressly/goose/v3 v3.26.0
+	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.51.0
