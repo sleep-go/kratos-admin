@@ -10,16 +10,21 @@ vi.mock('@/api/auth', () => ({
   logout: vi.fn(),
   refresh: vi.fn(),
   verifyMfa: vi.fn(),
-  switchTenant: vi.fn()
+  switchTenant: vi.fn(),
+  listNavigation: vi.fn()
 }))
 
 describe('认证状态恢复', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    vi.mocked(authApi.listNavigation).mockResolvedValue({ items: [] })
   })
 
   it('切换租户时直接采用服务端返回的新权限上下文', async () => {
+    vi.mocked(authApi.listNavigation).mockResolvedValue({
+      items: [{ name: '文件管理', routePath: '/files', componentKey: 'files' }]
+    })
     vi.mocked(authApi.switchTenant).mockResolvedValue({
       accessToken: 'switched-token',
       user: {
@@ -37,6 +42,10 @@ describe('认证状态恢复', () => {
 
     expect(store.currentTenant?.id).toBe('11')
     expect(store.currentUser?.permissions).toEqual(['files:*'])
+    expect(store.navigationItems).toEqual([
+      { name: '文件管理', routePath: '/files', componentKey: 'files' }
+    ])
+    expect(authApi.listNavigation).toHaveBeenCalledOnce()
     expect(authApi.refresh).not.toHaveBeenCalled()
   })
 

@@ -33,7 +33,27 @@ describe('权限指令', () => {
     expect(wrapper.get('#roles-delete').attributes('hidden')).toBeDefined()
   })
 
-  it('平台管理员在租户上下文仍可执行跨租户治理操作', () => {
+  it('平台管理员只有在平台上下文才可绕过权限检查', () => {
     expect(hasPermission([], 'api-logs:export', true)).toBe(true)
+
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = useAuthStore()
+    store.currentUser = {
+      id: '1',
+      displayName: '平台管理员',
+      platformAdmin: true,
+      permissions: []
+    }
+    store.currentTenant = { id: '8', code: 'demo', name: '演示租户' }
+    const component = defineComponent({
+      template: `<button id="platform-action" v-permission="'tenants:update'">编辑租户</button>`
+    })
+
+    const wrapper = mount(component, {
+      global: { plugins: [pinia], directives: { permission: permissionDirective } }
+    })
+
+    expect(wrapper.get('#platform-action').attributes('hidden')).toBeDefined()
   })
 })

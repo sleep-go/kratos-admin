@@ -89,6 +89,9 @@ func (q managementReadQuery) field(name string) field.Field {
 }
 
 func (r *ManagementRepository) scopedManagementRead(ctx context.Context, scope managementbiz.Scope, resource string) (managementReadQuery, error) {
+	if err := validatePlatformTargetTenantGen(ctx, r.gen(), scope); err != nil {
+		return managementReadQuery{}, err
+	}
 	definition := managementResources[resource]
 	read, err := newManagementReadQuery(ctx, r.gen(), resource)
 	if err != nil {

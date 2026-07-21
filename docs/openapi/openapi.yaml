@@ -640,6 +640,10 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: targetTenantId
+                  in: query
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -661,6 +665,10 @@ paths:
                 - name: resource
                   in: path
                   required: true
+                  schema:
+                    type: string
+                - name: targetTenantId
+                  in: query
                   schema:
                     type: string
             requestBody:
@@ -698,6 +706,10 @@ paths:
                   required: true
                   schema:
                     type: string
+                - name: targetTenantId
+                  in: query
+                  schema:
+                    type: string
             requestBody:
                 content:
                     application/json:
@@ -730,6 +742,10 @@ paths:
                 - name: id
                   in: path
                   required: true
+                  schema:
+                    type: string
+                - name: targetTenantId
+                  in: query
                   schema:
                     type: string
             responses:
@@ -1207,6 +1223,8 @@ components:
                     type: array
                     items:
                         type: string
+                targetTenantId:
+                    type: string
         admin.v1.UpdateRoleAuthorizationResponse:
             type: object
             properties:

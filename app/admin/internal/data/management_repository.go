@@ -71,13 +71,13 @@ func fieldSet(fields ...string) map[string]struct{} {
 
 var managementResources = map[string]resourceDefinition{
 	"users":                  {table: "users", columns: []string{"id", "username", "email", "phone", "display_name", "is_platform_admin", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status", "mfa_enabled", "mfa_channel"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
-	"tenants":                {table: "tenants", columns: []string{"id", "code", "name", "status", "permission_version", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("status"), keywordFields: []string{"code", "name"}, softDelete: true},
+	"tenants":                {table: "tenants", columns: []string{"id", "code", "name", "status", "permission_version", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("id", "status"), keywordFields: []string{"code", "name"}, softDelete: true},
 	"members":                {table: "tenant_members", columns: []string{"id", "tenant_id", "user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin", "joined_at"}, writeFields: fieldSet("user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin"), filterFields: fieldSet("status", "primary_department_id", "position_id"), keywordFields: []string{"display_name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"departments":            {table: "departments", columns: []string{"id", "tenant_id", "parent_id", "name", "code", "path", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("parent_id", "name", "code", "sort_order", "status"), filterFields: fieldSet("parent_id", "status"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"positions":              {table: "positions", columns: []string{"id", "tenant_id", "code", "name", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "sort_order", "status"), filterFields: fieldSet("status"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"roles":                  {table: "roles", columns: []string{"id", "tenant_id", "code", "name", "data_scope", "is_builtin", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "data_scope", "status"), filterFields: fieldSet("status", "data_scope"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
-	"resources":              {table: "resources", columns: []string{"id", "parent_id", "type", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status"}, writeFields: fieldSet("parent_id", "type", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status"), filterFields: fieldSet("parent_id", "type", "status"), keywordFields: []string{"name", "code", "route_path", "api_path"}, softDelete: true},
-	"tenant-resources":       {table: "tenant_resources", columns: []string{"id", "tenant_id", "resource_id", "created_by", "created_at"}, writeFields: fieldSet("tenant_id", "resource_id"), filterFields: fieldSet("tenant_id", "resource_id")},
+	"resources":              {table: "resources", columns: []string{"id", "parent_id", "type", "scope_mask", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status"}, writeFields: fieldSet("parent_id", "type", "scope_mask", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status"), filterFields: fieldSet("parent_id", "type", "scope_mask", "status"), keywordFields: []string{"name", "code", "route_path", "api_path"}, softDelete: true},
+	"tenant-resources":       {table: "tenant_resources", columns: []string{"id", "tenant_id", "resource_id", "created_by", "created_at"}, filterFields: fieldSet("tenant_id", "resource_id"), readOnly: true},
 	"casbin-rules":           {table: "casbin_rules", columns: []string{"id", "ptype", "v0", "v1", "v2", "v3", "v4", "v5"}, writeFields: fieldSet("ptype", "v1", "v2", "v3", "v4", "v5"), filterFields: fieldSet("ptype", "v1", "v2"), tenantScoped: true, tenantColumn: "v0"},
 	"role-scope-departments": {table: "role_scope_departments", columns: []string{"id", "tenant_id", "role_id", "department_id", "created_at"}, writeFields: fieldSet("role_id", "department_id"), filterFields: fieldSet("role_id", "department_id"), tenantScoped: true, tenantColumn: "tenant_id"},
 	"login-logs":             {table: "login_logs", columns: []string{"id", "tenant_id", "user_id", "identifier", "result", "reason", "ip", "user_agent", "request_id", "created_at"}, filterFields: fieldSet("user_id", "result"), keywordFields: []string{"identifier", "ip", "request_id"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
@@ -173,7 +173,7 @@ func (r *ManagementRepository) Allowed(ctx context.Context, scope managementbiz.
 	tr := q.TenantResource.As("tr")
 	res := q.Resource.As("res")
 	base := tr.WithContext(ctx).Join(res, res.ID.EqCol(tr.ResourceID), res.Code.Eq(resource), res.Status.Eq(1), res.DeletedAt.IsNull()).
-		Where(tr.TenantID.Eq(scope.TenantID))
+		Where(tr.TenantID.Eq(scope.TenantID), res.ScopeMask.BitAnd(2).Eq(2))
 	if member != nil && member.IsTenantAdmin {
 		count, err := base.Count()
 		if err != nil {
@@ -330,7 +330,7 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 		return 0, err
 	}
 	if definition.tenantScoped {
-		values[definition.tenantColumn] = targetTenantID(scope, data)
+		values[definition.tenantColumn] = scope.TenantID
 	}
 	if resource == "departments" {
 		values["path"] = "/"
@@ -358,6 +358,9 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 	}
 	var id uint64
 	err = r.gen().Transaction(func(tx *query.Query) error {
+		if err := validatePlatformTargetTenantGen(ctx, tx, scope); err != nil {
+			return err
+		}
 		tenantID := numericID(values[definition.tenantColumn])
 		if err := validateManagementAssociationsGen(ctx, tx, resource, values, tenantID, 0, true); err != nil {
 			return err
@@ -508,6 +511,9 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 		}
 	}
 	return r.gen().Transaction(func(tx *query.Query) error {
+		if err := validatePlatformTargetTenantGen(ctx, tx, scope); err != nil {
+			return err
+		}
 		role := tx.Role
 		if _, err := role.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where(role.ID.Eq(roleID), role.TenantID.Eq(scope.TenantID), role.Status.Eq(1), role.DeletedAt.IsNull()).Take(); err != nil {
@@ -525,7 +531,7 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 			tr := tx.TenantResource.As("tr")
 			resource := tx.Resource.As("res")
 			count, err := tr.WithContext(ctx).Join(resource, resource.ID.EqCol(tr.ResourceID), resource.Code.In(codes...), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
-				Where(tr.TenantID.Eq(scope.TenantID)).Distinct(resource.Code).Count()
+				Where(tr.TenantID.Eq(scope.TenantID), resource.ScopeMask.BitAnd(2).Eq(2)).Distinct(resource.Code).Count()
 			if err != nil {
 				return err
 			}
@@ -596,22 +602,18 @@ func (r *ManagementRepository) UpdateTenantFeatures(ctx context.Context, scope m
 	if !scope.PlatformAdmin || tenantID == 0 {
 		return errors.New("仅平台管理员可配置租户功能")
 	}
-	resourceIDs = uniqueUint64(resourceIDs)
 	return r.gen().Transaction(func(tx *query.Query) error {
 		tenant := tx.Tenant
-		if _, err := tenant.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where(tenant.ID.Eq(tenantID), tenant.DeletedAt.IsNull()).Take(); err != nil {
-			return errors.New("目标租户不存在")
+		if _, err := tenant.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where(
+			tenant.ID.Eq(tenantID), tenant.Status.Eq(1), tenant.DeletedAt.IsNull(),
+		).Take(); err != nil {
+			return errors.New("目标租户不存在、已冻结或已删除")
 		}
-		if len(resourceIDs) > 0 {
-			resource := tx.Resource
-			count, err := resource.WithContext(ctx).Where(resource.ID.In(resourceIDs...), resource.Status.Eq(1), resource.DeletedAt.IsNull()).Distinct(resource.ID).Count()
-			if err != nil {
-				return err
-			}
-			if count != int64(len(resourceIDs)) {
-				return errors.New("租户功能集合包含无效资源")
-			}
+		resolvedResourceIDs, err := tenantResourceIDsWithAncestors(ctx, tx, resourceIDs)
+		if err != nil {
+			return err
 		}
+		resourceIDs = resolvedResourceIDs
 		tr := tx.TenantResource
 		if _, err := tr.WithContext(ctx).Where(tr.TenantID.Eq(tenantID)).Delete(); err != nil {
 			return err
@@ -638,6 +640,31 @@ func (r *ManagementRepository) UpdateTenantFeatures(ctx context.Context, scope m
 	})
 }
 
+func tenantResourceIDsWithAncestors(ctx context.Context, q *query.Query, resourceIDs []uint64) ([]uint64, error) {
+	resource := q.Resource
+	resolved := make(map[uint64]struct{})
+	for _, requestedID := range uniqueUint64(resourceIDs) {
+		for currentID := requestedID; currentID != 0; {
+			if _, exists := resolved[currentID]; exists {
+				break
+			}
+			row, err := resource.WithContext(ctx).Select(resource.ID, resource.ParentID, resource.ScopeMask).
+				Where(resource.ID.Eq(currentID), resource.Status.Eq(1), resource.DeletedAt.IsNull()).Take()
+			if err != nil || row.ScopeMask&2 == 0 {
+				return nil, errors.New("租户功能集合包含平台专属资源或无效资源")
+			}
+			resolved[row.ID] = struct{}{}
+			currentID = row.ParentID
+		}
+	}
+	result := make([]uint64, 0, len(resolved))
+	for resourceID := range resolved {
+		result = append(result, resourceID)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	return result, nil
+}
+
 func uniqueUint64(values []uint64) []uint64 {
 	seen := make(map[uint64]struct{}, len(values))
 	result := make([]uint64, 0, len(values))
@@ -652,15 +679,6 @@ func uniqueUint64(values []uint64) []uint64 {
 		result = append(result, value)
 	}
 	return result
-}
-
-func targetTenantID(scope managementbiz.Scope, data map[string]any) uint64 {
-	if scope.PlatformAdmin {
-		if target := numericID(data["target_tenant_id"]); target != 0 {
-			return target
-		}
-	}
-	return scope.TenantID
 }
 
 func (r *ManagementRepository) prepareCreateValues(resource string, values map[string]any, scope managementbiz.Scope) error {
@@ -953,6 +971,12 @@ func validateManagementEnumValues(resource string, values map[string]any) error 
 			resourceType, ok := exactUint(value)
 			if !ok || resourceType < 1 || resourceType > 4 {
 				return errors.New("资源类型取值无效")
+			}
+		}
+		if value, exists := values["scope_mask"]; exists {
+			scopeMask, ok := exactUint(value)
+			if !ok || scopeMask < 1 || scopeMask > 3 {
+				return errors.New("资源适用范围取值无效")
 			}
 		}
 	case "casbin-rules":

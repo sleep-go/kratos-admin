@@ -10,6 +10,7 @@ import * as managementApi from '@/api/management'
 import AppIcon from '@/components/icons/AppIcon.vue'
 import { Refresh } from '@/components/icons/actions'
 import type { IconName } from '@/components/icons/registry'
+import { auditSummaryLabel } from '@/features/management/auditLabels'
 import { useAuthStore } from '@/stores/auth'
 import type { ResourceRow } from '@/api/management'
 
@@ -140,6 +141,15 @@ function formatActivityTime(value: unknown) {
   })
 }
 
+function formatActivity(activity: ResourceRow) {
+  return auditSummaryLabel(
+    activity.summary,
+    activity.action,
+    activity.resource_type,
+    activity.resource_id
+  )
+}
+
 function resizeChart() {
   chart?.resize()
 }
@@ -192,9 +202,7 @@ onBeforeUnmount(() => {
         <ul v-if="activities.length">
           <li v-for="activity in activities" :key="String(activity.id)">
             <time>{{ formatActivityTime(activity.created_at) }}</time>
-            <span>{{
-              activity.summary || `${activity.action ?? '操作'} ${activity.resource_type ?? ''}`
-            }}</span>
+            <span>{{ formatActivity(activity) }}</span>
           </li>
         </ul>
         <div v-else class="empty-state">

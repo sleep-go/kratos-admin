@@ -11,6 +11,7 @@ import (
 
 type fakeManagementRepository struct {
 	scope          managementbiz.Scope
+	resource       string
 	filters        map[string]string
 	effectiveRows  []map[string]any
 	providerTested uint64
@@ -40,7 +41,8 @@ func (r *fakeManagementRepository) List(_ context.Context, scope managementbiz.S
 	r.scope = scope
 	return []map[string]any{{"id": uint64(1), "name": "示例部门"}}, 1, nil
 }
-func (r *fakeManagementRepository) Create(context.Context, managementbiz.Scope, string, map[string]any) (uint64, error) {
+func (r *fakeManagementRepository) Create(_ context.Context, scope managementbiz.Scope, resource string, _ map[string]any) (uint64, error) {
+	r.scope, r.resource = scope, resource
 	return 1, nil
 }
 func (r *fakeManagementRepository) Update(context.Context, managementbiz.Scope, string, uint64, map[string]any) error {
@@ -164,5 +166,41 @@ func TestUpdateTenantFeaturesRequiresPlatformAdministrator(t *testing.T) {
 	_, err := service.UpdateTenantFeatures(ctx, &v1.UpdateTenantFeaturesRequest{TenantId: 10, ResourceIds: []uint64{2, 3}})
 	if err != nil || repository.tenantID != 10 || len(repository.featureIDs) != 2 {
 		t.Fatalf("UpdateTenantFeatures() tenant=%d resources=%v err=%v", repository.tenantID, repository.featureIDs, err)
+	}
+}
+
+func TestPlatformTenantSetupUsesExplicitTargetTenant(t *testing.T) {
+	repository := &fakeManagementRepository{}
+	service := NewManagementService(repository)
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, PlatformAdmin: true})
+
+	_, err := service.CreateResource(ctx, &v1.CreateResourceRequest{
+		Resource: "roles", TargetTenantId: 8,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repository.scope.TenantID != 8 || !repository.scope.PlatformAdmin || repository.resource != "roles" {
+		t.Fatalf("scope = %+v, resource = %q", repository.scope, repository.resource)
+	}
+}
+
+func TestTenantContextCannotUsePlatformTenantSetupTarget(t *testing.T) {
+	service := NewManagementService(&fakeManagementRepository{})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{
+		UserID: 5, TenantID: 7, MemberID: 9, PlatformAdmin: true,
+	})
+
+	if _, err := service.CreateResource(ctx, &v1.CreateResourceRequest{Resource: "roles", TargetTenantId: 8}); err == nil {
+		t.Fatal("租户上下文不能指定平台初始化目标租户")
+	}
+}
+
+func TestPlatformTenantSetupRejectsPlatformResource(t *testing.T) {
+	service := NewManagementService(&fakeManagementRepository{})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, PlatformAdmin: true})
+
+	if _, err := service.CreateResource(ctx, &v1.CreateResourceRequest{Resource: "users", TargetTenantId: 8}); err == nil {
+		t.Fatal("平台专属资源不能通过目标租户初始化入口维护")
 	}
 }

@@ -11,6 +11,12 @@ const listResources = vi.hoisted(() =>
         total: 1
       })
     }
+    if (resource === 'tenants') {
+      return Promise.resolve({
+        items: [{ id: '1', code: 'demo', name: '演示租户', status: 1 }],
+        total: 1
+      })
+    }
     return Promise.resolve({ items: [], total: 0 })
   })
 )
@@ -29,9 +35,9 @@ vi.mock('@/api/logs', () => ({
   getLogExportDownloadURL: vi.fn()
 }))
 
-function mountView(resourceKey = 'users') {
+function mountView(resourceKey = 'users', targetTenantId?: string) {
   return mount(ResourceListView, {
-    props: { resourceKey },
+    props: { resourceKey, targetTenantId },
     global: {
       directives: { permission: () => undefined, loading: () => undefined },
       stubs: {
@@ -99,20 +105,36 @@ describe('通用数据管理表单', () => {
     expect(drawer.attributes('data-title')).toBe('编辑全局用户')
   })
 
-  it('打开新增租户表单时从接口加载管理员候选项', async () => {
+  it('租户列表提供独立初始化入口', async () => {
     const wrapper = mountView('tenants')
     await flushPromises()
 
-    await wrapper.get('.heading-actions button').trigger('click')
+    expect(wrapper.get('[data-testid="tenant-setup-1"]').attributes('to')).toBe(
+      '/platform/tenants/1/setup'
+    )
+  })
+
+  it('目标租户成员管理通过查询上下文调用接口且全局用户候选不带租户', async () => {
+    const wrapper = mountView('members', '8')
     await flushPromises()
 
-    expect(listResources).toHaveBeenCalledWith('users', {
-      page: 1,
-      page_size: 200,
-      sort: 'id:asc'
-    })
-    const field = wrapper.get('[data-field="admin_user_id"]')
-    expect(field.attributes('data-options')).toBe('2')
+    expect(listResources).toHaveBeenCalledWith(
+      'members',
+      expect.objectContaining({ page: 1, page_size: 20 }),
+      { targetTenantId: '8' }
+    )
+    await wrapper.get('.heading-actions button').trigger('click')
+    await flushPromises()
+    expect(listResources).toHaveBeenCalledWith(
+      'users',
+      { page: 1, page_size: 200, sort: 'id:asc' },
+      undefined
+    )
+    expect(listResources).toHaveBeenCalledWith(
+      'members',
+      { page: 1, page_size: 200, sort: 'id:asc' },
+      { targetTenantId: '8' }
+    )
   })
 
   it('切换Casbin策略类型时重新加载对应关联候选项', async () => {
@@ -121,19 +143,19 @@ describe('通用数据管理表单', () => {
 
     await wrapper.get('.heading-actions > button').trigger('click')
     await flushPromises()
-    expect(listResources).toHaveBeenCalledWith('resources', {
-      page: 1,
-      page_size: 200,
-      sort: 'id:asc'
-    })
+    expect(listResources).toHaveBeenCalledWith(
+      'resources',
+      { page: 1, page_size: 200, sort: 'id:asc' },
+      undefined
+    )
 
     await wrapper.get('[data-field="ptype"]').trigger('click')
     await flushPromises()
-    expect(listResources).toHaveBeenCalledWith('members', {
-      page: 1,
-      page_size: 200,
-      sort: 'id:asc'
-    })
+    expect(listResources).toHaveBeenCalledWith(
+      'members',
+      { page: 1, page_size: 200, sort: 'id:asc' },
+      undefined
+    )
   })
 
   it('必填关联或枚举未选择时不提交新增请求', async () => {

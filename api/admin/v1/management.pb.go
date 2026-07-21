@@ -24,15 +24,16 @@ const (
 )
 
 type ListResourcesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	Page          uint32                 `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize      uint32                 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	Keyword       string                 `protobuf:"bytes,4,opt,name=keyword,proto3" json:"keyword,omitempty"`
-	Sort          string                 `protobuf:"bytes,5,opt,name=sort,proto3" json:"sort,omitempty"`
-	Filters       map[string]string      `protobuf:"bytes,6,rep,name=filters,proto3" json:"filters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Resource       string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	Page           uint32                 `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize       uint32                 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Keyword        string                 `protobuf:"bytes,4,opt,name=keyword,proto3" json:"keyword,omitempty"`
+	Sort           string                 `protobuf:"bytes,5,opt,name=sort,proto3" json:"sort,omitempty"`
+	Filters        map[string]string      `protobuf:"bytes,6,rep,name=filters,proto3" json:"filters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	TargetTenantId uint64                 `protobuf:"varint,7,opt,name=target_tenant_id,json=targetTenantId,proto3" json:"target_tenant_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListResourcesRequest) Reset() {
@@ -107,6 +108,13 @@ func (x *ListResourcesRequest) GetFilters() map[string]string {
 	return nil
 }
 
+func (x *ListResourcesRequest) GetTargetTenantId() uint64 {
+	if x != nil {
+		return x.TargetTenantId
+	}
+	return 0
+}
+
 type ListResourcesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Items         []*structpb.Struct     `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
@@ -176,11 +184,12 @@ func (x *ListResourcesResponse) GetPageSize() uint32 {
 }
 
 type CreateResourceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	Data          *structpb.Struct       `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Resource       string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	Data           *structpb.Struct       `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	TargetTenantId uint64                 `protobuf:"varint,3,opt,name=target_tenant_id,json=targetTenantId,proto3" json:"target_tenant_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateResourceRequest) Reset() {
@@ -227,13 +236,21 @@ func (x *CreateResourceRequest) GetData() *structpb.Struct {
 	return nil
 }
 
+func (x *CreateResourceRequest) GetTargetTenantId() uint64 {
+	if x != nil {
+		return x.TargetTenantId
+	}
+	return 0
+}
+
 type UpdateResourceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	Id            uint64                 `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
-	Data          *structpb.Struct       `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Resource       string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	Id             uint64                 `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
+	Data           *structpb.Struct       `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	TargetTenantId uint64                 `protobuf:"varint,4,opt,name=target_tenant_id,json=targetTenantId,proto3" json:"target_tenant_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateResourceRequest) Reset() {
@@ -287,12 +304,20 @@ func (x *UpdateResourceRequest) GetData() *structpb.Struct {
 	return nil
 }
 
+func (x *UpdateResourceRequest) GetTargetTenantId() uint64 {
+	if x != nil {
+		return x.TargetTenantId
+	}
+	return 0
+}
+
 type DeleteResourceRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	Id            uint64                 `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Resource       string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	Id             uint64                 `protobuf:"varint,2,opt,name=id,proto3" json:"id,omitempty"`
+	TargetTenantId uint64                 `protobuf:"varint,3,opt,name=target_tenant_id,json=targetTenantId,proto3" json:"target_tenant_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *DeleteResourceRequest) Reset() {
@@ -335,6 +360,13 @@ func (x *DeleteResourceRequest) GetResource() string {
 func (x *DeleteResourceRequest) GetId() uint64 {
 	if x != nil {
 		return x.Id
+	}
+	return 0
+}
+
+func (x *DeleteResourceRequest) GetTargetTenantId() uint64 {
+	if x != nil {
+		return x.TargetTenantId
 	}
 	return 0
 }
@@ -708,13 +740,14 @@ func (x *RoleResourceGrant) GetActions() []string {
 }
 
 type UpdateRoleAuthorizationRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoleId        uint64                 `protobuf:"varint,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
-	DataScope     uint32                 `protobuf:"varint,2,opt,name=data_scope,json=dataScope,proto3" json:"data_scope,omitempty"`
-	Grants        []*RoleResourceGrant   `protobuf:"bytes,3,rep,name=grants,proto3" json:"grants,omitempty"`
-	DepartmentIds []uint64               `protobuf:"varint,4,rep,packed,name=department_ids,json=departmentIds,proto3" json:"department_ids,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RoleId         uint64                 `protobuf:"varint,1,opt,name=role_id,json=roleId,proto3" json:"role_id,omitempty"`
+	DataScope      uint32                 `protobuf:"varint,2,opt,name=data_scope,json=dataScope,proto3" json:"data_scope,omitempty"`
+	Grants         []*RoleResourceGrant   `protobuf:"bytes,3,rep,name=grants,proto3" json:"grants,omitempty"`
+	DepartmentIds  []uint64               `protobuf:"varint,4,rep,packed,name=department_ids,json=departmentIds,proto3" json:"department_ids,omitempty"`
+	TargetTenantId uint64                 `protobuf:"varint,5,opt,name=target_tenant_id,json=targetTenantId,proto3" json:"target_tenant_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateRoleAuthorizationRequest) Reset() {
@@ -773,6 +806,13 @@ func (x *UpdateRoleAuthorizationRequest) GetDepartmentIds() []uint64 {
 		return x.DepartmentIds
 	}
 	return nil
+}
+
+func (x *UpdateRoleAuthorizationRequest) GetTargetTenantId() uint64 {
+	if x != nil {
+		return x.TargetTenantId
+	}
+	return 0
 }
 
 type UpdateRoleAuthorizationResponse struct {
@@ -919,14 +959,15 @@ var File_admin_v1_management_proto protoreflect.FileDescriptor
 
 const file_admin_v1_management_proto_rawDesc = "" +
 	"\n" +
-	"\x19admin/v1/management.proto\x12\badmin.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\"\x94\x02\n" +
+	"\x19admin/v1/management.proto\x12\badmin.v1\x1a\x1cgoogle/api/annotations.proto\x1a\x1cgoogle/protobuf/struct.proto\"\xbe\x02\n" +
 	"\x14ListResourcesRequest\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\rR\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x03 \x01(\rR\bpageSize\x12\x18\n" +
 	"\akeyword\x18\x04 \x01(\tR\akeyword\x12\x12\n" +
 	"\x04sort\x18\x05 \x01(\tR\x04sort\x12E\n" +
-	"\afilters\x18\x06 \x03(\v2+.admin.v1.ListResourcesRequest.FiltersEntryR\afilters\x1a:\n" +
+	"\afilters\x18\x06 \x03(\v2+.admin.v1.ListResourcesRequest.FiltersEntryR\afilters\x12(\n" +
+	"\x10target_tenant_id\x18\a \x01(\x04R\x0etargetTenantId\x1a:\n" +
 	"\fFiltersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8d\x01\n" +
@@ -934,17 +975,20 @@ const file_admin_v1_management_proto_rawDesc = "" +
 	"\x05items\x18\x01 \x03(\v2\x17.google.protobuf.StructR\x05items\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x04R\x05total\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\rR\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\rR\bpageSize\"`\n" +
+	"\tpage_size\x18\x04 \x01(\rR\bpageSize\"\x8a\x01\n" +
 	"\x15CreateResourceRequest\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12+\n" +
-	"\x04data\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x04data\"p\n" +
+	"\x04data\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x04data\x12(\n" +
+	"\x10target_tenant_id\x18\x03 \x01(\x04R\x0etargetTenantId\"\x9a\x01\n" +
 	"\x15UpdateResourceRequest\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\x04R\x02id\x12+\n" +
-	"\x04data\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04data\"C\n" +
+	"\x04data\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04data\x12(\n" +
+	"\x10target_tenant_id\x18\x04 \x01(\x04R\x0etargetTenantId\"m\n" +
 	"\x15DeleteResourceRequest\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x0e\n" +
-	"\x02id\x18\x02 \x01(\x04R\x02id\"(\n" +
+	"\x02id\x18\x02 \x01(\x04R\x02id\x12(\n" +
+	"\x10target_tenant_id\x18\x03 \x01(\x04R\x0etargetTenantId\"(\n" +
 	"\x16CreateResourceResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\"(\n" +
 	"\x16UpdateResourceResponse\x12\x0e\n" +
@@ -962,13 +1006,14 @@ const file_admin_v1_management_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"R\n" +
 	"\x11RoleResourceGrant\x12#\n" +
 	"\rresource_code\x18\x01 \x01(\tR\fresourceCode\x12\x18\n" +
-	"\aactions\x18\x02 \x03(\tR\aactions\"\xb4\x01\n" +
+	"\aactions\x18\x02 \x03(\tR\aactions\"\xde\x01\n" +
 	"\x1eUpdateRoleAuthorizationRequest\x12\x17\n" +
 	"\arole_id\x18\x01 \x01(\x04R\x06roleId\x12\x1d\n" +
 	"\n" +
 	"data_scope\x18\x02 \x01(\rR\tdataScope\x123\n" +
 	"\x06grants\x18\x03 \x03(\v2\x1b.admin.v1.RoleResourceGrantR\x06grants\x12%\n" +
-	"\x0edepartment_ids\x18\x04 \x03(\x04R\rdepartmentIds\":\n" +
+	"\x0edepartment_ids\x18\x04 \x03(\x04R\rdepartmentIds\x12(\n" +
+	"\x10target_tenant_id\x18\x05 \x01(\x04R\x0etargetTenantId\":\n" +
 	"\x1fUpdateRoleAuthorizationResponse\x12\x17\n" +
 	"\arole_id\x18\x01 \x01(\x04R\x06roleId\"]\n" +
 	"\x1bUpdateTenantFeaturesRequest\x12\x1b\n" +

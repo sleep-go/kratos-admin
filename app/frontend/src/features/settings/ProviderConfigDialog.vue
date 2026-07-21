@@ -63,12 +63,16 @@ async function submit() {
       display_name: form.displayName,
       status: form.status,
       is_default: form.isDefault,
-      target_tenant_id: props.targetTenantId,
       config: sanitizeProviderConfig(form.config)
     }
     if (props.row?.id)
-      await managementApi.updateResource('providers', String(props.row.id), payload)
-    else await managementApi.createResource('providers', payload)
+      await managementApi.updateResource('providers', String(props.row.id), payload, {
+        targetTenantId: props.targetTenantId
+      })
+    else
+      await managementApi.createResource('providers', payload, {
+        targetTenantId: props.targetTenantId
+      })
     ElMessage.success('渠道配置已加密保存')
     emit('saved')
   } catch (error) {
@@ -116,8 +120,8 @@ async function submit() {
             :placeholder="
               field.secret && form.config[`${field.key}_configured`] ? '已配置，留空保持不变' : ''
             "
-            show-password
-            autocomplete="new-password"
+            :show-password="Boolean(field.secret)"
+            :autocomplete="field.secret ? 'new-password' : undefined"
           />
         </el-form-item>
       </div>

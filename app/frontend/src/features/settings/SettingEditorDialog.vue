@@ -67,15 +67,18 @@ async function submit() {
       setting_key: props.item?.setting_key,
       value_type: form.valueType,
       allow_tenant_override: props.platformContext ? form.allowTenantOverride : false,
-      is_secret: form.isSecret,
-      target_tenant_id: props.targetTenantId
+      is_secret: form.isSecret
     }
     if (!form.isSecret || form.settingValue) payload.setting_value = parseValue()
     if (props.stored?.id) {
-      await managementApi.updateResource('settings', String(props.stored.id), payload)
+      await managementApi.updateResource('settings', String(props.stored.id), payload, {
+        targetTenantId: props.targetTenantId
+      })
     } else {
       if (form.isSecret && !form.settingValue) throw new Error('首次配置敏感值时不能为空')
-      await managementApi.createResource('settings', payload)
+      await managementApi.createResource('settings', payload, {
+        targetTenantId: props.targetTenantId
+      })
     }
     ElMessage.success('配置已保存')
     emit('saved')
@@ -115,8 +118,8 @@ async function submit() {
           v-model="form.settingValue"
           :type="form.isSecret ? 'password' : form.valueType === 'json' ? 'textarea' : 'text'"
           :rows="5"
-          show-password
-          autocomplete="new-password"
+          :show-password="form.isSecret"
+          :autocomplete="form.isSecret ? 'new-password' : undefined"
         />
       </el-form-item>
       <el-form-item v-if="platformContext" label="覆盖策略">

@@ -6,6 +6,7 @@ import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
 import { Check } from '@/components/icons/actions'
 
+const props = defineProps<{ targetTenantId?: string }>()
 const loading = ref(false)
 const saving = ref(false)
 const tenants = ref<ResourceRow[]>([])
@@ -17,7 +18,9 @@ const featureTree = ref<InstanceType<typeof ElTree>>()
 
 const resourceTree = computed(() => {
   const children = new Map<string, ResourceRow[]>()
-  for (const item of resources.value.filter((row) => Number(row.status) === 1)) {
+  for (const item of resources.value.filter(
+    (row) => Number(row.status) === 1 && (Number(row.scope_mask) & 2) === 2
+  )) {
     const parent = String(item.parent_id ?? '0')
     children.set(parent, [...(children.get(parent) ?? []), item])
   }
@@ -36,7 +39,10 @@ async function load() {
     tenants.value = tenantResponse.items ?? []
     resources.value = resourceResponse.items ?? []
     grants.value = grantResponse.items ?? []
-    if (tenants.value[0]) await selectTenant(tenants.value[0])
+    const initialTenant = props.targetTenantId
+      ? tenants.value.find((tenant) => String(tenant.id) === props.targetTenantId)
+      : tenants.value[0]
+    if (initialTenant) await selectTenant(initialTenant)
   } finally {
     loading.value = false
   }
@@ -95,8 +101,8 @@ onMounted(load)
         保存授权
       </el-button>
     </header>
-    <div class="feature-layout">
-      <aside class="tenant-list">
+    <div class="feature-layout" :class="{ 'fixed-tenant': targetTenantId }">
+      <aside v-if="!targetTenantId" class="tenant-list">
         <header>
           <strong>平台租户</strong><span>{{ tenants.length }} 个</span>
         </header>
@@ -107,7 +113,8 @@ onMounted(load)
           :class="{ active: selectedTenant?.id === tenant.id }"
           @click="selectTenant(tenant)"
         >
-          <strong>{{ tenant.name }}</strong><span>{{ tenant.code }} · ID {{ tenant.id }}</span>
+          <strong>{{ tenant.name }}</strong
+          ><span>{{ tenant.code }} · ID {{ tenant.id }}</span>
         </button>
       </aside>
       <main class="tree-panel">
@@ -130,7 +137,8 @@ onMounted(load)
         >
           <template #default="{ data }">
             <div class="tree-node">
-              <strong>{{ data.name }}</strong><span>{{ data.code }}</span>
+              <strong>{{ data.name }}</strong
+              ><span>{{ data.code }}</span>
             </div>
           </template>
         </el-tree>
@@ -172,6 +180,9 @@ onMounted(load)
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 16px;
+}
+.feature-layout.fixed-tenant {
+  grid-template-columns: minmax(0, 1fr);
 }
 .tenant-list,
 .tree-panel {

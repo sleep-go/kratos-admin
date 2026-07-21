@@ -14,7 +14,16 @@ vi.mock('@/api/management', () => ({
         items: [{ id: '1', status_code: 500, created_at: '2026-07-20T08:00:00Z' }]
       })
     return Promise.resolve({
-      items: [{ id: '2', summary: '角色权限已更新', created_at: '2026-07-20T09:00:00Z' }],
+      items: [
+        {
+          id: '2',
+          action: 'update_authorization',
+          resource_type: 'roles',
+          resource_id: '8',
+          summary: 'update_authorization roles 8',
+          created_at: '2026-07-20T09:00:00Z'
+        }
+      ],
       total: 1
     })
   })
@@ -33,6 +42,6 @@ describe('DashboardView', () => {
     expect(wrapper.text()).toContain('请求趋势')
     expect(wrapper.text()).toContain('安全动态')
     expect(wrapper.text()).toContain('18')
-    expect(wrapper.text()).toContain('角色权限已更新')
+    expect(wrapper.text()).toContain('更新授权角色 #8')
   })
 })

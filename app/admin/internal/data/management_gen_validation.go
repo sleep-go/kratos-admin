@@ -10,6 +10,23 @@ import (
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
+func validatePlatformTargetTenantGen(ctx context.Context, q *query.Query, scope managementbiz.Scope) error {
+	if !scope.PlatformAdmin || scope.TenantID == 0 {
+		return nil
+	}
+	tenant := q.Tenant
+	count, err := tenant.WithContext(ctx).Where(
+		tenant.ID.Eq(scope.TenantID), tenant.Status.Eq(1), tenant.DeletedAt.IsNull(),
+	).Count()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return errors.New("目标租户不存在、已冻结或已删除")
+	}
+	return nil
+}
+
 func validateSettingOverrideGen(ctx context.Context, q *query.Query, resource string, values map[string]any) error {
 	if resource != "settings" || numericID(values["tenant_id"]) == 0 {
 		return nil
@@ -33,7 +50,7 @@ func validateSettingOverrideGen(ctx context.Context, q *query.Query, resource st
 func incrementPermissionVersionGen(ctx context.Context, q *query.Query, scope managementbiz.Scope, resource string, values map[string]any, resourceID uint64) error {
 	tenant := q.Tenant
 	switch resource {
-	case "roles", "casbin-rules", "role-scope-departments":
+	case "members", "roles", "casbin-rules", "role-scope-departments":
 		if scope.TenantID == 0 {
 			return nil
 		}

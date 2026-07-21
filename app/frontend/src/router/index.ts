@@ -75,6 +75,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/permission/TenantFeatureView.vue')
       },
       {
+        path: 'platform/tenants/:tenantId/setup',
+        name: 'tenant-setup',
+        component: () => import('@/views/platform/TenantSetupView.vue'),
+        props: (route) => ({ tenantId: String(route.params.tenantId) }),
+        meta: { platformOnly: true }
+      },
+      {
         path: 'settings',
         name: 'system-settings',
         component: () => import('@/views/settings/SystemSettingsView.vue')
@@ -109,6 +116,16 @@ export function createAppRouter(mode: 'web' | 'memory' = 'web') {
     }
     if (to.meta.guestOnly && authStore.isAuthenticated) {
       return { name: 'dashboard' }
+    }
+    if (to.meta.platformOnly) {
+      const platformContext =
+        Boolean(authStore.currentUser?.platformAdmin) &&
+        Number(authStore.currentTenant?.id ?? 0) === 0
+      const canManageTenants = resolveNavigation(authStore.navigationItems).some(
+        (item) => item.to === '/platform/tenants'
+      )
+      if (!platformContext || !canManageTenants) return { name: 'dashboard' }
+      return
     }
     if (authStore.isAuthenticated && !to.meta.guestOnly && !['/', '/account'].includes(to.path)) {
       const allowed = resolveNavigation(authStore.navigationItems).some(

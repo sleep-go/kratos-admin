@@ -26,6 +26,7 @@ describe('后台资源页面注册表', () => {
   it('日志和文件元数据不能通过通用页面伪造', () => {
     expect(resourceDefinitions['audit-logs'].readOnly).toBe(true)
     expect(resourceDefinitions.files.readOnly).toBe(true)
+    expect(resourceDefinitions['tenant-resources'].readOnly).toBe(true)
   })
 
   it('为三类日志声明后端允许的结构化筛选项', () => {
@@ -48,13 +49,61 @@ describe('后台资源页面注册表', () => {
 
   it('为日志枚举值提供中文标签', () => {
     const result = resourceDefinitions['login-logs'].fields.find((item) => item.key === 'result')
+    const reason = resourceDefinitions['login-logs'].fields.find((item) => item.key === 'reason')
     const logType = resourceDefinitions['log-exports'].fields.find(
       (item) => item.key === 'log_type'
     )
 
     expect(result?.valueLabels?.['1']).toBe('成功')
     expect(result?.valueLabels?.['4']).toBe('需要 MFA')
+    expect(reason?.valueLabels?.AUTH_INVALID_CREDENTIALS).toBe('账号或密码错误')
+    expect(reason?.valueLabels?.CAPTCHA_INVALID).toBe('图形验证码错误或已过期')
     expect(logType?.valueLabels?.api).toBe('API 日志')
+  })
+
+  it('按不同业务语义展示用户、租户和文件状态', () => {
+    const userStatus = resourceDefinitions.users.fields.find((item) => item.key === 'status')
+    const tenantStatus = resourceDefinitions.tenants.fields.find((item) => item.key === 'status')
+    const fileStatus = resourceDefinitions.files.fields.find((item) => item.key === 'status')
+
+    expect(userStatus?.options).toContainEqual({ label: '锁定', value: 3 })
+    expect(tenantStatus?.options).toContainEqual({ label: '冻结', value: 2 })
+    expect(fileStatus?.valueLabels).toMatchObject({
+      '1': '待确认',
+      '2': '可用',
+      '4': '清理失败',
+      '5': '等待后台清理'
+    })
+  })
+
+  it('操作审计筛选项使用中文选项并保留英文传输值', () => {
+    const action = resourceDefinitions['audit-logs'].filters?.find((item) => item.key === 'action')
+    const resourceType = resourceDefinitions['audit-logs'].filters?.find(
+      (item) => item.key === 'resource_type'
+    )
+
+    expect(action).toMatchObject({ type: 'select' })
+    expect(action?.options).toContainEqual({ label: '更新授权', value: 'update_authorization' })
+    expect(resourceType).toMatchObject({ type: 'select' })
+    expect(resourceType?.options).toContainEqual({ label: '菜单与权限资源', value: 'resources' })
+  })
+
+  it('操作审计列表字段使用同一套中文展示规则', () => {
+    const fields = resourceDefinitions['audit-logs'].fields
+    const row = {
+      action: 'update_authorization',
+      resource_type: 'roles',
+      resource_id: '8',
+      summary: 'update_authorization roles 8'
+    }
+
+    expect(fields.find((item) => item.key === 'summary')?.format?.(row.summary, row)).toBe(
+      '更新授权角色 #8'
+    )
+    expect(fields.find((item) => item.key === 'action')?.format?.(row.action, row)).toBe('更新授权')
+    expect(
+      fields.find((item) => item.key === 'resource_type')?.format?.(row.resource_type, row)
+    ).toBe('角色')
   })
 
   it('可写关联字段使用接口选项或树选择而不是数字输入', () => {
@@ -89,6 +138,7 @@ describe('后台资源页面注册表', () => {
       ['users', 'mfa_channel'],
       ['roles', 'data_scope'],
       ['resources', 'type'],
+      ['resources', 'scope_mask'],
       ['casbin-rules', 'ptype']
     ] as const) {
       const field = resourceDefinitions[resource].fields.find((item) => item.key === key)

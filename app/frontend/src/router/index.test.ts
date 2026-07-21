@@ -10,6 +10,10 @@ vi.mock('@/api/auth', () => ({
   refresh: vi.fn().mockRejectedValue(new Error('unauthorized'))
 }))
 
+vi.mock('@/views/dashboard/DashboardView.vue', () => ({
+  default: { template: '<div>工作台</div>' }
+}))
+
 describe('路由鉴权', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -47,6 +51,26 @@ describe('路由鉴权', () => {
     await router.push('/permission/roles')
     await router.isReady()
 
+    expect(router.currentRoute.value.name).toBe('dashboard')
+  })
+
+  it('仅允许平台上下文管理员从租户菜单进入初始化页', async () => {
+    const authStore = useAuthStore()
+    authStore.accessToken = 'token'
+    authStore.sessionRestored = true
+    authStore.currentUser = { id: '1', displayName: '平台管理员', platformAdmin: true }
+    authStore.currentTenant = { id: '0', code: 'platform', name: '平台' }
+    authStore.navigationItems = [
+      { name: '租户管理', routePath: '/platform/tenants', componentKey: 'tenants' }
+    ]
+    const router = createAppRouter('memory')
+
+    await router.push('/platform/tenants/8/setup')
+    await router.isReady()
+    expect(router.currentRoute.value.name).toBe('tenant-setup')
+
+    authStore.currentTenant = { id: '8', code: 'demo', name: '演示租户' }
+    await router.push('/platform/tenants/9/setup')
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
 })

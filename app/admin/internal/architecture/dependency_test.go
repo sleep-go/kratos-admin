@@ -38,6 +38,14 @@ func TestMonorepoEntrypoints(t *testing.T) {
 	assertFileContains(t, "../../../../docker-compose.yml", "configs/config.docker.yaml")
 }
 
+func TestLocalMySQLGrantsTemporaryGORMGenDatabaseAccess(t *testing.T) {
+	t.Parallel()
+	const initSQL = "../../../../deploy/mysql/init/01-gorm-gen.sql"
+	assertPathExists(t, initSQL)
+	assertFileContains(t, "../../../../docker-compose.yml", "./deploy/mysql/init/01-gorm-gen.sql:/docker-entrypoint-initdb.d/01-gorm-gen.sql:ro")
+	assertFileContains(t, initSQL, "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX ON `kratos\\_admin\\_gen\\_%`.* TO 'kratos'@'%'")
+}
+
 func assertFileContains(t *testing.T, path, expected string) {
 	t.Helper()
 	content, err := os.ReadFile(path)

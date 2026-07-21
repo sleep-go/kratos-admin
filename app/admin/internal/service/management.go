@@ -15,7 +15,7 @@ import (
 
 // GetEffectiveSettings 返回按代码默认、平台默认和租户覆盖解析后的有效设置。
 func (s *ManagementService) GetEffectiveSettings(ctx context.Context, request *v1.GetEffectiveSettingsRequest) (*v1.GetEffectiveSettingsResponse, error) {
-	scope, err := managementScope(ctx, "settings")
+	scope, err := managementScope(ctx, "settings", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (s *ManagementService) GetEffectiveSettings(ctx context.Context, request *v
 
 // TestProviderConnection 使用已保存的加密配置验证 Provider 连接。
 func (s *ManagementService) TestProviderConnection(ctx context.Context, request *v1.TestProviderConnectionRequest) (*v1.TestProviderConnectionResponse, error) {
-	scope, err := managementScope(ctx, "providers")
+	scope, err := managementScope(ctx, "providers", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (s *ManagementService) TestProviderConnection(ctx context.Context, request 
 
 // UpdateRoleAuthorization 在单个事务内替换角色资源授权与数据范围。
 func (s *ManagementService) UpdateRoleAuthorization(ctx context.Context, request *v1.UpdateRoleAuthorizationRequest) (*v1.UpdateRoleAuthorizationResponse, error) {
-	scope, err := managementScope(ctx, "roles")
+	scope, err := managementScope(ctx, "roles", request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (s *ManagementService) UpdateRoleAuthorization(ctx context.Context, request
 
 // UpdateTenantFeatures 在单个事务内替换目标租户功能授权。
 func (s *ManagementService) UpdateTenantFeatures(ctx context.Context, request *v1.UpdateTenantFeaturesRequest) (*v1.UpdateTenantFeaturesResponse, error) {
-	scope, err := managementScope(ctx, "tenant-resources")
+	scope, err := managementScope(ctx, "tenant-resources", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func NewManagementService(repository managementbiz.Repository, checkers ...manag
 
 // ListResources 按可信租户边界分页查询白名单资源。
 func (s *ManagementService) ListResources(ctx context.Context, request *v1.ListResourcesRequest) (*v1.ListResourcesResponse, error) {
-	scope, err := managementScope(ctx, request.GetResource())
+	scope, err := managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (s *ManagementService) ListResources(ctx context.Context, request *v1.ListR
 
 // CreateResource 在可信租户边界内创建白名单资源并写入审计 Outbox。
 func (s *ManagementService) CreateResource(ctx context.Context, request *v1.CreateResourceRequest) (*v1.CreateResourceResponse, error) {
-	scope, err := managementScope(ctx, request.GetResource())
+	scope, err := managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (s *ManagementService) CreateResource(ctx context.Context, request *v1.Crea
 
 // UpdateResource 在可信租户边界内更新白名单资源并写入审计 Outbox。
 func (s *ManagementService) UpdateResource(ctx context.Context, request *v1.UpdateResourceRequest) (*v1.UpdateResourceResponse, error) {
-	scope, err := managementScope(ctx, request.GetResource())
+	scope, err := managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (s *ManagementService) UpdateResource(ctx context.Context, request *v1.Upda
 
 // DeleteResource 在可信租户边界内逻辑删除白名单资源并写入审计 Outbox。
 func (s *ManagementService) DeleteResource(ctx context.Context, request *v1.DeleteResourceRequest) (*v1.DeleteResourceResponse, error) {
-	scope, err := managementScope(ctx, request.GetResource())
+	scope, err := managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -207,12 +207,28 @@ func (s *ManagementService) authorize(ctx context.Context, scope managementbiz.S
 	return nil
 }
 
-func managementScope(ctx context.Context, resource string) (managementbiz.Scope, error) {
+var tenantSetupResources = map[string]struct{}{
+	"members": {}, "departments": {}, "positions": {}, "roles": {},
+	"casbin-rules": {}, "role-scope-departments": {},
+}
+
+func managementScope(ctx context.Context, resource string, targetTenantID uint64) (managementbiz.Scope, error) {
 	claims, ok := bizauth.ClaimsFromContext(ctx)
 	if !ok {
 		return managementbiz.Scope{}, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
 	platformContext := bizauth.IsPlatformContext(claims)
+	if targetTenantID != 0 {
+		if !platformContext {
+			return managementbiz.Scope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "租户初始化仅限平台管理员")
+		}
+		if _, allowed := tenantSetupResources[resource]; !allowed {
+			return managementbiz.Scope{}, kratoserrors.BadRequest("TENANT_SETUP_RESOURCE_INVALID", "该资源不能通过租户初始化入口维护")
+		}
+		return managementbiz.Scope{
+			TenantID: targetTenantID, UserID: claims.UserID, PlatformAdmin: true,
+		}, nil
+	}
 	if isPlatformResource(resource) && !platformContext {
 		return managementbiz.Scope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "该资源仅限平台管理员")
 	}

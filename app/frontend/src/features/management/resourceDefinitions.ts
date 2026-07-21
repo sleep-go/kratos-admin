@@ -1,3 +1,11 @@
+import {
+  auditActionLabel,
+  auditActionOptions,
+  auditResourceLabel,
+  auditResourceOptions,
+  auditSummaryLabel
+} from './auditLabels'
+
 export interface ResourceOption {
   label: string
   value: string | number
@@ -45,6 +53,7 @@ export interface ResourceField {
   options?: ResourceOption[]
   lookup?: ResourceLookupDefinition
   lookupBy?: ResourceLookupByDefinition
+  format?: (value: unknown, row: Record<string, unknown>) => unknown
 }
 
 export interface ResourceFilter {
@@ -64,7 +73,17 @@ export interface ResourceDefinition {
   filters?: ResourceFilter[]
 }
 
-const commonStatus: ResourceField = { key: 'status', label: '状态', type: 'status', table: true }
+const commonStatusOptions: ResourceOption[] = [
+  { label: '启用', value: 1 },
+  { label: '禁用', value: 2 }
+]
+const commonStatus: ResourceField = {
+  key: 'status',
+  label: '状态',
+  type: 'status',
+  table: true,
+  options: commonStatusOptions
+}
 const createdAt: ResourceField = { key: 'created_at', label: '创建时间', table: true }
 
 export const resourceDefinitions: Record<string, ResourceDefinition> = {
@@ -84,7 +103,14 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
         required: true,
         createOnly: true
       },
-      { key: 'status', label: '状态', type: 'status', default: 1, table: true },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        default: 1,
+        table: true,
+        options: [...commonStatusOptions, { label: '锁定', value: 3 }]
+      },
       { key: 'mfa_enabled', label: '启用 MFA', type: 'boolean', default: false, table: true },
       {
         key: 'mfa_channel',
@@ -254,6 +280,19 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
         ]
       },
       {
+        key: 'scope_mask',
+        label: '适用范围',
+        type: 'select',
+        required: true,
+        default: 3,
+        table: true,
+        options: [
+          { label: '仅平台', value: 1 },
+          { label: '仅租户', value: 2 },
+          { label: '平台与租户共用', value: 3 }
+        ]
+      },
+      {
         key: 'parent_id',
         label: '父资源',
         type: 'tree',
@@ -280,6 +319,7 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     resource: 'tenant-resources',
     title: '租户功能授权',
     description: '控制每个租户可使用的功能集合。',
+    readOnly: true,
     fields: [
       {
         key: 'tenant_id',
@@ -389,7 +429,21 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
         table: true,
         valueLabels: { '1': '成功', '2': '失败', '3': '账号锁定', '4': '需要 MFA' }
       },
-      { key: 'reason', label: '原因', table: true },
+      {
+        key: 'reason',
+        label: '原因',
+        table: true,
+        valueLabels: {
+          AUTH_INVALID_ARGUMENT: '账号和密码不能为空',
+          CAPTCHA_INVALID: '图形验证码错误或已过期',
+          AUTH_INVALID_CREDENTIALS: '账号或密码错误',
+          AUTH_ACCOUNT_LOCKED: '账号已被临时锁定',
+          AUTH_ACCOUNT_DISABLED: '账号已被禁用',
+          AUTH_NO_TENANT: '账号没有可用租户',
+          AUTH_INTERNAL: '认证服务暂时不可用',
+          MFA_REQUIRED: '需要 MFA 验证'
+        }
+      },
       { key: 'ip', label: 'IP', table: true },
       { key: 'request_id', label: '请求 ID', table: true },
       createdAt
@@ -402,15 +456,31 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     readOnly: true,
     exportLogType: 'audit',
     filters: [
-      { key: 'action', label: '操作类型', type: 'text' },
-      { key: 'resource_type', label: '资源类型', type: 'text' },
+      { key: 'action', label: '操作类型', type: 'select', options: auditActionOptions },
+      {
+        key: 'resource_type',
+        label: '资源类型',
+        type: 'select',
+        options: auditResourceOptions
+      },
       { key: 'user_id', label: '用户 ID', type: 'text' },
       { key: 'member_id', label: '成员 ID', type: 'text' }
     ],
     fields: [
-      { key: 'summary', label: '操作摘要', table: true },
-      { key: 'action', label: '动作', table: true },
-      { key: 'resource_type', label: '资源类型', table: true },
+      {
+        key: 'summary',
+        label: '操作摘要',
+        table: true,
+        format: (value, row) =>
+          auditSummaryLabel(value, row.action, row.resource_type, row.resource_id)
+      },
+      { key: 'action', label: '动作', table: true, format: auditActionLabel },
+      {
+        key: 'resource_type',
+        label: '资源类型',
+        table: true,
+        format: auditResourceLabel
+      },
       { key: 'resource_id', label: '资源 ID', table: true },
       { key: 'user_id', label: '用户 ID', table: true },
       { key: 'request_id', label: '请求 ID', table: true },
@@ -509,7 +579,19 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
       { key: 'content_type', label: '类型', table: true },
       { key: 'size_bytes', label: '大小', table: true },
       { key: 'provider_name', label: '存储', table: true },
-      commonStatus,
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        table: true,
+        valueLabels: {
+          '1': '待确认',
+          '2': '可用',
+          '3': '已删除',
+          '4': '清理失败',
+          '5': '等待后台清理'
+        }
+      },
       createdAt
     ]
   },

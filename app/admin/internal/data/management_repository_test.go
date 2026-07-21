@@ -50,6 +50,8 @@ func TestValidateManagementEnumValues(t *testing.T) {
 		{name: "拒绝未知数据范围", resource: "roles", values: map[string]any{"data_scope": 6}, wantErr: true},
 		{name: "API资源类型", resource: "resources", values: map[string]any{"type": 4}},
 		{name: "拒绝未知资源类型", resource: "resources", values: map[string]any{"type": 0}, wantErr: true},
+		{name: "平台与租户共用资源", resource: "resources", values: map[string]any{"scope_mask": 3}},
+		{name: "拒绝未知资源适用范围", resource: "resources", values: map[string]any{"scope_mask": 4}, wantErr: true},
 		{name: "资源授权策略", resource: "casbin-rules", values: map[string]any{"ptype": "p"}},
 		{name: "角色继承策略", resource: "casbin-rules", values: map[string]any{"ptype": "g"}},
 		{name: "拒绝未知策略类型", resource: "casbin-rules", values: map[string]any{"ptype": "x"}, wantErr: true},
@@ -206,6 +208,9 @@ func TestSettingsAndProviderConfigsAreEncryptedAndResolvedInMySQL(t *testing.T) 
 func TestReadOnlyResourceRejectsWrites(t *testing.T) {
 	if _, err := sanitizeResourceWrite(managementResources["audit-logs"], map[string]any{"summary": "伪造"}); err == nil {
 		t.Fatal("audit logs must be read-only")
+	}
+	if _, err := sanitizeResourceWrite(managementResources["tenant-resources"], map[string]any{"tenant_id": 1, "resource_id": 2}); err == nil {
+		t.Fatal("tenant resources must only be replaced through the dedicated API")
 	}
 }
 
@@ -482,6 +487,158 @@ func TestRoleAuthorizationAndTenantFeaturesAreAtomicInMySQL(t *testing.T) {
 	tx.Model(&model.Tenant{}).Where("id = ?", tenant.ID).Pluck("permission_version", &version)
 	if policyCount != 2 || scopeCount != 1 || version != 3 {
 		t.Fatalf("policy=%d scope=%d version=%d", policyCount, scopeCount, version)
+	}
+}
+
+func TestTenantFeaturesRejectPlatformResourcesAndAddsAncestorsInMySQL(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	tenant := &model.Tenant{Code: "feature-scope", Name: "功能范围租户", Status: 1, PermissionVersion: 1}
+	if err := tx.Create(tenant).Error; err != nil {
+		t.Fatal(err)
+	}
+	parent := &model.Resource{Type: 1, ScopeMask: 2, Code: "feature-parent", Name: "租户目录", Visible: true, Status: 1}
+	if err := tx.Create(parent).Error; err != nil {
+		t.Fatal(err)
+	}
+	child := &model.Resource{ParentID: parent.ID, Type: 2, ScopeMask: 2, Code: "feature-child", Name: "租户菜单", Visible: true, Status: 1}
+	platformOnly := &model.Resource{Type: 2, ScopeMask: 1, Code: "feature-platform", Name: "平台菜单", Visible: true, Status: 1}
+	for _, resource := range []*model.Resource{child, platformOnly} {
+		if err := tx.Create(resource).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	repository := &ManagementRepository{q: query.Use(tx)}
+	scope := managementbiz.Scope{UserID: 1, PlatformAdmin: true}
+	if err := repository.UpdateTenantFeatures(context.Background(), scope, tenant.ID, []uint64{platformOnly.ID}); err == nil {
+		t.Fatal("平台专属资源不能授权给租户")
+	}
+	if err := repository.UpdateTenantFeatures(context.Background(), scope, tenant.ID, []uint64{child.ID}); err != nil {
+		t.Fatal(err)
+	}
+	var count int64
+	if err := tx.Model(&model.TenantResource{}).Where("tenant_id = ? AND resource_id IN ?", tenant.ID, []uint64{parent.ID, child.ID}).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("tenant resource count = %d, want child and parent", count)
+	}
+}
+
+func TestMemberAdministratorChangeIncrementsPermissionVersionInMySQL(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	tenant := &model.Tenant{Code: "member-version", Name: "成员版本租户", Status: 1, PermissionVersion: 1}
+	user := &model.User{Username: "member-version-user", PasswordHash: "hash", DisplayName: "成员", Status: 1, PasswordChangedAt: time.Now().UTC()}
+	for _, value := range []any{tenant, user} {
+		if err := tx.Create(value).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	member := &model.TenantMember{TenantID: tenant.ID, UserID: user.ID, DisplayName: "成员", Status: 1, JoinedAt: time.Now().UTC()}
+	if err := tx.Create(member).Error; err != nil {
+		t.Fatal(err)
+	}
+	repository := &ManagementRepository{q: query.Use(tx)}
+	if err := repository.Update(context.Background(), managementbiz.Scope{
+		TenantID: tenant.ID, UserID: 1, PlatformAdmin: true,
+	}, "members", member.ID, map[string]any{"is_tenant_admin": true}); err != nil {
+		t.Fatal(err)
+	}
+	var version uint64
+	if err := tx.Model(&model.Tenant{}).Where("id = ?", tenant.ID).Pluck("permission_version", &version).Error; err != nil {
+		t.Fatal(err)
+	}
+	if version != 2 {
+		t.Fatalf("permission version = %d, want 2", version)
+	}
+}
+
+func TestPlatformTargetTenantMustBeActiveInMySQL(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	tenant := &model.Tenant{Code: "frozen-target", Name: "冻结目标租户", Status: 2, PermissionVersion: 1}
+	if err := tx.Create(tenant).Error; err != nil {
+		t.Fatal(err)
+	}
+	repository := &ManagementRepository{q: query.Use(tx)}
+	scope := managementbiz.Scope{TenantID: tenant.ID, UserID: 1, PlatformAdmin: true}
+	if _, err := repository.Create(context.Background(), scope, "roles", map[string]any{
+		"code": "blocked", "name": "不可创建", "data_scope": 1, "status": 1,
+	}); err == nil {
+		t.Fatal("冻结租户不能继续执行平台初始化")
+	}
+}
+
+func TestPlatformTargetTenantCannotBeOverriddenByPayloadInMySQL(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	target := &model.Tenant{Code: "trusted-target", Name: "可信目标租户", Status: 1, PermissionVersion: 1}
+	other := &model.Tenant{Code: "payload-target", Name: "载荷目标租户", Status: 1, PermissionVersion: 1}
+	user := &model.User{Username: "trusted-target-user", PasswordHash: "hash", DisplayName: "目标成员", Status: 1, PasswordChangedAt: time.Now().UTC()}
+	for _, value := range []any{target, other, user} {
+		if err := tx.Create(value).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	repository := &ManagementRepository{q: query.Use(tx)}
+	scope := managementbiz.Scope{TenantID: target.ID, UserID: 1, PlatformAdmin: true}
+	roleID, err := repository.Create(context.Background(), scope, "roles", map[string]any{
+		"code": "trusted-role", "name": "可信角色", "data_scope": 1, "status": 1,
+		"target_tenant_id": other.ID, "tenant_id": other.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	memberID, err := repository.Create(context.Background(), scope, "members", map[string]any{
+		"user_id": user.ID, "display_name": "目标成员", "status": 1,
+		"target_tenant_id": other.ID, "tenant_id": other.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var role model.Role
+	var member model.TenantMember
+	if err := tx.First(&role, roleID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.First(&member, memberID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if role.TenantID != target.ID || member.TenantID != target.ID {
+		t.Fatalf("role tenant=%d member tenant=%d, want trusted target %d", role.TenantID, member.TenantID, target.ID)
 	}
 }
 

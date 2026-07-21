@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth'
 import { Check, Delete, Plus } from '@/components/icons/actions'
 import type { ResourceRow } from '@/api/management'
 
+const props = defineProps<{ targetTenantId?: string }>()
 const actions = [
   { value: 'list', label: '查看' },
   { value: 'create', label: '新建' },
@@ -38,6 +39,9 @@ const dataScope = ref(4)
 const departmentTreeRef = ref<InstanceType<typeof ElTree>>()
 const roleDialogOpen = ref(false)
 const roleForm = reactive({ code: '', name: '', data_scope: 4, status: 1 })
+const targetScope = computed(() =>
+  props.targetTenantId ? { targetTenantId: props.targetTenantId } : undefined
+)
 
 const selectableResources = computed(() =>
   resources.value.filter((item) => Number(item.type) >= 2 && Number(item.status) === 1)
@@ -59,17 +63,33 @@ const departmentTree = computed(() => {
 async function load() {
   loading.value = true
   try {
-    const [roleResponse, resourceResponse, departmentResponse] = await Promise.all([
-      managementApi.listResources('roles', { page: 1, page_size: 200, sort: 'sort_order:asc' }),
+    const [roleResponse, resourceResponse, departmentResponse, grantResponse] = await Promise.all([
+      managementApi.listResources(
+        'roles',
+        { page: 1, page_size: 200, sort: 'sort_order:asc' },
+        targetScope.value
+      ),
       managementApi.listResources('resources', { page: 1, page_size: 200, sort: 'sort_order:asc' }),
-      managementApi.listResources('departments', {
-        page: 1,
-        page_size: 200,
-        sort: 'sort_order:asc'
-      })
+      managementApi.listResources(
+        'departments',
+        { page: 1, page_size: 200, sort: 'sort_order:asc' },
+        targetScope.value
+      ),
+      props.targetTenantId
+        ? managementApi.listResources('tenant-resources', { page: 1, page_size: 200 })
+        : Promise.resolve({ items: [], total: 0 })
     ])
     roles.value = roleResponse.items ?? []
-    resources.value = resourceResponse.items ?? []
+    const enabledResourceIDs = new Set(
+      (grantResponse.items ?? [])
+        .filter((grant) => String(grant.tenant_id) === props.targetTenantId)
+        .map((grant) => String(grant.resource_id))
+    )
+    resources.value = props.targetTenantId
+      ? (resourceResponse.items ?? []).filter((resource) =>
+          enabledResourceIDs.has(String(resource.id))
+        )
+      : (resourceResponse.items ?? [])
     departments.value = departmentResponse.items ?? []
     if (!selectedRole.value && roles.value[0]) await selectRole(roles.value[0])
   } finally {
@@ -82,16 +102,16 @@ async function selectRole(role: ResourceRow) {
   dataScope.value = Number(role.data_scope ?? 4)
   const roleId = String(role.id)
   const [policies, scopes] = await Promise.all([
-    managementApi.listResources('casbin-rules', {
-      page: 1,
-      page_size: 200,
-      filters: { ptype: 'p', v1: roleId }
-    }),
-    managementApi.listResources('role-scope-departments', {
-      page: 1,
-      page_size: 200,
-      filters: { role_id: roleId }
-    })
+    managementApi.listResources(
+      'casbin-rules',
+      { page: 1, page_size: 200, filters: { ptype: 'p', v1: roleId } },
+      targetScope.value
+    ),
+    managementApi.listResources(
+      'role-scope-departments',
+      { page: 1, page_size: 200, filters: { role_id: roleId } },
+      targetScope.value
+    )
   ])
   policyRows.value = (policies.items ?? []).filter(
     (item) => item.ptype === 'p' && String(item.v1) === roleId
@@ -128,9 +148,10 @@ async function save() {
         resourceCode,
         actions: resourceActions
       })),
-      departmentIds: dataScope.value === 5 ? selectedDepartments.value : []
+      departmentIds: dataScope.value === 5 ? selectedDepartments.value : [],
+      targetTenantId: props.targetTenantId
     })
-    await authStore.renewSession()
+    if (!props.targetTenantId) await authStore.renewSession()
     ElMessage.success('角色授权与数据范围已生效，现有令牌将在下次请求重新加载')
     await selectRole(selectedRole.value)
   } finally {
@@ -144,20 +165,20 @@ function openRoleDialog() {
 }
 
 async function createRole() {
-  await managementApi.createResource('roles', roleForm)
+  await managementApi.createResource('roles', roleForm, targetScope.value)
   roleDialogOpen.value = false
   selectedRole.value = undefined
   ElMessage.success('角色已创建')
-  await authStore.renewSession()
+  if (!props.targetTenantId) await authStore.renewSession()
   await load()
 }
 
 async function removeRole(role: ResourceRow) {
   await ElMessageBox.confirm(`确认删除角色“${role.name}”？`, '危险操作确认', { type: 'warning' })
-  await managementApi.deleteResource('roles', String(role.id))
+  await managementApi.deleteResource('roles', String(role.id), targetScope.value)
   selectedRole.value = undefined
   ElMessage.success('角色已删除')
-  await authStore.renewSession()
+  if (!props.targetTenantId) await authStore.renewSession()
   await load()
 }
 
@@ -190,7 +211,13 @@ onMounted(load)
           <div>
             <strong>角色</strong><span>{{ roles.length }} 个</span>
           </div>
-          <el-button v-permission="'roles:create'" link type="danger" :icon="Plus" @click="openRoleDialog">
+          <el-button
+            v-permission="'roles:create'"
+            link
+            type="danger"
+            :icon="Plus"
+            @click="openRoleDialog"
+          >
             新建角色
           </el-button>
         </header>
@@ -201,7 +228,8 @@ onMounted(load)
           :class="{ active: selectedRole?.id === role.id }"
         >
           <button type="button" @click="selectRole(role)">
-            <strong>{{ role.name }}</strong><span>{{ role.code }}</span>
+            <strong>{{ role.name }}</strong
+            ><span>{{ role.code }}</span>
           </button>
           <el-button
             v-if="!role.is_builtin"
@@ -255,7 +283,8 @@ onMounted(load)
             <article v-for="resource in selectableResources" :key="String(resource.id)">
               <header>
                 <div>
-                  <strong>{{ resource.name }}</strong><span>{{ resource.code }}</span>
+                  <strong>{{ resource.name }}</strong
+                  ><span>{{ resource.code }}</span>
                 </div>
                 <small>{{
                   Number(resource.type) === 2

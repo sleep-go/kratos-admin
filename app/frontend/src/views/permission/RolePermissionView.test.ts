@@ -13,7 +13,7 @@ const listResources = vi.hoisted(() =>
       })
     if (resource === 'resources')
       return Promise.resolve({
-        items: [{ id: '9', name: '文件管理', code: 'files', type: 2, status: 1 }],
+        items: [{ id: '9', name: '文件管理', code: 'files', type: 2, scope_mask: 2, status: 1 }],
         total: 1
       })
     return Promise.resolve({ items: [], total: 0 })
@@ -51,5 +51,31 @@ describe('角色授权', () => {
     expect(wrapper.text()).toContain('本部门及下级')
     expect(wrapper.text()).toContain('新建角色')
     expect(wrapper.find('[data-testid="department-tree"]').exists()).toBe(true)
+  })
+
+  it('为平台初始化页按目标租户加载角色和授权', async () => {
+    mount(RolePermissionView, {
+      props: { targetTenantId: '8' },
+      global: {
+        plugins: [createTestingPinia({ createSpy: vi.fn })],
+        directives: { permission: () => undefined, loading: () => undefined },
+        stubs: {
+          ElButton: { template: '<button><slot /></button>' },
+          ElCheckbox: { template: '<label><slot /></label>' },
+          ElCheckboxGroup: { template: '<div><slot /></div>' },
+          ElRadio: { template: '<label><slot /></label>' },
+          ElRadioGroup: { template: '<div><slot /></div>' },
+          ElTree: { template: '<div />' }
+        }
+      }
+    })
+
+    await vi.waitFor(() =>
+      expect(listResources).toHaveBeenCalledWith(
+        'roles',
+        expect.objectContaining({ page: 1, page_size: 200 }),
+        { targetTenantId: '8' }
+      )
+    )
   })
 })

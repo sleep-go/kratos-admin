@@ -23,7 +23,7 @@ import { buildLookupOptions, resolveFieldLookup } from '@/features/management/re
 import type { ResourceRow } from '@/api/management'
 import type { AdminV1LogExport } from '@/api/generated'
 
-const props = defineProps<{ resourceKey: string }>()
+const props = defineProps<{ resourceKey: string; targetTenantId?: string }>()
 const definition = computed(() => resourceDefinitions[props.resourceKey])
 const tableFields = computed(() => definition.value.fields.filter((field) => field.table))
 const formFields = computed(() =>
@@ -57,15 +57,25 @@ const exportTask = ref<AdminV1LogExport>()
 const exporting = ref(false)
 let active = true
 
+function scopeOptions(resource: string) {
+  if (!props.targetTenantId || ['users', 'tenants', 'resources'].includes(resource))
+    return undefined
+  return { targetTenantId: props.targetTenantId }
+}
+
 async function load() {
   loading.value = true
   try {
-    const response = await managementApi.listResources(definition.value.resource, {
-      page: page.value,
-      page_size: pageSize.value,
-      keyword: keyword.value,
-      filters: activeFilters()
-    })
+    const response = await managementApi.listResources(
+      definition.value.resource,
+      {
+        page: page.value,
+        page_size: pageSize.value,
+        keyword: keyword.value,
+        filters: activeFilters()
+      },
+      scopeOptions(definition.value.resource)
+    )
     items.value = response.items ?? []
     total.value = Number(response.total ?? 0)
   } finally {
@@ -142,7 +152,11 @@ async function loadFormOptions() {
         async (resource) =>
           [
             resource,
-            await managementApi.listResources(resource, { page: 1, page_size: 200, sort: 'id:asc' })
+            await managementApi.listResources(
+              resource,
+              { page: 1, page_size: 200, sort: 'id:asc' },
+              scopeOptions(resource)
+            )
           ] as const
       )
     )
@@ -207,8 +221,18 @@ async function save() {
     }
   }
   if (editingID.value)
-    await managementApi.updateResource(definition.value.resource, editingID.value, payload)
-  else await managementApi.createResource(definition.value.resource, payload)
+    await managementApi.updateResource(
+      definition.value.resource,
+      editingID.value,
+      payload,
+      scopeOptions(definition.value.resource)
+    )
+  else
+    await managementApi.createResource(
+      definition.value.resource,
+      payload,
+      scopeOptions(definition.value.resource)
+    )
   drawerOpen.value = false
   ElMessage.success(editingID.value ? '更新成功' : '创建成功')
   await load()
@@ -218,7 +242,11 @@ async function remove(row: ResourceRow) {
   await ElMessageBox.confirm('删除后不可从管理界面恢复，确认继续？', '危险操作确认', {
     type: 'warning'
   })
-  await managementApi.deleteResource(definition.value.resource, String(row.id))
+  await managementApi.deleteResource(
+    definition.value.resource,
+    String(row.id),
+    scopeOptions(definition.value.resource)
+  )
   ElMessage.success('删除成功')
   await load()
 }
@@ -274,7 +302,9 @@ async function downloadExportRow(row: ResourceRow) {
   link.remove()
 }
 
-function displayValue(value: unknown, field: ResourceField) {
+function displayValue(value: unknown, field: ResourceField, row: ResourceRow) {
+  const formatted = field.format?.(value, row)
+  if (formatted !== undefined) return formatted
   const label = field.valueLabels?.[String(value)]
   if (label) return label
   if (field.options) {
@@ -299,7 +329,7 @@ watch(
 )
 
 watch(
-  () => props.resourceKey,
+  () => [props.resourceKey, props.targetTenantId],
   () => {
     page.value = 1
     keyword.value = ''
@@ -356,7 +386,12 @@ onBeforeUnmount(() => {
         <span v-else-if="exportTask.status === 3">已完成，共 {{ exportTask.rowCount }} 条</span>
         <span v-else>失败：{{ exportTask.failureReason || '请稍后重试' }}</span>
       </div>
-      <el-button v-if="exportTask.status === 3" type="danger" :icon="Download" @click="downloadExport">
+      <el-button
+        v-if="exportTask.status === 3"
+        type="danger"
+        :icon="Download"
+        @click="downloadExport"
+      >
         下载文件
       </el-button>
     </div>
@@ -399,18 +434,26 @@ onBeforeUnmount(() => {
           :label="field.label"
           min-width="125"
         >
-          <template #default="scope">{{ displayValue(scope.row[field.key], field) }}</template>
+          <template #default="scope">{{
+            displayValue(scope.row[field.key], field, scope.row)
+          }}</template>
         </el-table-column>
-        <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" width="138">
+        <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" width="210">
           <template #default="scope">
+            <router-link
+              v-if="definition.resource === 'tenants'"
+              :to="`/platform/tenants/${scope.row.id}/setup`"
+            >
+              <el-button link>初始化</el-button>
+            </router-link>
             <el-button
               v-permission="`${definition.resource}:update`"
               link
               :icon="Edit"
               @click="openEdit(scope.row)"
             >
-              编辑
-            </el-button><el-button
+              编辑 </el-button
+            ><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
@@ -443,20 +486,34 @@ onBeforeUnmount(() => {
       <div v-if="!loading && items.length === 0" class="mobile-empty">暂无数据</div>
       <div class="mobile-cards">
         <article v-for="row in items" :key="String(row.id)">
-          <strong>#{{ row.id }} ·
+          <strong
+            >#{{ row.id }} ·
             {{
               row.name ?? row.display_name ?? row.summary ?? row.original_name ?? definition.title
-            }}</strong>
+            }}</strong
+          >
           <dl>
             <template v-for="field in tableFields.slice(0, 5)" :key="field.key">
               <dt>{{ field.label }}</dt>
-              <dd>{{ displayValue(row[field.key], field) }}</dd>
+              <dd>{{ displayValue(row[field.key], field, row) }}</dd>
             </template>
           </dl>
           <div v-if="!definition.readOnly">
-            <el-button v-permission="`${definition.resource}:update`" link :icon="Edit" @click="openEdit(row)">
-              编辑
-            </el-button><el-button
+            <router-link
+              v-if="definition.resource === 'tenants'"
+              :to="`/platform/tenants/${row.id}/setup`"
+              :data-testid="`tenant-setup-${row.id}`"
+            >
+              <el-button link>初始化</el-button>
+            </router-link>
+            <el-button
+              v-permission="`${definition.resource}:update`"
+              link
+              :icon="Edit"
+              @click="openEdit(row)"
+            >
+              编辑 </el-button
+            ><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
@@ -508,7 +565,8 @@ onBeforeUnmount(() => {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="drawerOpen = false">取消</el-button><el-button type="danger" :icon="Check" @click="save">保存</el-button>
+        <el-button @click="drawerOpen = false">取消</el-button
+        ><el-button type="danger" :icon="Check" @click="save">保存</el-button>
       </template>
     </el-drawer>
   </section>

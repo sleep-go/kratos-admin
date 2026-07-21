@@ -280,6 +280,7 @@ export type AdminV1UpdateRoleAuthorizationRequest = {
     dataScope?: number;
     grants?: Array<AdminV1RoleResourceGrant>;
     departmentIds?: Array<string>;
+    targetTenantId?: string;
 };
 
 export type AdminV1UpdateRoleAuthorizationResponse = {
@@ -996,6 +997,7 @@ export type ManagementServiceListResourcesData = {
         pageSize?: number;
         keyword?: string;
         sort?: string;
+        targetTenantId?: string;
     };
     url: '/api/v1/management/{resource}';
 };
@@ -1025,7 +1027,9 @@ export type ManagementServiceCreateResourceData = {
     path: {
         resource: string;
     };
-    query?: never;
+    query?: {
+        targetTenantId?: string;
+    };
     url: '/api/v1/management/{resource}';
 };
 
@@ -1053,7 +1057,9 @@ export type ManagementServiceDeleteResourceData = {
         resource: string;
         id: string;
     };
-    query?: never;
+    query?: {
+        targetTenantId?: string;
+    };
     url: '/api/v1/management/{resource}/{id}';
 };
 
@@ -1083,7 +1089,9 @@ export type ManagementServiceUpdateResourceData = {
         resource: string;
         id: string;
     };
-    query?: never;
+    query?: {
+        targetTenantId?: string;
+    };
     url: '/api/v1/management/{resource}/{id}';
 };
 

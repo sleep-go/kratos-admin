@@ -54,6 +54,7 @@ message ListResourcesRequest {
   string keyword = 4;
   string sort = 5;
   map<string, string> filters = 6;
+  uint64 target_tenant_id = 7;
 }
 
 message ListResourcesResponse {
@@ -66,17 +67,20 @@ message ListResourcesResponse {
 message CreateResourceRequest {
   string resource = 1;
   google.protobuf.Struct data = 2;
+  uint64 target_tenant_id = 3;
 }
 
 message UpdateResourceRequest {
   string resource = 1;
   uint64 id = 2;
   google.protobuf.Struct data = 3;
+  uint64 target_tenant_id = 4;
 }
 
 message DeleteResourceRequest {
   string resource = 1;
   uint64 id = 2;
+  uint64 target_tenant_id = 3;
 }
 
 message CreateResourceResponse {
@@ -118,6 +122,7 @@ message UpdateRoleAuthorizationRequest {
   uint32 data_scope = 2;
   repeated RoleResourceGrant grants = 3;
   repeated uint64 department_ids = 4;
+  uint64 target_tenant_id = 5;
 }
 
 message UpdateRoleAuthorizationResponse {
