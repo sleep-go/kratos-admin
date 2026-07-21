@@ -6,6 +6,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as authApi from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import type { DeviceSession } from '@/api/auth'
+import AppIcon from '@/components/icons/AppIcon.vue'
+import { Check, Delete, Refresh } from '@/components/icons/actions'
 
 const authStore = useAuthStore()
 const { currentTenant, currentUser } = storeToRefs(authStore)
@@ -102,7 +104,7 @@ onMounted(() => {
             <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
             <el-form-item label="手机号"><el-input v-model="form.phone" /></el-form-item>
           </div>
-          <el-button type="danger" native-type="submit" :loading="saving">保存资料</el-button>
+          <el-button type="danger" native-type="submit" :icon="Check" :loading="saving">保存资料</el-button>
           <router-link to="/forgot-password" class="password-link">通过验证码重置密码</router-link>
         </el-form>
       </article>
@@ -113,7 +115,7 @@ onMounted(() => {
             <span>DEVICES</span>
             <h2>登录设备</h2>
           </div>
-          <el-button :loading="loading" @click="loadSessions">刷新</el-button>
+          <el-button :loading="loading" :icon="Refresh" @click="loadSessions">刷新</el-button>
         </div>
         <div v-if="sessions.length" class="session-list">
           <section v-for="session in sessions" :key="session.id" class="session-item">
@@ -123,10 +125,13 @@ onMounted(() => {
               <small>有效至 {{ formatTime(session.expiresAt) }}</small>
             </div>
             <span v-if="session.current" class="current-tag">当前设备</span>
-            <el-button v-else link type="danger" @click="revoke(session)">撤销</el-button>
+            <el-button v-else link type="danger" :icon="Delete" @click="revoke(session)">撤销</el-button>
           </section>
         </div>
-        <div v-else-if="!loading" class="empty-state">暂无有效设备会话</div>
+        <div v-else-if="!loading" class="empty-state">
+          <AppIcon name="empty" :size="26" />
+          <span>暂无有效设备会话</span>
+        </div>
       </article>
     </div>
   </section>
@@ -271,6 +276,7 @@ onMounted(() => {
   min-height: 180px;
   display: grid;
   place-items: center;
+  gap: 8px;
   color: var(--ka-muted);
 }
 @media (max-width: 900px) {

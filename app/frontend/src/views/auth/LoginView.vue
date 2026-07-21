@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import * as authApi from '@/api/auth'
+import { Refresh } from '@/components/icons/actions'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -86,7 +87,10 @@ onMounted(refreshCaptcha)
               @click="refreshCaptcha"
             >
               <img v-if="captchaImage" :src="captchaImage" alt="图形验证码" />
-              <span v-else>加载中</span>
+              <span v-else class="captcha-loading">
+                <el-icon :size="16"><Refresh /></el-icon>
+                加载中
+              </span>
             </button>
           </div>
           <label class="field">
@@ -297,6 +301,15 @@ onMounted(refreshCaptcha)
     display: block;
     object-fit: cover;
   }
+}
+
+.captcha-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--ka-muted);
+  font-size: 12px;
 }
 
 .submit-button {

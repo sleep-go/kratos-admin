@@ -4,6 +4,7 @@ import { ElMessage, ElTree } from 'element-plus'
 
 import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
+import { Check } from '@/components/icons/actions'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -86,6 +87,7 @@ onMounted(load)
       <el-button
         v-permission="'tenant-resources:update'"
         type="danger"
+        :icon="Check"
         :loading="saving"
         :disabled="!selectedTenant"
         @click="save"

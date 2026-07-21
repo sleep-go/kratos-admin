@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox, ElTree } from 'element-plus'
 
 import * as managementApi from '@/api/management'
 import { useAuthStore } from '@/stores/auth'
+import { Check, Delete, Plus } from '@/components/icons/actions'
 import type { ResourceRow } from '@/api/management'
 
 const actions = [
@@ -174,6 +175,7 @@ onMounted(load)
       <el-button
         v-permission="'roles:update'"
         type="danger"
+        :icon="Check"
         :loading="saving"
         :disabled="!selectedRole"
         @click="save"
@@ -188,7 +190,7 @@ onMounted(load)
           <div>
             <strong>角色</strong><span>{{ roles.length }} 个</span>
           </div>
-          <el-button v-permission="'roles:create'" link type="danger" @click="openRoleDialog">
+          <el-button v-permission="'roles:create'" link type="danger" :icon="Plus" @click="openRoleDialog">
             新建角色
           </el-button>
         </header>
@@ -206,6 +208,7 @@ onMounted(load)
             v-permission="'roles:delete'"
             link
             type="danger"
+            :icon="Delete"
             @click="removeRole(role)"
           >
             删除
@@ -294,7 +297,7 @@ onMounted(load)
       </el-form>
       <template #footer>
         <el-button @click="roleDialogOpen = false">取消</el-button>
-        <el-button type="danger" @click="createRole">创建</el-button>
+        <el-button type="danger" :icon="Plus" @click="createRole">创建</el-button>
       </template>
     </el-dialog>
   </section>

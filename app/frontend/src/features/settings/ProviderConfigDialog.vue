@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
 import { providerFields, providerImplementations, sanitizeProviderConfig } from './providerSchemas'
+import { Check } from '@/components/icons/actions'
 
 const props = defineProps<{ open: boolean; row?: ResourceRow; targetTenantId: string }>()
 const emit = defineEmits<{ close: []; saved: [] }>()
@@ -132,7 +133,7 @@ async function submit() {
       </div>
     </el-form>
     <template #footer>
-      <el-button @click="emit('close')">取消</el-button><el-button type="danger" :loading="saving" @click="submit">加密保存</el-button>
+      <el-button @click="emit('close')">取消</el-button><el-button type="danger" :icon="Check" :loading="saving" @click="submit">加密保存</el-button>
     </template>
   </el-dialog>
 </template>

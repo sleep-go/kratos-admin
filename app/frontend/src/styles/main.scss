@@ -36,9 +36,19 @@ select {
   font: inherit;
 }
 
-button:focus-visible,
-a:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--ka-accent);
-  outline-offset: 2px;
+.el-button.is-link .el-icon {
+  margin-right: 2px;
+}
+
+/* 顶栏与移动端导航图标对齐 */
+.navigation-link,
+.navigation-submenu a,
+.mobile-link,
+.tenant-switcher,
+.logout-button,
+.mobile-logout {
+  .app-icon,
+  .el-icon {
+    flex-shrink: 0;
+  }
 }

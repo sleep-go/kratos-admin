@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
 import { settingKeyLabel } from './settingLabels'
+import { Check } from '@/components/icons/actions'
 
 const props = defineProps<{
   open: boolean
@@ -127,7 +128,7 @@ async function submit() {
     </el-form>
     <template #footer>
       <el-button @click="emit('close')">取消</el-button>
-      <el-button type="danger" :loading="saving" @click="submit">保存配置</el-button>
+      <el-button type="danger" :icon="Check" :loading="saving" @click="submit">保存配置</el-button>
     </template>
   </el-dialog>
 </template>
