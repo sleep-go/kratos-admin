@@ -5,11 +5,12 @@ import "context"
 
 // Scope 是由认证上下文派生的可信数据边界。
 type Scope struct {
-	TenantID      uint64
-	UserID        uint64
-	MemberID      uint64
-	PlatformAdmin bool
-	Impersonating bool
+	TenantID        uint64
+	UserID          uint64
+	MemberID        uint64
+	ImpersonatorID  uint64
+	PlatformAdmin   bool
+	Impersonating   bool
 }
 
 // PageQuery 描述统一分页、排序、关键词与白名单筛选条件。

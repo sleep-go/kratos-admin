@@ -63,6 +63,15 @@ export interface ResourceFilter {
   options?: ResourceOption[]
 }
 
+export interface ResourceScopeTab {
+  key: string
+  label: string
+  description: string
+  scopeSide: 'all' | 'platform' | 'tenant'
+  defaultScopeMask: number
+  scopeMaskOptions: ResourceOption[]
+}
+
 export interface ResourceDefinition {
   resource: string
   title: string
@@ -71,6 +80,8 @@ export interface ResourceDefinition {
   readOnly?: boolean
   exportLogType?: 'login' | 'audit' | 'api'
   filters?: ResourceFilter[]
+  scopeTabs?: ResourceScopeTab[]
+  listMode?: 'table' | 'tree'
 }
 
 const commonStatusOptions: ResourceOption[] = [
@@ -87,10 +98,10 @@ const commonStatus: ResourceField = {
 const createdAt: ResourceField = { key: 'created_at', label: '创建时间', table: true }
 
 export const resourceDefinitions: Record<string, ResourceDefinition> = {
-  users: {
-    resource: 'users',
-    title: '全局用户',
-    description: '管理跨租户账号及登录 MFA 安全策略。',
+  'app-users': {
+    resource: 'app-users',
+    title: 'App 用户',
+    description: '管理 App 端账号及登录 MFA 安全策略。',
     fields: [
       { key: 'username', label: '用户名', required: true, table: true },
       { key: 'email', label: '邮箱', table: true },
@@ -143,6 +154,84 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
         ]
       },
       { key: 'permission_version', label: '权限版本', table: true },
+      createdAt
+    ]
+  },
+  'tenant-admins': {
+    resource: 'tenant-admins',
+    title: '租户管理员',
+    description: '管理租户后台管理员账号及登录安全策略。',
+    fields: [
+      { key: 'username', label: '用户名', required: true, table: true },
+      { key: 'email', label: '邮箱', table: true },
+      { key: 'phone', label: '手机号', table: true },
+      { key: 'display_name', label: '显示名称', required: true, table: true },
+      {
+        key: 'initial_password',
+        label: '初始密码',
+        type: 'password',
+        required: true,
+        createOnly: true
+      },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        default: 1,
+        table: true,
+        options: [...commonStatusOptions, { label: '锁定', value: 3 }]
+      },
+      { key: 'mfa_enabled', label: '启用 MFA', type: 'boolean', default: false, table: true },
+      {
+        key: 'mfa_channel',
+        label: 'MFA 渠道',
+        type: 'select',
+        default: 'email',
+        table: true,
+        options: [
+          { label: '邮件', value: 'email' },
+          { label: '短信', value: 'sms' }
+        ]
+      },
+      createdAt
+    ]
+  },
+  'platform-admins': {
+    resource: 'platform-admins',
+    title: '平台管理员',
+    description: '管理平台级管理员账号及登录安全策略。',
+    fields: [
+      { key: 'username', label: '用户名', required: true, table: true },
+      { key: 'email', label: '邮箱', table: true },
+      { key: 'phone', label: '手机号', table: true },
+      { key: 'display_name', label: '显示名称', required: true, table: true },
+      {
+        key: 'initial_password',
+        label: '初始密码',
+        type: 'password',
+        required: true,
+        createOnly: true
+      },
+      {
+        key: 'status',
+        label: '状态',
+        type: 'status',
+        default: 1,
+        table: true,
+        options: [...commonStatusOptions, { label: '锁定', value: 3 }]
+      },
+      { key: 'mfa_enabled', label: '启用 MFA', type: 'boolean', default: false, table: true },
+      {
+        key: 'mfa_channel',
+        label: 'MFA 渠道',
+        type: 'select',
+        default: 'email',
+        table: true,
+        options: [
+          { label: '邮件', value: 'email' },
+          { label: '短信', value: 'sms' }
+        ]
+      },
       createdAt
     ]
   },
@@ -236,25 +325,22 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
   },
   roles: {
     resource: 'roles',
-    title: '角色与数据权限',
-    description: '配置角色、状态及数据范围。',
+    title: '角色与权限',
+    description: '配置角色与状态。',
     fields: [
       { key: 'code', label: '角色编码', required: true, table: true },
       { key: 'name', label: '角色名称', required: true, table: true },
-      {
-        key: 'data_scope',
-        label: '数据范围',
-        type: 'select',
-        default: 4,
-        table: true,
-        options: [
-          { label: '全部数据', value: 1 },
-          { label: '本部门及下级', value: 2 },
-          { label: '本部门', value: 3 },
-          { label: '仅本人', value: 4 },
-          { label: '自定义部门', value: 5 }
-        ]
-      },
+      { key: 'is_builtin', label: '内置角色', type: 'boolean', table: true },
+      commonStatus
+    ]
+  },
+  'platform-roles': {
+    resource: 'platform-roles',
+    title: '平台角色',
+    description: '配置平台域角色与状态。',
+    fields: [
+      { key: 'code', label: '角色编码', required: true, table: true },
+      { key: 'name', label: '角色名称', required: true, table: true },
       { key: 'is_builtin', label: '内置角色', type: 'boolean', table: true },
       commonStatus
     ]
@@ -262,7 +348,44 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
   resources: {
     resource: 'resources',
     title: '菜单与权限资源',
-    description: '平台统一维护目录、菜单、按钮和 API 资源。',
+    description: '按平台与租户视角分别维护目录、菜单、按钮和 API 资源。',
+    listMode: 'tree',
+    scopeTabs: [
+      {
+        key: 'all',
+        label: '全部',
+        description: '查看完整的目录、菜单、按钮和 API 资源树。',
+        scopeSide: 'all',
+        defaultScopeMask: 3,
+        scopeMaskOptions: [
+          { label: '仅平台', value: 1 },
+          { label: '仅租户', value: 2 },
+          { label: '平台与租户共用', value: 3 }
+        ]
+      },
+      {
+        key: 'platform',
+        label: '平台资源',
+        description: '用于平台治理视角的目录、菜单、按钮和 API。',
+        scopeSide: 'platform',
+        defaultScopeMask: 1,
+        scopeMaskOptions: [
+          { label: '仅平台', value: 1 },
+          { label: '平台与租户共用', value: 3 }
+        ]
+      },
+      {
+        key: 'tenant',
+        label: '租户资源',
+        description: '用于租户控制台与功能授权的目录、菜单、按钮和 API。',
+        scopeSide: 'tenant',
+        defaultScopeMask: 2,
+        scopeMaskOptions: [
+          { label: '仅租户', value: 2 },
+          { label: '平台与租户共用', value: 3 }
+        ]
+      }
+    ],
     fields: [
       { key: 'name', label: '资源名称', required: true, table: true },
       { key: 'code', label: '资源编码', required: true, table: true },
@@ -373,7 +496,7 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
           field: 'ptype',
           values: {
             p: { resource: 'roles', labelKeys: ['name', 'code'], onlyActive: true },
-            g: { resource: 'members', labelKeys: ['display_name'], onlyActive: true }
+            g: { resource: 'tenant-admins', labelKeys: ['display_name', 'username'], onlyActive: true }
           }
         }
       },
@@ -393,6 +516,61 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
               onlyActive: true
             },
             g: { resource: 'roles', labelKeys: ['name', 'code'], onlyActive: true }
+          }
+        }
+      },
+      { key: 'v3', label: '动作', table: true },
+      { key: 'v4', label: '扩展值 4' },
+      { key: 'v5', label: '扩展值 5' }
+    ]
+  },
+  'platform-casbin-rules': {
+    resource: 'platform-casbin-rules',
+    title: '平台按钮与 API 授权',
+    description: '维护平台域 Casbin 角色和资源策略。',
+    fields: [
+      {
+        key: 'ptype',
+        label: '策略类型',
+        type: 'select',
+        default: 'p',
+        required: true,
+        table: true,
+        options: [
+          { label: '资源授权', value: 'p' },
+          { label: '角色继承', value: 'g' }
+        ]
+      },
+      {
+        key: 'v1',
+        label: '管理员 / 角色',
+        type: 'relation',
+        required: true,
+        table: true,
+        lookupBy: {
+          field: 'ptype',
+          values: {
+            p: { resource: 'platform-roles', labelKeys: ['name', 'code'], onlyActive: true },
+            g: { resource: 'platform-admins', labelKeys: ['display_name', 'username'], onlyActive: true }
+          }
+        }
+      },
+      {
+        key: 'v2',
+        label: '资源 / 角色',
+        type: 'relation',
+        required: true,
+        table: true,
+        lookupBy: {
+          field: 'ptype',
+          values: {
+            p: {
+              resource: 'resources',
+              valueKey: 'code',
+              labelKeys: ['name', 'code'],
+              onlyActive: true
+            },
+            g: { resource: 'platform-roles', labelKeys: ['name', 'code'], onlyActive: true }
           }
         }
       },

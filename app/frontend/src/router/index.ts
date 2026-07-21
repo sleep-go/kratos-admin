@@ -10,12 +10,15 @@ import { useAuthStore } from '@/stores/auth'
 import { resolveNavigation } from '@/features/navigation/registry'
 
 const platformManagementRoutes: Array<[string, string, string]> = [
-  ['users', 'platform-user-management', 'users'],
+  ['app-users', 'platform-app-user-management', 'app-users'],
   ['tenants', 'tenant-management', 'tenants'],
   ['admins', 'platform-admin-management', 'platform-admins'],
   ['resources', 'platform-resource-management', 'resources'],
-  ['tenant-features', 'platform-tenant-feature-management', 'tenant-resources'],
-  ['settings/providers', 'platform-provider-management', 'providers']
+  ['settings/providers', 'platform-provider-management', 'providers'],
+  ['logs/login', 'platform-login-logs', 'platform-login-logs'],
+  ['logs/audit', 'platform-audit-logs', 'platform-audit-logs'],
+  ['logs/api', 'platform-api-logs', 'platform-api-logs'],
+  ['logs/exports', 'platform-log-exports', 'platform-log-exports']
 ]
 
 const consoleManagementRoutes: Array<[string, string, string]> = [
@@ -36,6 +39,12 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'login',
+    component: () => import('@/views/auth/LoginView.vue'),
+    meta: { guestOnly: true, realm: 'tenant' }
+  },
+  {
+    path: '/tenant/login',
+    name: 'tenant-login',
     component: () => import('@/views/auth/LoginView.vue'),
     meta: { guestOnly: true, realm: 'tenant' }
   },
@@ -74,6 +83,21 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/platform/TenantSetupView.vue'),
         props: (route) => ({ tenantId: String(route.params.tenantId) }),
         meta: { platformOnly: true }
+      },
+      // 兼容旧链接，功能授权已合并到「开通配置」
+      { path: 'tenant-features', redirect: '/platform/tenants' },
+      { path: 'users', redirect: '/platform/app-users' },
+      {
+        path: 'permission/roles',
+        name: 'platform-role-management',
+        component: () => import('@/views/permission/RolePermissionView.vue'),
+        props: { platformMode: true }
+      },
+      {
+        path: 'permission/policies',
+        name: 'platform-policy-management',
+        component: () => import('@/views/management/ResourceListView.vue'),
+        props: { resourceKey: 'platform-casbin-rules' }
       },
       ...platformManagementRoutes.map(([path, name, resourceKey]) => ({
         path,

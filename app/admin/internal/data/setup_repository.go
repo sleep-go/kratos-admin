@@ -34,7 +34,7 @@ func (r *AdminRepository) FindByUsername(ctx context.Context, username string) (
 	return &setup.Admin{Username: row.Username, PlatformAdmin: true}, nil
 }
 
-// Create 在 platform_admins 表中创建启用的平台管理员账号。
+	// Create 在 platform_admins 表中创建启用的超级平台管理员账号。
 func (r *AdminRepository) Create(ctx context.Context, admin setup.Admin) error {
 	var email, phone *string
 	if admin.Email != "" {
@@ -46,7 +46,8 @@ func (r *AdminRepository) Create(ctx context.Context, admin setup.Admin) error {
 	return r.q.PlatformAdmin.WithContext(ctx).Create(&model.PlatformAdmin{
 		Username: admin.Username, Email: email, Phone: phone,
 		PasswordHash: admin.PasswordHash, DisplayName: admin.DisplayName,
-		Status: 1,
+		IsSuperAdmin: true,
+		Status:       1,
 	})
 }
 

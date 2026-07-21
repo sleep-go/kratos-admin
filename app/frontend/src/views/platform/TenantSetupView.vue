@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
@@ -11,50 +11,61 @@ const props = defineProps<{ tenantId: string }>()
 
 const activeTab = ref('features')
 const tenant = ref<ResourceRow>()
+const loading = ref(false)
 const loaded = ref(false)
-const tenantName = computed(() => String(tenant.value?.name ?? '待初始化租户'))
+const tenantName = computed(() => String(tenant.value?.name ?? '待开通租户'))
 const targetAvailable = computed(() => Boolean(tenant.value) && Number(tenant.value?.status) === 1)
 
 async function loadTenant() {
-  const response = await managementApi.listResources('tenants', {
-    page: 1,
-    page_size: 1,
-    filters: { id: props.tenantId }
-  })
-  tenant.value = (response.items ?? []).find((item) => String(item.id) === props.tenantId)
-  loaded.value = true
+  loading.value = true
+  loaded.value = false
+  try {
+    const response = await managementApi.listResources('tenants', {
+      page: 1,
+      page_size: 200,
+      sort: 'id:asc'
+    })
+    tenant.value = (response.items ?? []).find((item) => String(item.id) === props.tenantId)
+  } finally {
+    loading.value = false
+    loaded.value = true
+  }
 }
 
-onMounted(loadTenant)
+watch(
+  () => props.tenantId,
+  () => {
+    activeTab.value = 'features'
+    void loadTenant()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
-  <section class="tenant-setup-page">
+  <section v-loading="loading" class="tenant-setup-page">
     <header class="page-heading">
       <div>
-        <p>TENANT SETUP</p>
-        <h1>租户初始化 · {{ tenantName }}</h1>
-        <span>目标租户 ID {{ tenantId }}。先授权功能，再创建角色、全局用户并添加为租户成员。</span>
+        <p>TENANT PROVISIONING</p>
+        <h1>租户开通 · {{ tenantName }}</h1>
+        <span>目标租户 ID {{ tenantId }}。组织、权限、日志等后台治理由平台管理员在开通页维护；此处仅授权租户业务功能模块。</span>
       </div>
       <router-link to="/platform/tenants">返回租户列表</router-link>
     </header>
 
     <el-tabs v-if="targetAvailable" v-model="activeTab" class="setup-tabs">
       <el-tab-pane data-testid="setup-tab" label="功能授权" name="features">
-        <TenantFeatureView :target-tenant-id="tenantId" />
+        <TenantFeatureView embedded :target-tenant-id="tenantId" />
       </el-tab-pane>
       <el-tab-pane data-testid="setup-tab" label="角色管理" name="roles" lazy>
-        <RolePermissionView :target-tenant-id="tenantId" />
+        <RolePermissionView embedded :target-tenant-id="tenantId" />
       </el-tab-pane>
-      <el-tab-pane data-testid="setup-tab" label="用户管理" name="users" lazy>
-        <ResourceListView resource-key="users" />
-      </el-tab-pane>
-      <el-tab-pane data-testid="setup-tab" label="成员管理" name="members" lazy>
-        <ResourceListView resource-key="members" :target-tenant-id="tenantId" />
+      <el-tab-pane data-testid="setup-tab" label="租户管理员" name="tenant-admins" lazy>
+        <ResourceListView embedded resource-key="tenant-admins" :target-tenant-id="tenantId" />
       </el-tab-pane>
     </el-tabs>
     <div v-else-if="loaded" class="target-unavailable">
-      目标租户不存在、已冻结或已删除，不能继续初始化。
+      目标租户不存在、已冻结或已删除，不能继续开通配置。
     </div>
   </section>
 </template>
@@ -85,6 +96,13 @@ onMounted(loadTenant)
   display: block;
   margin-top: 8px;
   color: var(--ka-muted);
+}
+.page-heading a {
+  color: var(--ka-accent);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
 }
 .setup-tabs {
   padding: 16px;

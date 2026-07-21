@@ -22,9 +22,10 @@ type Event struct {
 type Entry struct {
 	EventID      string
 	TenantID     uint64
-	UserID       uint64         `json:"user_id"`
-	MemberID     uint64         `json:"member_id"`
-	Action       string         `json:"action"`
+	UserID         uint64         `json:"user_id"`
+	MemberID       uint64         `json:"member_id"`
+	ImpersonatorID uint64         `json:"impersonator_id"`
+	Action         string         `json:"action"`
 	ResourceType string         `json:"resource_type"`
 	ResourceID   string         `json:"resource_id"`
 	Summary      string         `json:"summary"`

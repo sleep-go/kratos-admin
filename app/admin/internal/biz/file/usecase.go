@@ -47,7 +47,7 @@ var (
 type Record struct {
 	ID               string
 	TenantID         uint64
-	UploaderMemberID uint64
+	UploaderID       uint64
 	ProviderName     string
 	ObjectKey        string
 	OriginalName     string
@@ -114,7 +114,7 @@ func (u *Usecase) CreateUpload(ctx context.Context, input UploadInput) (UploadRe
 	now := u.now().UTC()
 	objectKey := fmt.Sprintf("%d/%04d/%02d/%s/%s", input.TenantID, now.Year(), int(now.Month()), fileID, input.OriginalName)
 	record := Record{
-		ID: fileID, TenantID: input.TenantID, UploaderMemberID: input.MemberID,
+		ID: fileID, TenantID: input.TenantID, UploaderID: input.MemberID,
 		ProviderName: u.provider.Name(), ObjectKey: objectKey, OriginalName: input.OriginalName,
 		ContentType: input.ContentType, Size: input.Size, SHA256: input.SHA256, Status: StatusPending, CreatedAt: now,
 	}

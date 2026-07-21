@@ -17,7 +17,7 @@ type LogExport struct {
 	ID             string         `gorm:"column:id;type:char(36);primaryKey;comment:日志导出任务UUID" json:"id"`                                                                                            // 日志导出任务UUID
 	TenantID       uint64         `gorm:"column:tenant_id;type:bigint unsigned;not null;index:idx_log_exports_query,priority:1;default:0;comment:所属租户ID，0表示平台跨租户导出" json:"tenant_id"`                 // 所属租户ID，0表示平台跨租户导出
 	UserID         uint64         `gorm:"column:user_id;type:bigint unsigned;not null;index:idx_log_exports_query,priority:2;comment:发起导出的用户ID" json:"user_id"`                                       // 发起导出的用户ID
-	MemberID       uint64         `gorm:"column:member_id;type:bigint unsigned;not null;default:0;comment:发起导出的租户成员ID，平台域为0" json:"member_id"`                                                        // 发起导出的租户成员ID，平台域为0
+	MemberID       uint64         `gorm:"column:member_id;type:bigint unsigned;not null;default:0;comment:兼容字段，阶段1固定为0" json:"member_id"`                                                             // 兼容字段，阶段1固定为0
 	LogType        string         `gorm:"column:log_type;type:varchar(16);not null;comment:日志类型：login登录日志，audit操作审计，api接口访问日志" json:"log_type"`                                                       // 日志类型：login登录日志，audit操作审计，api接口访问日志
 	Keyword        string         `gorm:"column:keyword;type:varchar(191);not null;comment:导出查询关键词" json:"keyword"`                                                                                   // 导出查询关键词
 	Filters        datatypes.JSON `gorm:"column:filters;type:json;comment:导出查询白名单筛选条件" json:"filters"`                                                                                                // 导出查询白名单筛选条件

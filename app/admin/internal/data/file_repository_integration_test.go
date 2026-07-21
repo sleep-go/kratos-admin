@@ -24,21 +24,20 @@ func TestFileRepositoryUsesTenantBoundaryAndAuditOutbox(t *testing.T) {
 	tx := db.Begin()
 	t.Cleanup(func() { tx.Rollback() })
 	now := time.Now().UTC()
-	user := &model.User{Username: "file-user", PasswordHash: "hash", DisplayName: "文件用户", Status: 1, PasswordChangedAt: now}
 	tenant := &model.Tenant{Code: "file-tenant", Name: "文件租户", Status: 1, PermissionVersion: 1}
-	if err := tx.Create(user).Error; err != nil {
-		t.Fatal(err)
-	}
 	if err := tx.Create(tenant).Error; err != nil {
 		t.Fatal(err)
 	}
-	member := &model.TenantMember{TenantID: tenant.ID, UserID: user.ID, DisplayName: "文件成员", Status: 1, JoinedAt: now}
-	if err := tx.Create(member).Error; err != nil {
+	admin := &model.TenantAdmin{
+		TenantID: tenant.ID, Username: "file-admin", PasswordHash: "hash",
+		DisplayName: "文件管理员", Status: 1, PasswordChangedAt: now,
+	}
+	if err := tx.Create(admin).Error; err != nil {
 		t.Fatal(err)
 	}
 	repository := &FileRepository{q: query.Use(tx)}
 	record := filebiz.Record{
-		ID: "550e8400-e29b-41d4-a716-446655440001", TenantID: tenant.ID, UploaderMemberID: member.ID,
+		ID: "550e8400-e29b-41d4-a716-446655440001", TenantID: tenant.ID, UploaderID: admin.ID,
 		ProviderName: "local", ObjectKey: "tenant/file.txt", OriginalName: "file.txt",
 		ContentType: "text/plain", Size: 5, Status: filebiz.StatusPending, CreatedAt: now,
 	}

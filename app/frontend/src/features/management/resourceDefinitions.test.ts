@@ -6,6 +6,10 @@ describe('后台资源页面注册表', () => {
   it('覆盖计划中的核心管理模块', () => {
     for (const key of [
       'tenants',
+      'app-users',
+      'tenant-admins',
+      'platform-roles',
+      'platform-casbin-rules',
       'members',
       'departments',
       'positions',
@@ -27,6 +31,15 @@ describe('后台资源页面注册表', () => {
     expect(resourceDefinitions['audit-logs'].readOnly).toBe(true)
     expect(resourceDefinitions.files.readOnly).toBe(true)
     expect(resourceDefinitions['tenant-resources'].readOnly).toBe(true)
+  })
+
+  it('菜单与权限资源按平台与租户拆分维护', () => {
+    const tabs = resourceDefinitions.resources.scopeTabs
+    expect(resourceDefinitions.resources.listMode).toBe('tree')
+    expect(tabs?.map((tab) => tab.label)).toEqual(['全部', '平台资源', '租户资源'])
+    expect(tabs?.[0]?.scopeSide).toBe('all')
+    expect(tabs?.[1]?.scopeSide).toBe('platform')
+    expect(tabs?.[2]?.scopeSide).toBe('tenant')
   })
 
   it('为三类日志声明后端允许的结构化筛选项', () => {
@@ -62,7 +75,7 @@ describe('后台资源页面注册表', () => {
   })
 
   it('按不同业务语义展示用户、租户和文件状态', () => {
-    const userStatus = resourceDefinitions.users.fields.find((item) => item.key === 'status')
+    const userStatus = resourceDefinitions['app-users'].fields.find((item) => item.key === 'status')
     const tenantStatus = resourceDefinitions.tenants.fields.find((item) => item.key === 'status')
     const fileStatus = resourceDefinitions.files.fields.find((item) => item.key === 'status')
 
@@ -135,8 +148,7 @@ describe('后台资源页面注册表', () => {
 
   it('业务枚举使用带中文标签的下拉选择', () => {
     for (const [resource, key] of [
-      ['users', 'mfa_channel'],
-      ['roles', 'data_scope'],
+      ['app-users', 'mfa_channel'],
       ['resources', 'type'],
       ['resources', 'scope_mask'],
       ['casbin-rules', 'ptype']

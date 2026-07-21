@@ -30,7 +30,7 @@ func newFile(db *gorm.DB, opts ...gen.DOOption) file {
 	_file.ALL = field.NewAsterisk(tableName)
 	_file.ID = field.NewString(tableName, "id")
 	_file.TenantID = field.NewUint64(tableName, "tenant_id")
-	_file.UploaderMemberID = field.NewUint64(tableName, "uploader_member_id")
+	_file.UploaderID = field.NewUint64(tableName, "uploader_id")
 	_file.ProviderName = field.NewString(tableName, "provider_name")
 	_file.ObjectKey = field.NewString(tableName, "object_key")
 	_file.OriginalName = field.NewString(tableName, "original_name")
@@ -64,7 +64,7 @@ type file struct {
 	ALL                  field.Asterisk
 	ID                   field.String // 文件UUID
 	TenantID             field.Uint64 // 所属租户ID
-	UploaderMemberID     field.Uint64 // 上传成员ID
+	UploaderID           field.Uint64 // 上传者ID（租户管理员或App用户）
 	ProviderName         field.String // 存储Provider名称
 	ObjectKey            field.String // 对象存储键
 	OriginalName         field.String // 原始文件名
@@ -99,7 +99,7 @@ func (f *file) updateTableName(table string) *file {
 	f.ALL = field.NewAsterisk(table)
 	f.ID = field.NewString(table, "id")
 	f.TenantID = field.NewUint64(table, "tenant_id")
-	f.UploaderMemberID = field.NewUint64(table, "uploader_member_id")
+	f.UploaderID = field.NewUint64(table, "uploader_id")
 	f.ProviderName = field.NewString(table, "provider_name")
 	f.ObjectKey = field.NewString(table, "object_key")
 	f.OriginalName = field.NewString(table, "original_name")
@@ -142,7 +142,7 @@ func (f *file) fillFieldMap() {
 	f.fieldMap = make(map[string]field.Expr, 19)
 	f.fieldMap["id"] = f.ID
 	f.fieldMap["tenant_id"] = f.TenantID
-	f.fieldMap["uploader_member_id"] = f.UploaderMemberID
+	f.fieldMap["uploader_id"] = f.UploaderID
 	f.fieldMap["provider_name"] = f.ProviderName
 	f.fieldMap["object_key"] = f.ObjectKey
 	f.fieldMap["original_name"] = f.OriginalName

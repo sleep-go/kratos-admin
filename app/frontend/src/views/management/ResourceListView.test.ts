@@ -5,24 +5,24 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import ResourceListView from './ResourceListView.vue'
 
-const listResources = vi.hoisted(() =>
-  vi.fn((resource: string) => {
-    if (resource === 'users') {
-      return Promise.resolve({
-        items: [{ id: '1', username: 'admin', display_name: '管理员', status: 1 }],
-        total: 1
-      })
-    }
-    if (resource === 'tenants') {
-      return Promise.resolve({
-        items: [{ id: '1', code: 'demo', name: '演示租户', status: 1 }],
-        total: 1
-      })
-    }
-    return Promise.resolve({ items: [], total: 0 })
-  })
-)
+const listResources = vi.hoisted(() => vi.fn())
 const createResource = vi.hoisted(() => vi.fn())
+
+function mockListResources(resource: string) {
+  if (resource === 'app-users') {
+    return Promise.resolve({
+      items: [{ id: '1', username: 'app-user', display_name: 'App 用户', status: 1 }],
+      total: 1
+    })
+  }
+  if (resource === 'tenants') {
+    return Promise.resolve({
+      items: [{ id: '1', code: 'demo', name: '演示租户', status: 1 }],
+      total: 1
+    })
+  }
+  return Promise.resolve({ items: [], total: 0 })
+}
 
 vi.mock('@/api/management', () => ({
   listResources,
@@ -37,7 +37,7 @@ vi.mock('@/api/logs', () => ({
   getLogExportDownloadURL: vi.fn()
 }))
 
-function mountView(resourceKey = 'users', targetTenantId?: string) {
+function mountView(resourceKey = 'app-users', targetTenantId?: string) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/', component: { template: '<div />' } }]
@@ -76,6 +76,36 @@ function mountView(resourceKey = 'users', targetTenantId?: string) {
         ElTable: { template: '<div><slot /></div>' },
         ElTableColumn: { template: '<div />' },
         ElPagination: true,
+        ElTabs: {
+          props: ['modelValue'],
+          emits: ['tab-change', 'update:modelValue'],
+          template: `
+            <div data-testid="resource-scope-tabs">
+              <button
+                data-tab="all"
+                type="button"
+                @click="$emit('update:modelValue', 'all'); $emit('tab-change', 'all')"
+              >
+                全部
+              </button>
+              <button
+                data-tab="platform"
+                type="button"
+                @click="$emit('update:modelValue', 'platform'); $emit('tab-change', 'platform')"
+              >
+                平台资源
+              </button>
+              <button
+                data-tab="tenant"
+                type="button"
+                @click="$emit('update:modelValue', 'tenant'); $emit('tab-change', 'tenant')"
+              >
+                租户资源
+              </button>
+            </div>
+          `
+        },
+        ElTabPane: { template: '<div><slot /></div>' },
         RouterLink: { template: '<a><slot /></a>' }
       }
     }
@@ -84,8 +114,75 @@ function mountView(resourceKey = 'users', targetTenantId?: string) {
 
 describe('通用数据管理表单', () => {
   beforeEach(() => {
-    listResources.mockClear()
+    listResources.mockReset()
+    listResources.mockImplementation(mockListResources)
     createResource.mockClear()
+  })
+
+  it('平台管理员列表可正常加载', async () => {
+    const wrapper = mountView('platform-admins')
+    await flushPromises()
+
+    expect(wrapper.get('h1').text()).toBe('平台管理员')
+    expect(listResources).toHaveBeenCalledWith(
+      'platform-admins',
+      expect.objectContaining({ page: 1, page_size: 20 }),
+      undefined
+    )
+  })
+
+  it('未知资源键展示占位提示且不请求接口', async () => {
+    const wrapper = mountView('unknown-resource')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('未找到资源定义：unknown-resource')
+    expect(listResources).not.toHaveBeenCalled()
+  })
+
+  it('菜单与权限资源按平台与租户分开展示', async () => {
+    const wrapper = mountView('resources')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="resource-scope-tabs"]').text()).toContain('全部')
+    expect(wrapper.get('[data-testid="resource-scope-tabs"]').text()).toContain('平台资源')
+    expect(wrapper.get('[data-testid="resource-scope-tabs"]').text()).toContain('租户资源')
+    expect(listResources).toHaveBeenCalledWith(
+      'resources',
+      expect.objectContaining({
+        page: 1,
+        page_size: 500,
+        sort: 'sort_order:asc',
+        filters: {}
+      }),
+      undefined
+    )
+
+    await wrapper.get('[data-tab="platform"]').trigger('click')
+    await flushPromises()
+    expect(listResources).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-tab="tenant"]').trigger('click')
+    await flushPromises()
+    expect(listResources).toHaveBeenCalledTimes(1)
+  })
+
+  it('菜单与权限资源以树形结构展示', async () => {
+    listResources.mockImplementation((resource: string) => {
+      if (resource === 'resources') {
+        return Promise.resolve({
+          items: [
+            { id: '1', parent_id: 0, name: '平台管理', code: 'menu.platform', type: 1, sort_order: 10 },
+            { id: '2', parent_id: 1, name: 'App 用户', code: 'app-users', type: 2, sort_order: 11 }
+          ],
+          total: 2
+        })
+      }
+      return Promise.resolve({ items: [], total: 0 })
+    })
+    const wrapper = mountView('resources')
+    await flushPromises()
+
+    expect(wrapper.find('.tree-summary').text()).toContain('共 2 项资源')
   })
 
   it('通过右侧抽屉展示新增表单', async () => {
@@ -109,10 +206,10 @@ describe('通用数据管理表单', () => {
 
     const drawer = wrapper.get('[data-testid="resource-form-drawer"]')
     expect(drawer.attributes('data-open')).toBe('true')
-    expect(drawer.attributes('data-title')).toBe('编辑全局用户')
+    expect(drawer.attributes('data-title')).toBe('编辑App 用户')
   })
 
-  it('租户列表提供独立初始化入口', async () => {
+  it('租户列表提供独立开通配置入口', async () => {
     const wrapper = mountView('tenants')
     await flushPromises()
 
@@ -121,27 +218,18 @@ describe('通用数据管理表单', () => {
     )
   })
 
-  it('目标租户成员管理通过查询上下文调用接口且全局用户候选不带租户', async () => {
-    const wrapper = mountView('members', '8')
+  it('目标租户管理员通过查询上下文调用接口', async () => {
+    const wrapper = mountView('tenant-admins', '8')
     await flushPromises()
 
     expect(listResources).toHaveBeenCalledWith(
-      'members',
+      'tenant-admins',
       expect.objectContaining({ page: 1, page_size: 20 }),
       { targetTenantId: '8' }
     )
     await wrapper.get('.heading-actions button').trigger('click')
     await flushPromises()
-    expect(listResources).toHaveBeenCalledWith(
-      'users',
-      { page: 1, page_size: 200, sort: 'id:asc' },
-      undefined
-    )
-    expect(listResources).toHaveBeenCalledWith(
-      'members',
-      { page: 1, page_size: 200, sort: 'id:asc' },
-      { targetTenantId: '8' }
-    )
+    expect(wrapper.get('[data-testid="resource-form-drawer"]').attributes('data-open')).toBe('true')
   })
 
   it('切换Casbin策略类型时重新加载对应关联候选项', async () => {
@@ -152,15 +240,15 @@ describe('通用数据管理表单', () => {
     await flushPromises()
     expect(listResources).toHaveBeenCalledWith(
       'resources',
-      { page: 1, page_size: 200, sort: 'id:asc' },
+      { page: 1, page_size: 500, sort: 'sort_order:asc', filters: {} },
       undefined
     )
 
     await wrapper.get('[data-field="ptype"]').trigger('click')
     await flushPromises()
     expect(listResources).toHaveBeenCalledWith(
-      'members',
-      { page: 1, page_size: 200, sort: 'id:asc' },
+      'tenant-admins',
+      { page: 1, page_size: 200, sort: 'id:asc', filters: {} },
       undefined
     )
   })

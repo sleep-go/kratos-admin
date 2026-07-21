@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
+	permissionbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/permission"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
@@ -50,7 +51,7 @@ func validateSettingOverrideGen(ctx context.Context, q *query.Query, resource st
 func incrementPermissionVersionGen(ctx context.Context, q *query.Query, scope managementbiz.Scope, resource string, values map[string]any, resourceID uint64) error {
 	tenant := q.Tenant
 	switch resource {
-	case "members", "roles", "casbin-rules", "role-scope-departments":
+	case "tenant-admins", "roles", "casbin-rules":
 		if scope.TenantID == 0 {
 			return nil
 		}
@@ -78,58 +79,6 @@ func incrementPermissionVersionGen(ctx context.Context, q *query.Query, scope ma
 	}
 }
 
-func resolveDepartmentPathGen(ctx context.Context, q *query.Query, tenantID, parentID, id uint64) (string, error) {
-	if parentID == 0 {
-		return buildDepartmentPath("", id), nil
-	}
-	d := q.Department
-	parent, err := d.WithContext(ctx).Select(d.Path).Where(
-		d.ID.Eq(parentID), d.TenantID.Eq(tenantID), d.Status.Eq(1), d.DeletedAt.IsNull(),
-	).Take()
-	if err != nil || parent.Path == "" {
-		return "", errors.New("所选上级部门不存在或已禁用")
-	}
-	return buildDepartmentPath(parent.Path, id), nil
-}
-
-func prepareDepartmentPathUpdateGen(ctx context.Context, q *query.Query, values map[string]any, tenantID, id uint64) (*departmentPathChange, error) {
-	d := q.Department
-	current, err := d.WithContext(ctx).Select(d.ParentID, d.Path).Where(d.ID.Eq(id), d.TenantID.Eq(tenantID), d.DeletedAt.IsNull()).Take()
-	if err != nil {
-		return nil, errors.New("资源不存在或无权访问")
-	}
-	parentID := current.ParentID
-	if value, exists := values["parent_id"]; exists {
-		parentID = numericID(value)
-	}
-	newPath, err := resolveDepartmentPathGen(ctx, q, tenantID, parentID, id)
-	if err != nil {
-		return nil, err
-	}
-	if parentID != 0 && (newPath == current.Path || strings.HasPrefix(newPath, current.Path+"/")) {
-		return nil, errors.New("上级部门不能选择当前部门或其下级")
-	}
-	values["path"] = newPath
-	return &departmentPathChange{tenantID: tenantID, oldPath: current.Path, newPath: newPath}, nil
-}
-
-func updateDepartmentDescendantPathsGen(ctx context.Context, q *query.Query, change departmentPathChange) error {
-	d := q.Department
-	rows, err := d.WithContext(ctx).Select(d.ID, d.Path).Where(
-		d.TenantID.Eq(change.tenantID), d.Path.Like(change.oldPath+"/%"), d.DeletedAt.IsNull(),
-	).Find()
-	if err != nil {
-		return err
-	}
-	for _, row := range rows {
-		path := change.newPath + strings.TrimPrefix(row.Path, change.oldPath)
-		if _, err := d.WithContext(ctx).Where(d.ID.Eq(row.ID), d.TenantID.Eq(change.tenantID)).Update(d.Path, path); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func validateManagementAssociationsGen(ctx context.Context, q *query.Query, resource string, values map[string]any, tenantID, currentID uint64, creating bool) error {
 	for name, definition := range managementAssociations[resource] {
 		value, exists := values[name]
@@ -146,7 +95,7 @@ func validateManagementAssociationsGen(ctx context.Context, q *query.Query, reso
 			}
 			continue
 		}
-		if currentID != 0 && id == currentID && (resource == "departments" || resource == "resources") {
+		if currentID != 0 && id == currentID && resource == "resources" {
 			return errors.New("不能选择当前记录作为上级")
 		}
 		valid, err := managementAssociationExists(ctx, q, definition.table, "id", id, tenantID)
@@ -162,10 +111,13 @@ func validateManagementAssociationsGen(ctx context.Context, q *query.Query, reso
 			return err
 		}
 	}
-	if resource != "casbin-rules" || (!creating && values["ptype"] == nil && values["v1"] == nil && values["v2"] == nil) {
+	if resource != "casbin-rules" && resource != "platform-casbin-rules" {
 		return nil
 	}
-	targets, err := casbinAssociationTargets(values)
+	if !creating && values["ptype"] == nil && values["v1"] == nil && values["v2"] == nil {
+		return nil
+	}
+	targets, err := casbinAssociationTargets(resource, values)
 	if err != nil {
 		return err
 	}
@@ -185,15 +137,15 @@ func managementAssociationExists(ctx context.Context, q *query.Query, table, col
 	var count int64
 	var err error
 	switch table {
-	case "users":
-		u := q.User
+	case "app_users":
+		u := q.AppUser
 		count, err = u.WithContext(ctx).Where(u.ID.Eq(numericID(value)), u.Status.Eq(1), u.DeletedAt.IsNull()).Count()
-	case "departments":
-		d := q.Department
-		count, err = d.WithContext(ctx).Where(d.ID.Eq(numericID(value)), d.TenantID.Eq(tenantID), d.Status.Eq(1), d.DeletedAt.IsNull()).Count()
-	case "positions":
-		p := q.Position
-		count, err = p.WithContext(ctx).Where(p.ID.Eq(numericID(value)), p.TenantID.Eq(tenantID), p.Status.Eq(1), p.DeletedAt.IsNull()).Count()
+	case "tenant_admins":
+		ta := q.TenantAdmin
+		count, err = ta.WithContext(ctx).Where(ta.ID.Eq(numericID(value)), ta.TenantID.Eq(tenantID), ta.Status.Eq(1), ta.DeletedAt.IsNull()).Count()
+	case "platform_admins":
+		pa := q.PlatformAdmin
+		count, err = pa.WithContext(ctx).Where(pa.ID.Eq(numericID(value)), pa.Status.Eq(1), pa.DeletedAt.IsNull()).Count()
 	case "roles":
 		r := q.Role
 		count, err = r.WithContext(ctx).Where(r.ID.Eq(numericID(value)), r.TenantID.Eq(tenantID), r.Status.Eq(1), r.DeletedAt.IsNull()).Count()
@@ -207,9 +159,6 @@ func managementAssociationExists(ctx context.Context, q *query.Query, table, col
 	case "dictionary_types":
 		d := q.DictionaryType
 		count, err = d.WithContext(ctx).Where(d.ID.Eq(numericID(value)), d.TenantID.Eq(tenantID), d.Status.Eq(1), d.DeletedAt.IsNull()).Count()
-	case "tenant_members":
-		m := q.TenantMember
-		count, err = m.WithContext(ctx).Where(m.ID.Eq(numericID(value)), m.TenantID.Eq(tenantID), m.Status.Eq(1), m.DeletedAt.IsNull()).Count()
 	default:
 		return false, errors.New("关联资源类型不受支持")
 	}
@@ -240,22 +189,8 @@ func validateResourceParentChainGen(ctx context.Context, q *query.Query, parentI
 
 func tenantIDForManagementResource(ctx context.Context, q *query.Query, resource string, id uint64) (uint64, error) {
 	switch resource {
-	case "members":
-		x := q.TenantMember
-		row, err := x.WithContext(ctx).Select(x.TenantID).Where(x.ID.Eq(id)).Take()
-		if err != nil {
-			return 0, err
-		}
-		return row.TenantID, nil
-	case "departments":
-		x := q.Department
-		row, err := x.WithContext(ctx).Select(x.TenantID).Where(x.ID.Eq(id)).Take()
-		if err != nil {
-			return 0, err
-		}
-		return row.TenantID, nil
-	case "positions":
-		x := q.Position
+	case "tenant-admins":
+		x := q.TenantAdmin
 		row, err := x.WithContext(ctx).Select(x.TenantID).Where(x.ID.Eq(id)).Take()
 		if err != nil {
 			return 0, err
@@ -263,13 +198,6 @@ func tenantIDForManagementResource(ctx context.Context, q *query.Query, resource
 		return row.TenantID, nil
 	case "roles":
 		x := q.Role
-		row, err := x.WithContext(ctx).Select(x.TenantID).Where(x.ID.Eq(id)).Take()
-		if err != nil {
-			return 0, err
-		}
-		return row.TenantID, nil
-	case "role-scope-departments":
-		x := q.RoleScopeDepartment
 		row, err := x.WithContext(ctx).Select(x.TenantID).Where(x.ID.Eq(id)).Take()
 		if err != nil {
 			return 0, err
@@ -310,6 +238,11 @@ func tenantIDForManagementResource(ctx context.Context, q *query.Query, resource
 
 func (r *ManagementRepository) prepareUpdateValuesGen(ctx context.Context, q *query.Query, resource string, id, tenantID uint64, values map[string]any, scope managementbiz.Scope) error {
 	switch resource {
+	case "roles", "platform-roles":
+		if !permissionbiz.RoleDataScopeEnabled {
+			values["data_scope"] = uint64(permissionbiz.DataScopeAll)
+		}
+		return nil
 	case "settings":
 		s := q.SystemSetting
 		current, err := s.WithContext(ctx).Where(s.ID.Eq(id), s.TenantID.Eq(tenantID)).Take()
@@ -350,5 +283,50 @@ func (r *ManagementRepository) prepareUpdateValuesGen(ctx context.Context, q *qu
 		return r.encryptProviderConfig(values, existing)
 	default:
 		return nil
+	}
+}
+
+func casbinAssociationTargets(resource string, values map[string]any) ([]associationReference, error) {
+	ptype, _ := values["ptype"].(string)
+	v1 := values["v1"]
+	v2 := values["v2"]
+	if ptype == "" || numericID(v1) == 0 || v2 == nil || strings.TrimSpace(fmt.Sprint(v2)) == "" {
+		if resource == "platform-casbin-rules" && ptype == "g" && numericID(v2) != 0 {
+			// 平台 g 策略：v1=platform_admin_id, v2=role_id
+			return []associationReference{
+				{table: "platform_admins", column: "id", value: v1, activeOnly: true, softDelete: true, errorMessage: "所选平台管理员不存在或已禁用"},
+				{table: "roles", column: "id", value: v2, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选平台角色不存在或已禁用"},
+			}, nil
+		}
+		return nil, errors.New("策略关联对象不能为空")
+	}
+	switch ptype {
+	case "p":
+		if resource == "platform-casbin-rules" {
+			return []associationReference{
+				{table: "roles", column: "id", value: v1, activeOnly: true, softDelete: true, errorMessage: "所选平台角色不存在或已禁用"},
+				{table: "resources", column: "code", value: v2, activeOnly: true, softDelete: true, errorMessage: "所选权限资源不存在或已禁用"},
+			}, nil
+		}
+		return []associationReference{
+			{table: "roles", column: "id", value: v1, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选角色不存在或已禁用"},
+			{table: "resources", column: "code", value: v2, activeOnly: true, softDelete: true, errorMessage: "所选权限资源不存在或已禁用"},
+		}, nil
+	case "g":
+		if numericID(v2) == 0 {
+			return nil, errors.New("所选角色不存在或已禁用")
+		}
+		if resource == "platform-casbin-rules" {
+			return []associationReference{
+				{table: "platform_admins", column: "id", value: v1, activeOnly: true, softDelete: true, errorMessage: "所选平台管理员不存在或已禁用"},
+				{table: "roles", column: "id", value: v2, activeOnly: true, softDelete: true, errorMessage: "所选平台角色不存在或已禁用"},
+			}, nil
+		}
+		return []associationReference{
+			{table: "tenant_admins", column: "id", value: v1, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选租户管理员不存在或已禁用"},
+			{table: "roles", column: "id", value: v2, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选角色不存在或已禁用"},
+		}, nil
+	default:
+		return nil, errors.New("策略类型取值无效")
 	}
 }

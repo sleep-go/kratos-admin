@@ -23,14 +23,16 @@ const (
 	TokenTypeRefresh TokenType = "refresh"
 )
 
-// Realm 标识认证域：平台管理员或租户用户。
+// Realm 标识认证域：平台管理员、租户管理员或 App 用户。
 type Realm string
 
 const (
 	// RealmPlatform 表示平台管理员认证域。
 	RealmPlatform Realm = "platform"
-	// RealmTenant 表示租户用户认证域。
+	// RealmTenant 表示租户管理员认证域。
 	RealmTenant Realm = "tenant"
+	// RealmApp 表示 App 用户认证域（Admin 侧预留，供会话与日志扩展）。
+	RealmApp Realm = "app"
 )
 
 // TokenSubject 描述签发令牌所需的认证上下文。

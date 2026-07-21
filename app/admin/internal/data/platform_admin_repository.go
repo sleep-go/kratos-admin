@@ -3,6 +3,8 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sort"
 	"time"
 
 	"gorm.io/gen/field"
@@ -50,6 +52,35 @@ func (r *PlatformAdminRepository) FindByID(ctx context.Context, adminID uint64) 
 	return mapPlatformAdmin(row), nil
 }
 
+// ListPermissions 加载平台管理员权限：super admin 返回 *:*，否则按 Casbin v0=0 查询。
+func (r *PlatformAdminRepository) ListPermissions(ctx context.Context, adminID uint64) ([]string, error) {
+	pa := r.q.PlatformAdmin
+	row, err := pa.WithContext(ctx).Where(pa.ID.Eq(adminID)).First()
+	if err != nil {
+		return nil, err
+	}
+	if row.IsSuperAdmin {
+		return []string{"*:*"}, nil
+	}
+	g := r.q.CasbinRule.As("g")
+	p := r.q.CasbinRule.As("p")
+	resource := r.q.Resource.As("res")
+	var rows []struct{ V2, V3 string }
+	if err := g.WithContext(ctx).
+		Join(p, p.Ptype.Eq("p"), p.V0.EqCol(g.V0), p.V1.EqCol(g.V2)).
+		Join(resource, resource.Code.EqCol(p.V2), resource.ScopeMask.BitAnd(1).Eq(1), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+		Where(g.Ptype.Eq("g"), g.V0.Eq("0"), g.V1.Eq(fmt.Sprint(adminID))).
+		Distinct(p.V2, p.V3).Select(p.V2, p.V3).Scan(&rows); err != nil {
+		return nil, fmt.Errorf("查询平台管理员权限失败: %w", err)
+	}
+	permissions := make([]string, 0, len(rows))
+	for _, item := range rows {
+		permissions = append(permissions, item.V2+":"+item.V3)
+	}
+	sort.Strings(permissions)
+	return permissions, nil
+}
+
 // UpdateLoginFailure 记录连续登录失败次数与锁定截止时间。
 func (r *PlatformAdminRepository) UpdateLoginFailure(ctx context.Context, adminID uint64, count uint32, lockedUntil *time.Time) error {
 	pa := r.q.PlatformAdmin
@@ -87,7 +118,8 @@ func mapPlatformAdmin(row *model.PlatformAdmin) *bizauth.PlatformAdmin {
 	}
 	return &bizauth.PlatformAdmin{
 		ID: row.ID, Username: row.Username, DisplayName: row.DisplayName, AvatarURL: avatarURL,
-		Email: email, Phone: phone, MFAEnabled: row.MFAEnabled, MFAChannel: row.MFAChannel,
+		Email: email, Phone: phone, IsSuperAdmin: row.IsSuperAdmin,
+		MFAEnabled: row.MFAEnabled, MFAChannel: row.MFAChannel,
 		PasswordHash: row.PasswordHash,
 		Status: bizauth.UserStatus(row.Status), FailedLoginCount: row.FailedLoginCount, LockedUntil: row.LockedUntil,
 	}

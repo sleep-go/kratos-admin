@@ -42,7 +42,7 @@ func TestTaskRepositoryIgnoresStaleConfirmAndDuplicateFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := tx.Create(&model.File{
-		ID: fileID, TenantID: 1, UploaderMemberID: 1, ProviderName: "local", ObjectKey: "integration/" + fileID,
+		ID: fileID, TenantID: 1, UploaderID: 1, ProviderName: "local", ObjectKey: "integration/" + fileID,
 		OriginalName: "integration.txt", ContentType: "text/plain", Status: filebiz.StatusDeletionPending,
 		CreatedAt: now, UpdatedAt: now,
 	}).Error; err != nil {

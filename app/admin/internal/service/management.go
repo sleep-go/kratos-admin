@@ -208,8 +208,7 @@ func (s *ManagementService) authorize(ctx context.Context, scope managementbiz.S
 }
 
 var tenantSetupResources = map[string]struct{}{
-	"members": {}, "departments": {}, "positions": {}, "roles": {},
-	"casbin-rules": {}, "role-scope-departments": {},
+	"tenant-admins": {}, "roles": {}, "casbin-rules": {},
 }
 
 func managementListScope(ctx context.Context, resource string, targetTenantID uint64) (managementbiz.Scope, error) {
@@ -248,14 +247,15 @@ func managementScope(ctx context.Context, resource string, targetTenantID uint64
 	}
 	return managementbiz.Scope{
 		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID,
-		PlatformAdmin: claims.Realm == bizauth.RealmPlatform,
-		Impersonating: claims.ImpersonatorID > 0,
+		ImpersonatorID: claims.ImpersonatorID,
+		PlatformAdmin:  claims.Realm == bizauth.RealmPlatform,
+		Impersonating:  claims.ImpersonatorID > 0,
 	}, nil
 }
 
 func isPlatformResource(resource string) bool {
 	switch resource {
-	case "users", "tenants", "resources", "tenant-resources", "tenant-setup", "platform-admins":
+	case "app-users", "tenants", "resources", "tenant-resources", "tenant-setup", "platform-admins", "platform-roles", "platform-casbin-rules":
 		return true
 	default:
 		return false

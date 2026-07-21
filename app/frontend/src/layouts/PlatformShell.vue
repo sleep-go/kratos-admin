@@ -1,23 +1,28 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { SwitchButton } from '@element-plus/icons-vue'
 
 import AppIcon from '@/components/icons/AppIcon.vue'
 import TopNavigation from './components/TopNavigation.vue'
-import { resolveNavigation, resolveTopNavigation } from '@/features/navigation/registry'
+import { buildNavigationTree } from '@/features/navigation/registry'
 import { resolveNavigationIconName } from '@/components/icons/registry'
 import type { NavigationItem } from '@/features/navigation/types'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const { currentUser } = storeToRefs(authStore)
 const mobileOpen = shallowRef(false)
 const userName = computed(() => currentUser.value?.displayName ?? '平台管理员')
-const navigation = computed<NavigationItem[]>(() =>
-  resolveTopNavigation(resolveNavigation(authStore.navigationItems), 'platform')
-)
+const navigation = computed<NavigationItem[]>(() => buildNavigationTree(authStore.navigationItems))
+
+async function handleLogout() {
+  await authStore.logout()
+  mobileOpen.value = false
+  await router.push('/platform/login')
+}
 </script>
 
 <template>
@@ -29,7 +34,7 @@ const navigation = computed<NavigationItem[]>(() =>
       :show-tenant-switcher="false"
       account-path="/platform/account"
       @open-mobile="mobileOpen = true"
-      @logout="authStore.logout()"
+      @logout="handleLogout"
     />
 
     <div
@@ -74,7 +79,7 @@ const navigation = computed<NavigationItem[]>(() =>
           {{ item.label }}
         </RouterLink>
       </template>
-      <button class="mobile-logout" type="button" @click="authStore.logout()">
+      <button class="mobile-logout" type="button" @click="handleLogout">
         <el-icon :size="15"><SwitchButton /></el-icon>
         退出登录
       </button>

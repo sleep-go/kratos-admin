@@ -21,6 +21,7 @@ type PlatformAdmin struct {
 	PasswordHash     string         `gorm:"column:password_hash;type:varchar(255);not null;comment:Argon2id密码哈希" json:"password_hash"`                                                 // Argon2id密码哈希
 	DisplayName      string         `gorm:"column:display_name;type:varchar(128);not null;comment:显示名称" json:"display_name"`                                                           // 显示名称
 	AvatarURL        *string        `gorm:"column:avatar_url;type:text;comment:头像地址" json:"avatar_url"`                                                                                // 头像地址
+	IsSuperAdmin     bool           `gorm:"column:is_super_admin;type:tinyint(1);not null;default:0;comment:是否超级管理员：0否，1是（拥有*:*）" json:"is_super_admin"`                               // 是否超级管理员：0否，1是（拥有*:*）
 	MFAEnabled       bool           `gorm:"column:mfa_enabled;type:tinyint(1);not null;default:0;comment:是否启用登录MFA：0否，1是" json:"mfa_enabled"`                                          // 是否启用登录MFA：0否，1是
 	MFAChannel       string         `gorm:"column:mfa_channel;type:varchar(16);not null;default:email;comment:MFA渠道：email邮件，sms短信" json:"mfa_channel"`                                 // MFA渠道：email邮件，sms短信
 	Status           uint8          `gorm:"column:status;type:tinyint unsigned;not null;index:idx_platform_admins_status,priority:1;default:1;comment:账号状态：1启用，2禁用，3锁定" json:"status"` // 账号状态：1启用，2禁用，3锁定

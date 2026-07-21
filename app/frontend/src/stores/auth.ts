@@ -158,14 +158,20 @@ export const useAuthStore = defineStore('auth', () => {
       }
     } finally {
       clearSession()
+      sessionRestored.value = false
     }
   }
 
   async function exitImpersonation() {
     try {
-      await authApi.logout()
-    } finally {
+      const response = await authApi.exitImpersonation()
+      applyAuthResponse(response)
+      await loadNavigation()
+      sessionRestored.value = true
+    } catch (error) {
       clearSession()
+      sessionRestored.value = false
+      throw error
     }
   }
 

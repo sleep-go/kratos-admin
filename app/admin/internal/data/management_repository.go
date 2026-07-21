@@ -15,7 +15,6 @@ import (
 
 	"gorm.io/datatypes"
 	"gorm.io/gen/field"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
 	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
@@ -70,17 +69,16 @@ func fieldSet(fields ...string) map[string]struct{} {
 }
 
 var managementResources = map[string]resourceDefinition{
-	"users":                  {table: "users", columns: []string{"id", "username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status", "mfa_enabled", "mfa_channel"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
-	"platform-admins":        {table: "platform_admins", columns: []string{"id", "username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
-	"tenants":                {table: "tenants", columns: []string{"id", "code", "name", "status", "permission_version", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("id", "status"), keywordFields: []string{"code", "name"}, softDelete: true},
-	"members":                {table: "tenant_members", columns: []string{"id", "tenant_id", "user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin", "joined_at"}, writeFields: fieldSet("user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin"), filterFields: fieldSet("status", "primary_department_id", "position_id"), keywordFields: []string{"display_name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
-	"departments":            {table: "departments", columns: []string{"id", "tenant_id", "parent_id", "name", "code", "path", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("parent_id", "name", "code", "sort_order", "status"), filterFields: fieldSet("parent_id", "status"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
-	"positions":              {table: "positions", columns: []string{"id", "tenant_id", "code", "name", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "sort_order", "status"), filterFields: fieldSet("status"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
-	"roles":                  {table: "roles", columns: []string{"id", "tenant_id", "code", "name", "data_scope", "is_builtin", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "data_scope", "status"), filterFields: fieldSet("status", "data_scope"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
+	"app-users":             {table: "app_users", columns: []string{"id", "username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status", "mfa_enabled", "mfa_channel"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
+	"platform-admins":       {table: "platform_admins", columns: []string{"id", "username", "email", "phone", "display_name", "status", "is_super_admin", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
+	"tenant-admins":         {table: "tenant_admins", columns: []string{"id", "tenant_id", "username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status"), keywordFields: []string{"username", "email", "phone", "display_name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
+	"tenants":               {table: "tenants", columns: []string{"id", "code", "name", "status", "permission_version", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("id", "status"), keywordFields: []string{"code", "name"}, softDelete: true},
+	"roles":                 {table: "roles", columns: []string{"id", "tenant_id", "code", "name", "data_scope", "is_builtin", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "data_scope", "status"), filterFields: fieldSet("status", "data_scope"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
+	"platform-roles":        {table: "roles", columns: []string{"id", "tenant_id", "code", "name", "data_scope", "is_builtin", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "data_scope", "status"), filterFields: fieldSet("status"), keywordFields: []string{"name", "code"}, softDelete: true},
 	"resources":              {table: "resources", columns: []string{"id", "parent_id", "type", "scope_mask", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status"}, writeFields: fieldSet("parent_id", "type", "scope_mask", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status"), filterFields: fieldSet("parent_id", "type", "scope_mask", "status"), keywordFields: []string{"name", "code", "route_path", "api_path"}, softDelete: true},
 	"tenant-resources":       {table: "tenant_resources", columns: []string{"id", "tenant_id", "resource_id", "created_by", "created_at"}, filterFields: fieldSet("tenant_id", "resource_id"), tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
-	"casbin-rules":           {table: "casbin_rules", columns: []string{"id", "ptype", "v0", "v1", "v2", "v3", "v4", "v5"}, writeFields: fieldSet("ptype", "v1", "v2", "v3", "v4", "v5"), filterFields: fieldSet("ptype", "v1", "v2"), tenantScoped: true, tenantColumn: "v0"},
-	"role-scope-departments": {table: "role_scope_departments", columns: []string{"id", "tenant_id", "role_id", "department_id", "created_at"}, writeFields: fieldSet("role_id", "department_id"), filterFields: fieldSet("role_id", "department_id"), tenantScoped: true, tenantColumn: "tenant_id"},
+	"casbin-rules":          {table: "casbin_rules", columns: []string{"id", "ptype", "v0", "v1", "v2", "v3", "v4", "v5"}, writeFields: fieldSet("ptype", "v1", "v2", "v3", "v4", "v5"), filterFields: fieldSet("ptype", "v1", "v2"), tenantScoped: true, tenantColumn: "v0"},
+	"platform-casbin-rules": {table: "casbin_rules", columns: []string{"id", "ptype", "v0", "v1", "v2", "v3", "v4", "v5"}, writeFields: fieldSet("ptype", "v1", "v2", "v3", "v4", "v5"), filterFields: fieldSet("ptype", "v1", "v2")},
 	"login-logs":             {table: "login_logs", columns: []string{"id", "tenant_id", "user_id", "identifier", "result", "reason", "ip", "user_agent", "request_id", "created_at"}, filterFields: fieldSet("user_id", "result"), keywordFields: []string{"identifier", "ip", "request_id"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
 	"audit-logs":             {table: "audit_logs", columns: []string{"id", "event_id", "tenant_id", "user_id", "member_id", "action", "resource_type", "resource_id", "summary", "ip", "user_agent", "request_id", "created_at"}, filterFields: fieldSet("user_id", "member_id", "action", "resource_type"), keywordFields: []string{"summary", "resource_id", "request_id"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
 	"api-logs":               {table: "api_access_logs", columns: []string{"id", "tenant_id", "user_id", "request_id", "method", "route", "status_code", "duration_ms", "ip", "user_agent", "error_reason", "created_at"}, filterFields: fieldSet("user_id", "method", "status_code"), keywordFields: []string{"route", "request_id", "ip", "error_reason"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
@@ -89,18 +87,34 @@ var managementResources = map[string]resourceDefinition{
 	"dictionary-types":       {table: "dictionary_types", columns: []string{"id", "tenant_id", "code", "name", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("status"), keywordFields: []string{"code", "name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"dictionary-items":       {table: "dictionary_items", columns: []string{"id", "tenant_id", "type_id", "item_value", "label", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("type_id", "item_value", "label", "sort_order", "status"), filterFields: fieldSet("type_id", "status"), keywordFields: []string{"item_value", "label"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"providers":              {table: "provider_configs", columns: []string{"id", "tenant_id", "provider_type", "provider_name", "display_name", "encrypted_config", "status", "is_default", "updated_by", "created_at", "updated_at"}, writeFields: fieldSet("provider_type", "provider_name", "display_name", "config", "status", "is_default"), filterFields: fieldSet("provider_type", "status", "is_default"), keywordFields: []string{"provider_name", "display_name"}, tenantScoped: true, tenantColumn: "tenant_id"},
-	"files":                  {table: "files", columns: []string{"id", "tenant_id", "uploader_member_id", "provider_name", "object_key", "original_name", "content_type", "size_bytes", "sha256", "status", "created_at"}, filterFields: fieldSet("provider_name", "content_type", "status"), keywordFields: []string{"original_name", "object_key", "sha256"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true, readOnly: true},
+	"files":                 {table: "files", columns: []string{"id", "tenant_id", "uploader_id", "provider_name", "object_key", "original_name", "content_type", "size_bytes", "sha256", "status", "created_at"}, filterFields: fieldSet("provider_name", "content_type", "status"), keywordFields: []string{"original_name", "object_key", "sha256"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true, readOnly: true},
+}
+
+// platformGovernanceResources 为平台治理 API，代维租户会话不可直接访问。
+var platformGovernanceResources = map[string]struct{}{
+	"app-users": {}, "tenants": {}, "resources": {}, "tenant-resources": {}, "platform-admins": {},
+	"platform-roles": {}, "platform-casbin-rules": {},
+}
+
+func isPlatformGovernanceResource(resource string) bool {
+	_, ok := platformGovernanceResources[resource]
+	return ok
+}
+
+// impersonatingPermissionCodes 返回代维会话可操作的租户数据面资源编码。
+func impersonatingPermissionCodes() []string {
+	codes := make([]string, 0, len(managementResources))
+	for code := range managementResources {
+		if isPlatformGovernanceResource(code) {
+			continue
+		}
+		codes = append(codes, code)
+	}
+	sort.Strings(codes)
+	return codes
 }
 
 var managementAssociations = map[string]map[string]associationDefinition{
-	"members": {
-		"user_id":               {table: "users", required: true, activeOnly: true, softDelete: true, errorMessage: "所选用户不存在或已禁用"},
-		"primary_department_id": {table: "departments", tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选主部门不存在或已禁用"},
-		"position_id":           {table: "positions", tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选岗位不存在或已禁用"},
-	},
-	"departments": {
-		"parent_id": {table: "departments", tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选上级部门不存在或已禁用"},
-	},
 	"resources": {
 		"parent_id": {table: "resources", activeOnly: true, softDelete: true, errorMessage: "所选父资源不存在或已禁用"},
 	},
@@ -112,32 +126,6 @@ var managementAssociations = map[string]map[string]associationDefinition{
 func managementAssociation(resource, field string) (associationDefinition, bool) {
 	definition, ok := managementAssociations[resource][field]
 	return definition, ok
-}
-
-func casbinAssociationTargets(values map[string]any) ([]associationReference, error) {
-	ptype, _ := values["ptype"].(string)
-	v1 := values["v1"]
-	v2 := values["v2"]
-	if ptype == "" || numericID(v1) == 0 || v2 == nil || strings.TrimSpace(fmt.Sprint(v2)) == "" {
-		return nil, errors.New("策略关联对象不能为空")
-	}
-	switch ptype {
-	case "p":
-		return []associationReference{
-			{table: "roles", column: "id", value: v1, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选角色不存在或已禁用"},
-			{table: "resources", column: "code", value: v2, activeOnly: true, softDelete: true, errorMessage: "所选权限资源不存在或已禁用"},
-		}, nil
-	case "g":
-		if numericID(v2) == 0 {
-			return nil, errors.New("所选角色不存在或已禁用")
-		}
-		return []associationReference{
-			{table: "tenant_members", column: "id", value: v1, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选成员不存在或已禁用"},
-			{table: "roles", column: "id", value: v2, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选角色不存在或已禁用"},
-		}, nil
-	default:
-		return nil, errors.New("策略类型取值无效")
-	}
 }
 
 // ManagementRepository 使用编译期白名单访问后台资源。
@@ -159,43 +147,43 @@ func (r *ManagementRepository) gen() *query.Query {
 	return r.q
 }
 
-// Allowed 按 tenant、member、role 的 Casbin domain 关系校验资源动作，并限制在租户功能授权集合内。
+// Allowed 按 Casbin 关系校验资源动作，并限制在租户功能授权集合内。
 func (r *ManagementRepository) Allowed(ctx context.Context, scope managementbiz.Scope, resource, action string) (bool, error) {
 	if scope.PlatformAdmin {
 		return true, nil
 	}
-	q := r.gen()
-	m := q.TenantMember
-	member, err := m.WithContext(ctx).Select(m.IsTenantAdmin).
-		Where(m.ID.Eq(scope.MemberID), m.TenantID.Eq(scope.TenantID), m.Status.Eq(1), m.DeletedAt.IsNull()).Take()
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, err
-	}
-	tr := q.TenantResource.As("tr")
-	res := q.Resource.As("res")
+	tr := r.gen().TenantResource.As("tr")
+	res := r.gen().Resource.As("res")
 	base := tr.WithContext(ctx).Join(res, res.ID.EqCol(tr.ResourceID), res.Code.Eq(resource), res.Status.Eq(1), res.DeletedAt.IsNull()).
 		Where(tr.TenantID.Eq(scope.TenantID), res.ScopeMask.BitAnd(2).Eq(2))
-	if member != nil && member.IsTenantAdmin {
-		count, err := base.Count()
-		if err != nil {
-			return false, err
-		}
-		return count > 0, nil
-	}
+	// 代维会话等效租户管理员。
 	if scope.Impersonating {
-		count, err := base.Count()
-		if err != nil {
-			return false, err
-		}
-		return count > 0, nil
+		return r.impersonatingTenantResourceAllowed(ctx, resource)
 	}
-	p := q.CasbinRule.As("p")
-	g := q.CasbinRule.As("g")
-	count, err := base.
+	// 租户管理员拥有已授权资源的全部操作权限。
+	count, err := base.Count()
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	// 非管理员角色按 Casbin v1=tenant_admin_id 校验。
+	p := r.gen().CasbinRule.As("p")
+	g := r.gen().CasbinRule.As("g")
+	count, err = base.
 		Join(p, p.Ptype.Eq("p"), p.V0.Eq(fmt.Sprint(scope.TenantID)), p.V2.EqCol(res.Code), field.Or(p.V3.Eq(action), p.V3.Eq("*"))).
 		Join(g, g.Ptype.Eq("g"), g.V0.EqCol(p.V0), g.V2.EqCol(p.V1), g.V1.Eq(fmt.Sprint(scope.MemberID))).
 		Count()
 	return count > 0, err
+}
+
+// impersonatingTenantResourceAllowed 校验代维会话可访问的租户数据面资源。
+func (r *ManagementRepository) impersonatingTenantResourceAllowed(_ context.Context, resource string) (bool, error) {
+	if _, ok := managementResources[resource]; !ok {
+		return false, nil
+	}
+	return !isPlatformGovernanceResource(resource), nil
 }
 
 // AllowedRecord 按可信租户和角色数据范围校验单条资源可见性。
@@ -340,9 +328,6 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 	if definition.tenantScoped {
 		values[definition.tenantColumn] = scope.TenantID
 	}
-	if resource == "departments" {
-		values["path"] = "/"
-	}
 	if err := r.prepareCreateValues(resource, values, scope); err != nil {
 		return 0, err
 	}
@@ -352,7 +337,7 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 	if resource == "tenant-resources" {
 		values["created_by"] = scope.UserID
 	}
-	if resource == "users" {
+	if resource == "app-users" || resource == "platform-admins" || resource == "tenant-admins" {
 		initialPassword, _ := data["initial_password"].(string)
 		if err := bizauth.ValidatePassword(initialPassword); err != nil {
 			return 0, err
@@ -362,7 +347,18 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 			return 0, err
 		}
 		values["password_hash"] = passwordHash
-		values["password_changed_at"] = time.Now().UTC()
+		if resource == "app-users" || resource == "tenant-admins" {
+			values["password_changed_at"] = time.Now().UTC()
+		}
+	}
+	if resource == "platform-roles" {
+		values["tenant_id"] = uint64(0)
+	}
+	if resource == "platform-casbin-rules" {
+		values["v0"] = "0"
+	}
+	if resource == "casbin-rules" && values["v0"] == nil {
+		values["v0"] = fmt.Sprint(scope.TenantID)
 	}
 	var id uint64
 	err = r.gen().Transaction(func(tx *query.Query) error {
@@ -381,17 +377,6 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 			return err
 		}
 		id = createdID
-		if resource == "departments" {
-			path, err := resolveDepartmentPathGen(ctx, tx, tenantID, numericID(values["parent_id"]), id)
-			if err != nil {
-				return err
-			}
-			d := tx.Department
-			if _, err := d.WithContext(ctx).Where(d.ID.Eq(id), d.TenantID.Eq(tenantID)).Update(d.Path, path); err != nil {
-				return err
-			}
-			values["path"] = path
-		}
 		if err := incrementPermissionVersionGen(ctx, tx, scope, resource, values, id); err != nil {
 			return err
 		}
@@ -400,30 +385,9 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 	return id, err
 }
 
-func (r *ManagementRepository) validateCreateDataScope(ctx context.Context, scope managementbiz.Scope, resource string, values map[string]any) error {
-	if resource != "members" && resource != "departments" {
-		return nil
-	}
-	resolved, err := r.resolveDataScope(ctx, scope)
-	if err != nil {
-		return err
-	}
-	if resolved.All {
-		return nil
-	}
-	if resolved.SelfOnly {
-		return errors.New("仅本人数据范围不允许创建组织数据")
-	}
-	departmentID := numericID(values["primary_department_id"])
-	if resource == "departments" {
-		departmentID = numericID(values["parent_id"])
-	}
-	for _, allowedID := range resolved.DepartmentIDs {
-		if allowedID == departmentID {
-			return nil
-		}
-	}
-	return errors.New("目标部门超出当前角色数据范围")
+func (r *ManagementRepository) validateCreateDataScope(_ context.Context, _ managementbiz.Scope, _ string, _ map[string]any) error {
+	// 阶段 1 数据范围固定为全部，跳过组织范围校验。
+	return nil
 }
 
 // Update 在可信作用域内更新资源并写入审计 Outbox。
@@ -457,13 +421,6 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 		if err := validateManagementAssociationsGen(ctx, tx, resource, values, tenantID, id, false); err != nil {
 			return err
 		}
-		var departmentChange *departmentPathChange
-		if resource == "departments" {
-			departmentChange, err = prepareDepartmentPathUpdateGen(ctx, tx, values, tenantID, id)
-			if err != nil {
-				return err
-			}
-		}
 		if err := r.prepareUpdateValuesGen(ctx, tx, resource, id, tenantID, values, scope); err != nil {
 			return err
 		}
@@ -473,11 +430,6 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 		}
 		if result.RowsAffected != 1 {
 			return errors.New("资源不存在或无权访问")
-		}
-		if departmentChange != nil && departmentChange.oldPath != departmentChange.newPath {
-			if err := updateDepartmentDescendantPathsGen(ctx, tx, *departmentChange); err != nil {
-				return err
-			}
 		}
 		if err := incrementPermissionVersionGen(ctx, tx, scope, resource, values, id); err != nil {
 			return err
@@ -490,6 +442,10 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scope managementbiz.Scope, roleID uint64, dataScope uint32, grants []managementbiz.RoleGrant, departmentIDs []uint64) error {
 	if scope.TenantID == 0 {
 		return errors.New("角色授权必须在租户上下文执行")
+	}
+	if !permissionbiz.RoleDataScopeEnabled {
+		dataScope = uint32(permissionbiz.DataScopeAll)
+		departmentIDs = nil
 	}
 	if dataScope < 1 || dataScope > 5 {
 		return errors.New("数据范围取值无效")
@@ -547,18 +503,6 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 				return errors.New("角色授权包含租户未获授权的资源")
 			}
 		}
-		if dataScope == 5 && len(departmentIDs) > 0 {
-			department := tx.Department
-			count, err := department.WithContext(ctx).
-				Where(department.TenantID.Eq(scope.TenantID), department.ID.In(departmentIDs...), department.Status.Eq(1), department.DeletedAt.IsNull()).
-				Distinct(department.ID).Count()
-			if err != nil {
-				return err
-			}
-			if count != int64(len(uniqueUint64(departmentIDs))) {
-				return errors.New("自定义数据范围包含无效部门")
-			}
-		}
 		if _, err := role.WithContext(ctx).Where(role.ID.Eq(roleID), role.TenantID.Eq(scope.TenantID)).Update(role.DataScope, uint8(dataScope)); err != nil {
 			return err
 		}
@@ -573,25 +517,6 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 			}
 			if err := casbin.WithContext(ctx).Create(policyRows...); err != nil {
 				return err
-			}
-		}
-		scopeDepartment := tx.RoleScopeDepartment
-		if _, err := scopeDepartment.WithContext(ctx).Where(scopeDepartment.TenantID.Eq(scope.TenantID), scopeDepartment.RoleID.Eq(roleID)).Delete(); err != nil {
-			return err
-		}
-		if dataScope == 5 {
-			rows := make([]model.RoleScopeDepartment, 0, len(departmentIDs))
-			for _, departmentID := range uniqueUint64(departmentIDs) {
-				rows = append(rows, model.RoleScopeDepartment{TenantID: scope.TenantID, RoleID: roleID, DepartmentID: departmentID})
-			}
-			if len(rows) > 0 {
-				rowPointers := make([]*model.RoleScopeDepartment, 0, len(rows))
-				for index := range rows {
-					rowPointers = append(rowPointers, &rows[index])
-				}
-				if err := scopeDepartment.WithContext(ctx).Create(rowPointers...); err != nil {
-					return err
-				}
 			}
 		}
 		tenant := tx.Tenant
@@ -691,6 +616,12 @@ func uniqueUint64(values []uint64) []uint64 {
 
 func (r *ManagementRepository) prepareCreateValues(resource string, values map[string]any, scope managementbiz.Scope) error {
 	switch resource {
+	case "roles":
+		// 数据范围功能暂不开放，新建角色固定为全部数据。
+		if !permissionbiz.RoleDataScopeEnabled {
+			values["data_scope"] = uint64(permissionbiz.DataScopeAll)
+		}
+		return nil
 	case "settings":
 		values["updated_by"] = scope.UserID
 		values["version"] = 1
@@ -823,106 +754,9 @@ type resolvedDataScope struct {
 	PrimaryDepartmentID uint64
 }
 
-func (r *ManagementRepository) resolveDataScope(ctx context.Context, scope managementbiz.Scope) (resolvedDataScope, error) {
-	if scope.PlatformAdmin {
-		return resolvedDataScope{QueryDataScope: permissionbiz.QueryDataScope{All: true}}, nil
-	}
-	q := r.gen()
-	m := q.TenantMember
-	member, err := m.WithContext(ctx).Select(m.PrimaryDepartmentID, m.IsTenantAdmin).
-		Where(m.ID.Eq(scope.MemberID), m.TenantID.Eq(scope.TenantID), m.Status.Eq(1), m.DeletedAt.IsNull()).Take()
-	if err != nil {
-		return resolvedDataScope{}, errors.New("当前租户成员不存在或已禁用")
-	}
-	if member.IsTenantAdmin {
-		return resolvedDataScope{QueryDataScope: permissionbiz.QueryDataScope{All: true}, PrimaryDepartmentID: member.PrimaryDepartmentID}, nil
-	}
-	g := q.CasbinRule
-	groupRows, err := g.WithContext(ctx).Select(g.V2).
-		Where(g.Ptype.Eq("g"), g.V0.Eq(fmt.Sprint(scope.TenantID)), g.V1.Eq(fmt.Sprint(scope.MemberID))).Find()
-	if err != nil {
-		return resolvedDataScope{}, err
-	}
-	roleIDs := make([]uint64, 0, len(groupRows))
-	for _, group := range groupRows {
-		if id := numericID(group.V2); id != 0 {
-			roleIDs = append(roleIDs, id)
-		}
-	}
-	type roleScopeRow struct {
-		ID        uint64
-		DataScope uint8
-	}
-	roleRows := make([]roleScopeRow, 0, len(roleIDs))
-	if len(roleIDs) > 0 {
-		role := q.Role
-		storedRoles, roleErr := role.WithContext(ctx).Select(role.ID, role.DataScope).
-			Where(role.ID.In(roleIDs...), role.TenantID.Eq(scope.TenantID), role.Status.Eq(1), role.DeletedAt.IsNull()).Find()
-		if roleErr != nil {
-			return resolvedDataScope{}, roleErr
-		}
-		for _, stored := range storedRoles {
-			roleRows = append(roleRows, roleScopeRow{ID: stored.ID, DataScope: stored.DataScope})
-		}
-	}
-	custom := make(map[uint64][]uint64)
-	if len(roleIDs) > 0 {
-		d := q.RoleScopeDepartment
-		rows, err := d.WithContext(ctx).Where(d.TenantID.Eq(scope.TenantID), d.RoleID.In(roleIDs...)).Find()
-		if err != nil {
-			return resolvedDataScope{}, err
-		}
-		for _, row := range rows {
-			custom[row.RoleID] = append(custom[row.RoleID], row.DepartmentID)
-		}
-	}
-	roles := make([]permissionbiz.RoleDataScope, 0, len(roleRows))
-	for _, role := range roleRows {
-		roles = append(roles, permissionbiz.RoleDataScope{Type: permissionbiz.DataScopeType(role.DataScope), PrimaryDepartmentID: member.PrimaryDepartmentID, DepartmentIDs: custom[role.ID]})
-	}
-	resolved := permissionbiz.ResolveDataScope(roles)
-	if len(resolved.DescendantRootIDs) > 0 {
-		expanded, err := r.expandDepartmentDescendants(ctx, scope.TenantID, resolved.DepartmentIDs, resolved.DescendantRootIDs)
-		if err != nil {
-			return resolvedDataScope{}, err
-		}
-		resolved.DepartmentIDs = expanded
-	}
-	return resolvedDataScope{QueryDataScope: resolved, PrimaryDepartmentID: member.PrimaryDepartmentID}, nil
-}
-
-func (r *ManagementRepository) expandDepartmentDescendants(ctx context.Context, tenantID uint64, departmentIDs, roots []uint64) ([]uint64, error) {
-	d := r.gen().Department
-	rows, err := d.WithContext(ctx).Select(d.ID, d.ParentID).Where(d.TenantID.Eq(tenantID), d.DeletedAt.IsNull()).Find()
-	if err != nil {
-		return nil, err
-	}
-	children := make(map[uint64][]uint64)
-	for _, row := range rows {
-		children[row.ParentID] = append(children[row.ParentID], row.ID)
-	}
-	set := make(map[uint64]struct{}, len(departmentIDs))
-	for _, id := range departmentIDs {
-		set[id] = struct{}{}
-	}
-	queue := append([]uint64(nil), roots...)
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		for _, child := range children[current] {
-			if _, exists := set[child]; exists {
-				continue
-			}
-			set[child] = struct{}{}
-			queue = append(queue, child)
-		}
-	}
-	result := make([]uint64, 0, len(set))
-	for id := range set {
-		result = append(result, id)
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
-	return result, nil
+func (r *ManagementRepository) resolveDataScope(_ context.Context, _ managementbiz.Scope) (resolvedDataScope, error) {
+	// 阶段 1 数据范围固定为全部数据。
+	return resolvedDataScope{QueryDataScope: permissionbiz.QueryDataScope{All: true}}, nil
 }
 
 func sanitizeResourceWrite(definition resourceDefinition, input map[string]any) (map[string]any, error) {
@@ -963,7 +797,7 @@ func numericID(value any) uint64 {
 
 func validateManagementEnumValues(resource string, values map[string]any) error {
 	switch resource {
-	case "users":
+	case "app-users", "platform-admins", "tenant-admins":
 		if value, exists := values["mfa_channel"]; exists && value != "email" && value != "sms" {
 			return errors.New("MFA渠道取值无效")
 		}
@@ -1016,16 +850,6 @@ func exactUint(value any) (uint64, bool) {
 	}
 }
 
-func buildDepartmentPath(parentPath string, id uint64) string {
-	return strings.TrimRight(parentPath, "/") + "/" + strconv.FormatUint(id, 10)
-}
-
-type departmentPathChange struct {
-	tenantID uint64
-	oldPath  string
-	newPath  string
-}
-
 func resourceParentChainContains(currentID uint64, chain []uint64) bool {
 	for _, id := range chain {
 		if id == currentID {
@@ -1036,7 +860,10 @@ func resourceParentChainContains(currentID uint64, chain []uint64) bool {
 }
 
 func writeAuditOutboxGen(ctx context.Context, tx *query.Query, scope managementbiz.Scope, action, resource, resourceID string, after map[string]any) error {
-	payload, err := json.Marshal(map[string]any{"user_id": scope.UserID, "member_id": scope.MemberID, "action": action, "resource_type": resource, "resource_id": resourceID, "after": after})
+	payload, err := json.Marshal(map[string]any{
+		"user_id": scope.UserID, "member_id": scope.MemberID, "impersonator_id": scope.ImpersonatorID,
+		"action": action, "resource_type": resource, "resource_id": resourceID, "after": after,
+	})
 	if err != nil {
 		return err
 	}

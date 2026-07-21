@@ -3,6 +3,10 @@ package permission
 
 import "sort"
 
+// RoleDataScopeEnabled 控制角色数据范围是否在运行时生效。
+// 暂时关闭后，所有角色等效为「全部数据」，前端也不展示数据范围配置。
+const RoleDataScopeEnabled = false
+
 // DataScopeType 表示角色的数据可见范围。
 type DataScopeType uint8
 

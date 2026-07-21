@@ -53,6 +53,7 @@ func (r *AuditRepository) Publish(ctx context.Context, event audit.Event, entry 
 		}
 		logRow := &model.AuditLog{
 			EventID: event.ID, TenantID: event.TenantID, UserID: entry.UserID, MemberID: entry.MemberID,
+			ImpersonatorID: entry.ImpersonatorID,
 			Action: entry.Action, ResourceType: entry.ResourceType, ResourceID: entry.ResourceID, Summary: entry.Summary,
 			BeforeData: datatypes.JSON(before), AfterData: datatypes.JSON(after), IP: entry.IP,
 			UserAgent: entry.UserAgent, RequestID: entry.RequestID,

@@ -126,7 +126,7 @@ func (r *LogExportRepository) Complete(ctx context.Context, record logexport.Rec
 	return r.q.Transaction(func(tx *query.Query) error {
 		name := fmt.Sprintf("%s-logs-%s.csv", record.LogType, time.Now().UTC().Format("20060102-150405"))
 		file := &model.File{
-			ID: fileID, TenantID: record.TenantID, UploaderMemberID: record.MemberID, ProviderName: "",
+			ID: fileID, TenantID: record.TenantID, UploaderID: record.MemberID, ProviderName: "",
 			ObjectKey: objectKey, OriginalName: name, ContentType: object.ContentType, SizeBytes: uint64(object.Size),
 			ETag: object.ETag, Status: 2, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 		}

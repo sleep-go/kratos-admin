@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, ElTree } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import * as managementApi from '@/api/management'
 import { useAuthStore } from '@/stores/auth'
 import { Check, Delete, Plus } from '@/components/icons/actions'
 import type { ResourceRow } from '@/api/management'
 
-const props = defineProps<{ targetTenantId?: string }>()
+const props = defineProps<{
+  targetTenantId?: string
+  embedded?: boolean
+  platformMode?: boolean
+}>()
 const actions = [
   { value: 'list', label: '查看' },
   { value: 'create', label: '新建' },
@@ -16,29 +20,23 @@ const actions = [
   { value: 'export', label: '导出' },
   { value: 'download', label: '下载' }
 ]
+// 数据范围功能暂不开放，保存时固定为全部数据。
+const DEFAULT_DATA_SCOPE = 1
 const authStore = useAuthStore()
-const scopeOptions = [
-  { value: 1, label: '全部数据' },
-  { value: 2, label: '本部门及下级' },
-  { value: 3, label: '本部门' },
-  { value: 4, label: '仅本人' },
-  { value: 5, label: '自定义部门' }
-]
 
 const loading = ref(false)
 const saving = ref(false)
 const roles = ref<ResourceRow[]>([])
 const resources = ref<ResourceRow[]>([])
-const departments = ref<ResourceRow[]>([])
 const policyRows = ref<ResourceRow[]>([])
-const scopeRows = ref<ResourceRow[]>([])
 const selectedRole = ref<ResourceRow>()
 const selectedPermissions = ref<string[]>([])
-const selectedDepartments = ref<string[]>([])
-const dataScope = ref(4)
-const departmentTreeRef = ref<InstanceType<typeof ElTree>>()
 const roleDialogOpen = ref(false)
-const roleForm = reactive({ code: '', name: '', data_scope: 4, status: 1 })
+const roleForm = reactive({ code: '', name: '', data_scope: DEFAULT_DATA_SCOPE, status: 1 })
+const roleResourceKey = computed(() => (props.platformMode ? 'platform-roles' : 'roles'))
+const policyResourceKey = computed(() =>
+  props.platformMode ? 'platform-casbin-rules' : 'casbin-rules'
+)
 const targetScope = computed(() =>
   props.targetTenantId ? { targetTenantId: props.targetTenantId } : undefined
 )
@@ -46,35 +44,17 @@ const targetScope = computed(() =>
 const selectableResources = computed(() =>
   resources.value.filter((item) => Number(item.type) >= 2 && Number(item.status) === 1)
 )
-const departmentTree = computed(() => {
-  const children = new Map<string, ResourceRow[]>()
-  for (const item of departments.value) {
-    const parent = String(item.parent_id ?? '0')
-    children.set(parent, [...(children.get(parent) ?? []), item])
-  }
-  const build = (parent: string): Array<ResourceRow & { children: ResourceRow[] }> =>
-    (children.get(parent) ?? []).map((item) => ({
-      ...item,
-      children: build(String(item.id))
-    }))
-  return build('0')
-})
 
 async function load() {
   loading.value = true
   try {
-    const [roleResponse, resourceResponse, departmentResponse, grantResponse] = await Promise.all([
+    const [roleResponse, resourceResponse, grantResponse] = await Promise.all([
       managementApi.listResources(
-        'roles',
+        roleResourceKey.value,
         { page: 1, page_size: 200, sort: 'sort_order:asc' },
         targetScope.value
       ),
       managementApi.listResources('resources', { page: 1, page_size: 200, sort: 'sort_order:asc' }),
-      managementApi.listResources(
-        'departments',
-        { page: 1, page_size: 200, sort: 'sort_order:asc' },
-        targetScope.value
-      ),
       props.targetTenantId
         ? managementApi.listResources(
             'tenant-resources',
@@ -94,7 +74,6 @@ async function load() {
           enabledResourceIDs.has(String(resource.id))
         )
       : (resourceResponse.items ?? [])
-    departments.value = departmentResponse.items ?? []
     if (!selectedRole.value && roles.value[0]) await selectRole(roles.value[0])
   } finally {
     loading.value = false
@@ -103,39 +82,20 @@ async function load() {
 
 async function selectRole(role: ResourceRow) {
   selectedRole.value = role
-  dataScope.value = Number(role.data_scope ?? 4)
   const roleId = String(role.id)
-  const [policies, scopes] = await Promise.all([
-    managementApi.listResources(
-      'casbin-rules',
-      { page: 1, page_size: 200, filters: { ptype: 'p', v1: roleId } },
-      targetScope.value
-    ),
-    managementApi.listResources(
-      'role-scope-departments',
-      { page: 1, page_size: 200, filters: { role_id: roleId } },
-      targetScope.value
-    )
-  ])
+  const policies = await managementApi.listResources(
+    policyResourceKey.value,
+    { page: 1, page_size: 200, filters: { ptype: 'p', v1: roleId } },
+    targetScope.value
+  )
   policyRows.value = (policies.items ?? []).filter(
     (item) => item.ptype === 'p' && String(item.v1) === roleId
   )
-  scopeRows.value = scopes.items ?? []
   selectedPermissions.value = policyRows.value.map((item) => `${item.v2}:${item.v3}`)
-  selectedDepartments.value = scopeRows.value.map((item) => String(item.department_id))
-  await nextTick()
-  departmentTreeRef.value?.setCheckedKeys?.(selectedDepartments.value, false)
-}
-
-function syncDepartments() {
-  selectedDepartments.value = (
-    departmentTreeRef.value?.getCheckedKeys?.(false) ?? selectedDepartments.value
-  ).map(String)
 }
 
 async function save() {
   if (!selectedRole.value?.id) return
-  syncDepartments()
   saving.value = true
   try {
     const roleId = String(selectedRole.value.id)
@@ -147,16 +107,16 @@ async function save() {
     }
     await managementApi.updateRoleAuthorization({
       roleId,
-      dataScope: dataScope.value,
+      dataScope: DEFAULT_DATA_SCOPE,
       grants: [...grantMap].map(([resourceCode, resourceActions]) => ({
         resourceCode,
         actions: resourceActions
       })),
-      departmentIds: dataScope.value === 5 ? selectedDepartments.value : [],
+      departmentIds: [],
       targetTenantId: props.targetTenantId
     })
     if (!props.targetTenantId) await authStore.renewSession()
-    ElMessage.success('角色授权与数据范围已生效，现有令牌将在下次请求重新加载')
+    ElMessage.success('角色授权已生效，现有令牌将在下次请求重新加载')
     await selectRole(selectedRole.value)
   } finally {
     saving.value = false
@@ -164,12 +124,12 @@ async function save() {
 }
 
 function openRoleDialog() {
-  Object.assign(roleForm, { code: '', name: '', data_scope: 4, status: 1 })
+  Object.assign(roleForm, { code: '', name: '', data_scope: DEFAULT_DATA_SCOPE, status: 1 })
   roleDialogOpen.value = true
 }
 
 async function createRole() {
-  await managementApi.createResource('roles', roleForm, targetScope.value)
+  await managementApi.createResource(roleResourceKey.value, roleForm, targetScope.value)
   roleDialogOpen.value = false
   selectedRole.value = undefined
   ElMessage.success('角色已创建')
@@ -179,7 +139,7 @@ async function createRole() {
 
 async function removeRole(role: ResourceRow) {
   await ElMessageBox.confirm(`确认删除角色“${role.name}”？`, '危险操作确认', { type: 'warning' })
-  await managementApi.deleteResource('roles', String(role.id), targetScope.value)
+  await managementApi.deleteResource(roleResourceKey.value, String(role.id), targetScope.value)
   selectedRole.value = undefined
   ElMessage.success('角色已删除')
   if (!props.targetTenantId) await authStore.renewSession()
@@ -190,12 +150,12 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="permission-page">
-    <header class="page-heading">
+  <section v-loading="loading" class="permission-page" :class="{ 'permission-page--embedded': embedded }">
+    <header v-if="!embedded" class="page-heading">
       <div>
         <p>RBAC POLICY</p>
         <h1>角色授权</h1>
-        <span>统一配置 Casbin 资源动作与五类数据范围。</span>
+        <span>统一配置 Casbin 资源动作权限。</span>
       </div>
       <el-button
         v-permission="'roles:update'"
@@ -208,6 +168,18 @@ onMounted(load)
         保存并生效
       </el-button>
     </header>
+    <div v-else-if="selectedRole" class="embedded-toolbar">
+      <span>为当前租户配置角色权限</span>
+      <el-button
+        v-permission="'roles:update'"
+        type="danger"
+        :icon="Check"
+        :loading="saving"
+        @click="save"
+      >
+        保存并生效
+      </el-button>
+    </div>
 
     <div class="permission-layout">
       <aside class="role-list">
@@ -249,32 +221,6 @@ onMounted(load)
       </aside>
 
       <main v-if="selectedRole" class="editor-panel">
-        <section class="scope-section">
-          <div class="section-title">
-            <div>
-              <small>DATA SCOPE</small>
-              <h2>数据范围</h2>
-            </div>
-            <span>多角色在仓储层取并集</span>
-          </div>
-          <el-radio-group v-model="dataScope" class="scope-grid">
-            <el-radio v-for="option in scopeOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </el-radio>
-          </el-radio-group>
-          <div v-show="dataScope === 5" class="department-scope">
-            <strong>自定义部门</strong>
-            <el-tree
-              ref="departmentTreeRef"
-              :data="departmentTree"
-              node-key="id"
-              show-checkbox
-              :props="{ label: 'name', children: 'children' }"
-              @check="syncDepartments"
-            />
-          </div>
-        </section>
-
         <section class="resource-section">
           <div class="section-title">
             <div>
@@ -317,16 +263,6 @@ onMounted(load)
       <el-form label-position="top">
         <el-form-item label="角色名称" required><el-input v-model="roleForm.name" /></el-form-item>
         <el-form-item label="角色编码" required><el-input v-model="roleForm.code" /></el-form-item>
-        <el-form-item label="初始数据范围">
-          <el-select v-model="roleForm.data_scope" class="full-width">
-            <el-option
-              v-for="option in scopeOptions"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="roleDialogOpen = false">取消</el-button>
@@ -340,6 +276,17 @@ onMounted(load)
 .permission-page {
   display: grid;
   gap: 18px;
+}
+.permission-page--embedded {
+  gap: 12px;
+}
+.embedded-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ka-muted);
+  font-size: 13px;
 }
 .page-heading {
   display: flex;
@@ -420,15 +367,8 @@ onMounted(load)
 .role-item > .el-button {
   padding-right: 8px;
 }
-.full-width {
-  width: 100%;
-}
 .editor-panel {
   padding: 24px;
-}
-.scope-section {
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--ka-border);
 }
 .section-title {
   display: flex;
@@ -444,24 +384,8 @@ onMounted(load)
   color: var(--ka-muted);
   font-size: 11px;
 }
-.scope-grid {
-  margin-top: 18px;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-}
-.department-scope {
-  margin-top: 16px;
-  padding: 16px;
-  background: #f7f7f7;
-}
-.department-scope strong {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 13px;
-}
 .resource-section {
-  padding-top: 24px;
+  padding-top: 0;
 }
 .resource-list {
   margin-top: 14px;
@@ -514,7 +438,6 @@ onMounted(load)
     min-width: 150px;
     border-left: 0;
   }
-  .scope-grid,
   .resource-list {
     grid-template-columns: 1fr 1fr;
   }
@@ -530,7 +453,6 @@ onMounted(load)
   .editor-panel {
     padding: 18px;
   }
-  .scope-grid,
   .resource-list {
     grid-template-columns: 1fr;
   }

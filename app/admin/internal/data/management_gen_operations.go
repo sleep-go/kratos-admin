@@ -38,12 +38,26 @@ func selectedManagementFields(values map[string]any, fields map[string]field.Exp
 
 func createManagementResource(ctx context.Context, q *query.Query, resource string, values map[string]any) (uint64, error) {
 	switch resource {
-	case "users":
-		row := new(model.User)
+	case "app-users":
+		row := new(model.AppUser)
 		if err := decodeManagementValues(values, row); err != nil {
 			return 0, err
 		}
-		err := q.User.WithContext(ctx).Create(row)
+		err := q.AppUser.WithContext(ctx).Create(row)
+		return row.ID, err
+	case "platform-admins":
+		row := new(model.PlatformAdmin)
+		if err := decodeManagementValues(values, row); err != nil {
+			return 0, err
+		}
+		err := q.PlatformAdmin.WithContext(ctx).Create(row)
+		return row.ID, err
+	case "tenant-admins":
+		row := new(model.TenantAdmin)
+		if err := decodeManagementValues(values, row); err != nil {
+			return 0, err
+		}
+		err := q.TenantAdmin.WithContext(ctx).Create(row)
 		return row.ID, err
 	case "tenants":
 		row := new(model.Tenant)
@@ -52,28 +66,7 @@ func createManagementResource(ctx context.Context, q *query.Query, resource stri
 		}
 		err := q.Tenant.WithContext(ctx).Create(row)
 		return row.ID, err
-	case "members":
-		row := new(model.TenantMember)
-		if err := decodeManagementValues(values, row); err != nil {
-			return 0, err
-		}
-		err := q.TenantMember.WithContext(ctx).Create(row)
-		return row.ID, err
-	case "departments":
-		row := new(model.Department)
-		if err := decodeManagementValues(values, row); err != nil {
-			return 0, err
-		}
-		err := q.Department.WithContext(ctx).Create(row)
-		return row.ID, err
-	case "positions":
-		row := new(model.Position)
-		if err := decodeManagementValues(values, row); err != nil {
-			return 0, err
-		}
-		err := q.Position.WithContext(ctx).Create(row)
-		return row.ID, err
-	case "roles":
+	case "roles", "platform-roles":
 		row := new(model.Role)
 		if err := decodeManagementValues(values, row); err != nil {
 			return 0, err
@@ -94,19 +87,12 @@ func createManagementResource(ctx context.Context, q *query.Query, resource stri
 		}
 		err := q.TenantResource.WithContext(ctx).Create(row)
 		return row.ID, err
-	case "casbin-rules":
+	case "casbin-rules", "platform-casbin-rules":
 		row := new(model.CasbinRule)
 		if err := decodeManagementValues(values, row); err != nil {
 			return 0, err
 		}
 		err := q.CasbinRule.WithContext(ctx).Create(row)
-		return row.ID, err
-	case "role-scope-departments":
-		row := new(model.RoleScopeDepartment)
-		if err := decodeManagementValues(values, row); err != nil {
-			return 0, err
-		}
-		err := q.RoleScopeDepartment.WithContext(ctx).Create(row)
 		return row.ID, err
 	case "settings":
 		row := new(model.SystemSetting)
@@ -143,13 +129,27 @@ func createManagementResource(ctx context.Context, q *query.Query, resource stri
 
 func updateManagementResource(ctx context.Context, q *query.Query, resource string, id, tenantID uint64, values map[string]any) (gen.ResultInfo, error) {
 	switch resource {
-	case "users":
-		u := q.User
-		row := new(model.User)
+	case "app-users":
+		u := q.AppUser
+		row := new(model.AppUser)
 		if err := decodeManagementValues(values, row); err != nil {
 			return gen.ResultInfo{}, err
 		}
 		return u.WithContext(ctx).Where(u.ID.Eq(id)).Select(selectedManagementFields(values, map[string]field.Expr{"username": u.Username, "email": u.Email, "phone": u.Phone, "display_name": u.DisplayName, "status": u.Status, "mfa_enabled": u.MFAEnabled, "mfa_channel": u.MFAChannel})...).Updates(row)
+	case "platform-admins":
+		pa := q.PlatformAdmin
+		row := new(model.PlatformAdmin)
+		if err := decodeManagementValues(values, row); err != nil {
+			return gen.ResultInfo{}, err
+		}
+		return pa.WithContext(ctx).Where(pa.ID.Eq(id)).Select(selectedManagementFields(values, map[string]field.Expr{"username": pa.Username, "email": pa.Email, "phone": pa.Phone, "display_name": pa.DisplayName, "status": pa.Status, "mfa_enabled": pa.MFAEnabled, "mfa_channel": pa.MFAChannel})...).Updates(row)
+	case "tenant-admins":
+		ta := q.TenantAdmin
+		row := new(model.TenantAdmin)
+		if err := decodeManagementValues(values, row); err != nil {
+			return gen.ResultInfo{}, err
+		}
+		return ta.WithContext(ctx).Where(ta.ID.Eq(id), ta.TenantID.Eq(tenantID)).Select(selectedManagementFields(values, map[string]field.Expr{"username": ta.Username, "email": ta.Email, "phone": ta.Phone, "display_name": ta.DisplayName, "status": ta.Status, "mfa_enabled": ta.MFAEnabled, "mfa_channel": ta.MFAChannel})...).Updates(row)
 	case "tenants":
 		t := q.Tenant
 		row := new(model.Tenant)
@@ -157,34 +157,19 @@ func updateManagementResource(ctx context.Context, q *query.Query, resource stri
 			return gen.ResultInfo{}, err
 		}
 		return t.WithContext(ctx).Where(t.ID.Eq(id)).Select(selectedManagementFields(values, map[string]field.Expr{"code": t.Code, "name": t.Name, "status": t.Status})...).Updates(row)
-	case "members":
-		m := q.TenantMember
-		row := new(model.TenantMember)
-		if err := decodeManagementValues(values, row); err != nil {
-			return gen.ResultInfo{}, err
-		}
-		return m.WithContext(ctx).Where(m.ID.Eq(id), m.TenantID.Eq(tenantID)).Select(selectedManagementFields(values, map[string]field.Expr{"user_id": m.UserID, "primary_department_id": m.PrimaryDepartmentID, "position_id": m.PositionID, "display_name": m.DisplayName, "status": m.Status, "is_tenant_admin": m.IsTenantAdmin})...).Updates(row)
-	case "departments":
-		d := q.Department
-		row := new(model.Department)
-		if err := decodeManagementValues(values, row); err != nil {
-			return gen.ResultInfo{}, err
-		}
-		return d.WithContext(ctx).Where(d.ID.Eq(id), d.TenantID.Eq(tenantID)).Select(selectedManagementFields(values, map[string]field.Expr{"parent_id": d.ParentID, "name": d.Name, "code": d.Code, "path": d.Path, "sort_order": d.SortOrder, "status": d.Status})...).Updates(row)
-	case "positions":
-		p := q.Position
-		row := new(model.Position)
-		if err := decodeManagementValues(values, row); err != nil {
-			return gen.ResultInfo{}, err
-		}
-		return p.WithContext(ctx).Where(p.ID.Eq(id), p.TenantID.Eq(tenantID)).Select(selectedManagementFields(values, map[string]field.Expr{"code": p.Code, "name": p.Name, "sort_order": p.SortOrder, "status": p.Status})...).Updates(row)
-	case "roles":
+	case "roles", "platform-roles":
 		r := q.Role
 		row := new(model.Role)
 		if err := decodeManagementValues(values, row); err != nil {
 			return gen.ResultInfo{}, err
 		}
-		return r.WithContext(ctx).Where(r.ID.Eq(id), r.TenantID.Eq(tenantID)).Select(selectedManagementFields(values, map[string]field.Expr{"code": r.Code, "name": r.Name, "data_scope": r.DataScope, "status": r.Status})...).Updates(row)
+		query := r.WithContext(ctx).Where(r.ID.Eq(id))
+		if resource == "platform-roles" {
+			query = query.Where(r.TenantID.Eq(0))
+		} else {
+			query = query.Where(r.TenantID.Eq(tenantID))
+		}
+		return query.Select(selectedManagementFields(values, map[string]field.Expr{"code": r.Code, "name": r.Name, "data_scope": r.DataScope, "status": r.Status})...).Updates(row)
 	case "resources":
 		r := q.Resource
 		row := new(model.Resource)
@@ -206,13 +191,13 @@ func updateManagementResource(ctx context.Context, q *query.Query, resource stri
 			return gen.ResultInfo{}, err
 		}
 		return c.WithContext(ctx).Where(c.ID.Eq(id), c.V0.Eq(stringID(tenantID))).Select(selectedManagementFields(values, map[string]field.Expr{"ptype": c.Ptype, "v1": c.V1, "v2": c.V2, "v3": c.V3, "v4": c.V4, "v5": c.V5})...).Updates(row)
-	case "role-scope-departments":
-		rd := q.RoleScopeDepartment
-		row := new(model.RoleScopeDepartment)
+	case "platform-casbin-rules":
+		c := q.CasbinRule
+		row := new(model.CasbinRule)
 		if err := decodeManagementValues(values, row); err != nil {
 			return gen.ResultInfo{}, err
 		}
-		return rd.WithContext(ctx).Where(rd.ID.Eq(id), rd.TenantID.Eq(tenantID)).Select(selectedManagementFields(values, map[string]field.Expr{"role_id": rd.RoleID, "department_id": rd.DepartmentID})...).Updates(row)
+		return c.WithContext(ctx).Where(c.ID.Eq(id), c.V0.Eq("0")).Select(selectedManagementFields(values, map[string]field.Expr{"ptype": c.Ptype, "v1": c.V1, "v2": c.V2, "v3": c.V3, "v4": c.V4, "v5": c.V5})...).Updates(row)
 	case "settings":
 		s := q.SystemSetting
 		row := new(model.SystemSetting)
@@ -254,24 +239,24 @@ func deleteManagementResource(ctx context.Context, q *query.Query, resource stri
 	if softDelete {
 		now := gorm.DeletedAt{Time: timeNowUTC(), Valid: true}
 		switch resource {
-		case "users":
-			u := q.User
+		case "app-users":
+			u := q.AppUser
 			return u.WithContext(ctx).Where(u.ID.Eq(id)).Update(u.DeletedAt, now)
+		case "platform-admins":
+			pa := q.PlatformAdmin
+			return pa.WithContext(ctx).Where(pa.ID.Eq(id)).Update(pa.DeletedAt, now)
+		case "tenant-admins":
+			ta := q.TenantAdmin
+			return ta.WithContext(ctx).Where(ta.ID.Eq(id), ta.TenantID.Eq(tenantID)).Update(ta.DeletedAt, now)
 		case "tenants":
 			t := q.Tenant
 			return t.WithContext(ctx).Where(t.ID.Eq(id)).Update(t.DeletedAt, now)
-		case "members":
-			m := q.TenantMember
-			return m.WithContext(ctx).Where(m.ID.Eq(id), m.TenantID.Eq(tenantID)).Update(m.DeletedAt, now)
-		case "departments":
-			d := q.Department
-			return d.WithContext(ctx).Where(d.ID.Eq(id), d.TenantID.Eq(tenantID)).Update(d.DeletedAt, now)
-		case "positions":
-			p := q.Position
-			return p.WithContext(ctx).Where(p.ID.Eq(id), p.TenantID.Eq(tenantID)).Update(p.DeletedAt, now)
 		case "roles":
 			r := q.Role
 			return r.WithContext(ctx).Where(r.ID.Eq(id), r.TenantID.Eq(tenantID)).Update(r.DeletedAt, now)
+		case "platform-roles":
+			r := q.Role
+			return r.WithContext(ctx).Where(r.ID.Eq(id), r.TenantID.Eq(0)).Update(r.DeletedAt, now)
 		case "resources":
 			r := q.Resource
 			return r.WithContext(ctx).Where(r.ID.Eq(id)).Update(r.DeletedAt, now)
@@ -290,9 +275,9 @@ func deleteManagementResource(ctx context.Context, q *query.Query, resource stri
 	case "casbin-rules":
 		d := q.CasbinRule
 		return d.WithContext(ctx).Where(d.ID.Eq(id), d.V0.Eq(stringID(tenantID))).Delete()
-	case "role-scope-departments":
-		d := q.RoleScopeDepartment
-		return d.WithContext(ctx).Where(d.ID.Eq(id), d.TenantID.Eq(tenantID)).Delete()
+	case "platform-casbin-rules":
+		d := q.CasbinRule
+		return d.WithContext(ctx).Where(d.ID.Eq(id), d.V0.Eq("0")).Delete()
 	case "settings":
 		d := q.SystemSetting
 		return d.WithContext(ctx).Where(d.ID.Eq(id), d.TenantID.Eq(tenantID)).Delete()

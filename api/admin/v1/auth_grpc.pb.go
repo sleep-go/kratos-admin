@@ -19,18 +19,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_GetCaptcha_FullMethodName     = "/admin.v1.AuthService/GetCaptcha"
-	AuthService_Login_FullMethodName          = "/admin.v1.AuthService/Login"
-	AuthService_VerifyMfa_FullMethodName      = "/admin.v1.AuthService/VerifyMfa"
-	AuthService_Refresh_FullMethodName        = "/admin.v1.AuthService/Refresh"
-	AuthService_Logout_FullMethodName         = "/admin.v1.AuthService/Logout"
-	AuthService_SwitchTenant_FullMethodName   = "/admin.v1.AuthService/SwitchTenant"
-	AuthService_ForgotPassword_FullMethodName = "/admin.v1.AuthService/ForgotPassword"
-	AuthService_ResetPassword_FullMethodName  = "/admin.v1.AuthService/ResetPassword"
-	AuthService_ListSessions_FullMethodName   = "/admin.v1.AuthService/ListSessions"
-	AuthService_RevokeSession_FullMethodName  = "/admin.v1.AuthService/RevokeSession"
-	AuthService_UpdateProfile_FullMethodName  = "/admin.v1.AuthService/UpdateProfile"
-	AuthService_ListNavigation_FullMethodName = "/admin.v1.AuthService/ListNavigation"
+	AuthService_GetCaptcha_FullMethodName        = "/admin.v1.AuthService/GetCaptcha"
+	AuthService_Login_FullMethodName             = "/admin.v1.AuthService/Login"
+	AuthService_VerifyMfa_FullMethodName         = "/admin.v1.AuthService/VerifyMfa"
+	AuthService_Refresh_FullMethodName           = "/admin.v1.AuthService/Refresh"
+	AuthService_Logout_FullMethodName            = "/admin.v1.AuthService/Logout"
+	AuthService_SwitchTenant_FullMethodName      = "/admin.v1.AuthService/SwitchTenant"
+	AuthService_ExitImpersonation_FullMethodName = "/admin.v1.AuthService/ExitImpersonation"
+	AuthService_ForgotPassword_FullMethodName    = "/admin.v1.AuthService/ForgotPassword"
+	AuthService_ResetPassword_FullMethodName     = "/admin.v1.AuthService/ResetPassword"
+	AuthService_ListSessions_FullMethodName      = "/admin.v1.AuthService/ListSessions"
+	AuthService_RevokeSession_FullMethodName     = "/admin.v1.AuthService/RevokeSession"
+	AuthService_UpdateProfile_FullMethodName     = "/admin.v1.AuthService/UpdateProfile"
+	AuthService_ListNavigation_FullMethodName    = "/admin.v1.AuthService/ListNavigation"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -45,6 +46,7 @@ type AuthServiceClient interface {
 	Refresh(ctx context.Context, in *RefreshRequest, opts ...grpc.CallOption) (*RefreshResponse, error)
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LogoutResponse, error)
 	SwitchTenant(ctx context.Context, in *SwitchTenantRequest, opts ...grpc.CallOption) (*SwitchTenantResponse, error)
+	ExitImpersonation(ctx context.Context, in *ExitImpersonationRequest, opts ...grpc.CallOption) (*ExitImpersonationResponse, error)
 	ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...grpc.CallOption) (*ForgotPasswordResponse, error)
 	ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*ResetPasswordResponse, error)
 	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
@@ -115,6 +117,16 @@ func (c *authServiceClient) SwitchTenant(ctx context.Context, in *SwitchTenantRe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SwitchTenantResponse)
 	err := c.cc.Invoke(ctx, AuthService_SwitchTenant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ExitImpersonation(ctx context.Context, in *ExitImpersonationRequest, opts ...grpc.CallOption) (*ExitImpersonationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExitImpersonationResponse)
+	err := c.cc.Invoke(ctx, AuthService_ExitImpersonation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +205,7 @@ type AuthServiceServer interface {
 	Refresh(context.Context, *RefreshRequest) (*RefreshResponse, error)
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
 	SwitchTenant(context.Context, *SwitchTenantRequest) (*SwitchTenantResponse, error)
+	ExitImpersonation(context.Context, *ExitImpersonationRequest) (*ExitImpersonationResponse, error)
 	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
 	ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
@@ -226,6 +239,9 @@ func (UnimplementedAuthServiceServer) Logout(context.Context, *LogoutRequest) (*
 }
 func (UnimplementedAuthServiceServer) SwitchTenant(context.Context, *SwitchTenantRequest) (*SwitchTenantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SwitchTenant not implemented")
+}
+func (UnimplementedAuthServiceServer) ExitImpersonation(context.Context, *ExitImpersonationRequest) (*ExitImpersonationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExitImpersonation not implemented")
 }
 func (UnimplementedAuthServiceServer) ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ForgotPassword not implemented")
@@ -374,6 +390,24 @@ func _AuthService_SwitchTenant_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_ExitImpersonation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExitImpersonationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ExitImpersonation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ExitImpersonation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ExitImpersonation(ctx, req.(*ExitImpersonationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AuthService_ForgotPassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ForgotPasswordRequest)
 	if err := dec(in); err != nil {
@@ -512,6 +546,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SwitchTenant",
 			Handler:    _AuthService_SwitchTenant_Handler,
+		},
+		{
+			MethodName: "ExitImpersonation",
+			Handler:    _AuthService_ExitImpersonation_Handler,
 		},
 		{
 			MethodName: "ForgotPassword",

@@ -16,43 +16,39 @@ import (
 )
 
 var (
-	Q                   = new(Query)
-	APIAccessLog        *aPIAccessLog
-	AuditLog            *auditLog
-	AuditOutbox         *auditOutbox
-	AuthSession         *authSession
-	CasbinRule          *casbinRule
-	Department          *department
-	DictionaryItem      *dictionaryItem
-	DictionaryType      *dictionaryType
-	FailedTask          *failedTask
-	File                *file
-	FileReference       *fileReference
-	LogExport           *logExport
-	LoginLog            *loginLog
-	MemberDepartment    *memberDepartment
-	Position            *position
-	PlatformAdmin      *platformAdmin
-	ProviderConfig      *providerConfig
-	Resource            *resource
-	Role                *role
-	RoleScopeDepartment *roleScopeDepartment
-	SystemSetting       *systemSetting
-	Tenant              *tenant
-	TenantMember        *tenantMember
-	TenantResource      *tenantResource
-	User                *user
-	VerificationCode    *verificationCode
+	Q                = new(Query)
+	APIAccessLog     *aPIAccessLog
+	AppUser          *appUser
+	AuditLog         *auditLog
+	AuditOutbox      *auditOutbox
+	AuthSession      *authSession
+	CasbinRule       *casbinRule
+	DictionaryItem   *dictionaryItem
+	DictionaryType   *dictionaryType
+	FailedTask       *failedTask
+	File             *file
+	FileReference    *fileReference
+	LogExport        *logExport
+	LoginLog         *loginLog
+	PlatformAdmin    *platformAdmin
+	ProviderConfig   *providerConfig
+	Resource         *resource
+	Role             *role
+	SystemSetting    *systemSetting
+	Tenant           *tenant
+	TenantAdmin      *tenantAdmin
+	TenantResource   *tenantResource
+	VerificationCode *verificationCode
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	APIAccessLog = &Q.APIAccessLog
+	AppUser = &Q.AppUser
 	AuditLog = &Q.AuditLog
 	AuditOutbox = &Q.AuditOutbox
 	AuthSession = &Q.AuthSession
 	CasbinRule = &Q.CasbinRule
-	Department = &Q.Department
 	DictionaryItem = &Q.DictionaryItem
 	DictionaryType = &Q.DictionaryType
 	FailedTask = &Q.FailedTask
@@ -60,82 +56,70 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	FileReference = &Q.FileReference
 	LogExport = &Q.LogExport
 	LoginLog = &Q.LoginLog
-	MemberDepartment = &Q.MemberDepartment
-	Position = &Q.Position
 	PlatformAdmin = &Q.PlatformAdmin
 	ProviderConfig = &Q.ProviderConfig
 	Resource = &Q.Resource
 	Role = &Q.Role
-	RoleScopeDepartment = &Q.RoleScopeDepartment
 	SystemSetting = &Q.SystemSetting
 	Tenant = &Q.Tenant
-	TenantMember = &Q.TenantMember
+	TenantAdmin = &Q.TenantAdmin
 	TenantResource = &Q.TenantResource
-	User = &Q.User
 	VerificationCode = &Q.VerificationCode
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:                  db,
-		APIAccessLog:        newAPIAccessLog(db, opts...),
-		AuditLog:            newAuditLog(db, opts...),
-		AuditOutbox:         newAuditOutbox(db, opts...),
-		AuthSession:         newAuthSession(db, opts...),
-		CasbinRule:          newCasbinRule(db, opts...),
-		Department:          newDepartment(db, opts...),
-		DictionaryItem:      newDictionaryItem(db, opts...),
-		DictionaryType:      newDictionaryType(db, opts...),
-		FailedTask:          newFailedTask(db, opts...),
-		File:                newFile(db, opts...),
-		FileReference:       newFileReference(db, opts...),
-		LogExport:           newLogExport(db, opts...),
-		LoginLog:            newLoginLog(db, opts...),
-		MemberDepartment:    newMemberDepartment(db, opts...),
-		Position:            newPosition(db, opts...),
-		PlatformAdmin:      newPlatformAdmin(db, opts...),
-		ProviderConfig:      newProviderConfig(db, opts...),
-		Resource:            newResource(db, opts...),
-		Role:                newRole(db, opts...),
-		RoleScopeDepartment: newRoleScopeDepartment(db, opts...),
-		SystemSetting:       newSystemSetting(db, opts...),
-		Tenant:              newTenant(db, opts...),
-		TenantMember:        newTenantMember(db, opts...),
-		TenantResource:      newTenantResource(db, opts...),
-		User:                newUser(db, opts...),
-		VerificationCode:    newVerificationCode(db, opts...),
+		db:               db,
+		APIAccessLog:     newAPIAccessLog(db, opts...),
+		AppUser:          newAppUser(db, opts...),
+		AuditLog:         newAuditLog(db, opts...),
+		AuditOutbox:      newAuditOutbox(db, opts...),
+		AuthSession:      newAuthSession(db, opts...),
+		CasbinRule:       newCasbinRule(db, opts...),
+		DictionaryItem:   newDictionaryItem(db, opts...),
+		DictionaryType:   newDictionaryType(db, opts...),
+		FailedTask:       newFailedTask(db, opts...),
+		File:             newFile(db, opts...),
+		FileReference:    newFileReference(db, opts...),
+		LogExport:        newLogExport(db, opts...),
+		LoginLog:         newLoginLog(db, opts...),
+		PlatformAdmin:    newPlatformAdmin(db, opts...),
+		ProviderConfig:   newProviderConfig(db, opts...),
+		Resource:         newResource(db, opts...),
+		Role:             newRole(db, opts...),
+		SystemSetting:    newSystemSetting(db, opts...),
+		Tenant:           newTenant(db, opts...),
+		TenantAdmin:      newTenantAdmin(db, opts...),
+		TenantResource:   newTenantResource(db, opts...),
+		VerificationCode: newVerificationCode(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	APIAccessLog        aPIAccessLog
-	AuditLog            auditLog
-	AuditOutbox         auditOutbox
-	AuthSession         authSession
-	CasbinRule          casbinRule
-	Department          department
-	DictionaryItem      dictionaryItem
-	DictionaryType      dictionaryType
-	FailedTask          failedTask
-	File                file
-	FileReference       fileReference
-	LogExport           logExport
-	LoginLog            loginLog
-	MemberDepartment    memberDepartment
-	Position            position
-	PlatformAdmin       platformAdmin
-	ProviderConfig      providerConfig
-	Resource            resource
-	Role                role
-	RoleScopeDepartment roleScopeDepartment
-	SystemSetting       systemSetting
-	Tenant              tenant
-	TenantMember        tenantMember
-	TenantResource      tenantResource
-	User                user
-	VerificationCode    verificationCode
+	APIAccessLog     aPIAccessLog
+	AppUser          appUser
+	AuditLog         auditLog
+	AuditOutbox      auditOutbox
+	AuthSession      authSession
+	CasbinRule       casbinRule
+	DictionaryItem   dictionaryItem
+	DictionaryType   dictionaryType
+	FailedTask       failedTask
+	File             file
+	FileReference    fileReference
+	LogExport        logExport
+	LoginLog         loginLog
+	PlatformAdmin    platformAdmin
+	ProviderConfig   providerConfig
+	Resource         resource
+	Role             role
+	SystemSetting    systemSetting
+	Tenant           tenant
+	TenantAdmin      tenantAdmin
+	TenantResource   tenantResource
+	VerificationCode verificationCode
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -144,33 +128,29 @@ func (q *Query) UnderlyingDB() *gorm.DB { return q.db }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:                  db,
-		APIAccessLog:        q.APIAccessLog.clone(db),
-		AuditLog:            q.AuditLog.clone(db),
-		AuditOutbox:         q.AuditOutbox.clone(db),
-		AuthSession:         q.AuthSession.clone(db),
-		CasbinRule:          q.CasbinRule.clone(db),
-		Department:          q.Department.clone(db),
-		DictionaryItem:      q.DictionaryItem.clone(db),
-		DictionaryType:      q.DictionaryType.clone(db),
-		FailedTask:          q.FailedTask.clone(db),
-		File:                q.File.clone(db),
-		FileReference:       q.FileReference.clone(db),
-		LogExport:           q.LogExport.clone(db),
-		LoginLog:            q.LoginLog.clone(db),
-		MemberDepartment:    q.MemberDepartment.clone(db),
-		Position:            q.Position.clone(db),
-		PlatformAdmin:       q.PlatformAdmin.clone(db),
-		ProviderConfig:      q.ProviderConfig.clone(db),
-		Resource:            q.Resource.clone(db),
-		Role:                q.Role.clone(db),
-		RoleScopeDepartment: q.RoleScopeDepartment.clone(db),
-		SystemSetting:       q.SystemSetting.clone(db),
-		Tenant:              q.Tenant.clone(db),
-		TenantMember:        q.TenantMember.clone(db),
-		TenantResource:      q.TenantResource.clone(db),
-		User:                q.User.clone(db),
-		VerificationCode:    q.VerificationCode.clone(db),
+		db:               db,
+		APIAccessLog:     q.APIAccessLog.clone(db),
+		AppUser:          q.AppUser.clone(db),
+		AuditLog:         q.AuditLog.clone(db),
+		AuditOutbox:      q.AuditOutbox.clone(db),
+		AuthSession:      q.AuthSession.clone(db),
+		CasbinRule:       q.CasbinRule.clone(db),
+		DictionaryItem:   q.DictionaryItem.clone(db),
+		DictionaryType:   q.DictionaryType.clone(db),
+		FailedTask:       q.FailedTask.clone(db),
+		File:             q.File.clone(db),
+		FileReference:    q.FileReference.clone(db),
+		LogExport:        q.LogExport.clone(db),
+		LoginLog:         q.LoginLog.clone(db),
+		PlatformAdmin:    q.PlatformAdmin.clone(db),
+		ProviderConfig:   q.ProviderConfig.clone(db),
+		Resource:         q.Resource.clone(db),
+		Role:             q.Role.clone(db),
+		SystemSetting:    q.SystemSetting.clone(db),
+		Tenant:           q.Tenant.clone(db),
+		TenantAdmin:      q.TenantAdmin.clone(db),
+		TenantResource:   q.TenantResource.clone(db),
+		VerificationCode: q.VerificationCode.clone(db),
 	}
 }
 
@@ -184,91 +164,81 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:                  db,
-		APIAccessLog:        q.APIAccessLog.replaceDB(db),
-		AuditLog:            q.AuditLog.replaceDB(db),
-		AuditOutbox:         q.AuditOutbox.replaceDB(db),
-		AuthSession:         q.AuthSession.replaceDB(db),
-		CasbinRule:          q.CasbinRule.replaceDB(db),
-		Department:          q.Department.replaceDB(db),
-		DictionaryItem:      q.DictionaryItem.replaceDB(db),
-		DictionaryType:      q.DictionaryType.replaceDB(db),
-		FailedTask:          q.FailedTask.replaceDB(db),
-		File:                q.File.replaceDB(db),
-		FileReference:       q.FileReference.replaceDB(db),
-		LogExport:           q.LogExport.replaceDB(db),
-		LoginLog:            q.LoginLog.replaceDB(db),
-		MemberDepartment:    q.MemberDepartment.replaceDB(db),
-		Position:            q.Position.replaceDB(db),
-		PlatformAdmin:       q.PlatformAdmin.replaceDB(db),
-		ProviderConfig:      q.ProviderConfig.replaceDB(db),
-		Resource:            q.Resource.replaceDB(db),
-		Role:                q.Role.replaceDB(db),
-		RoleScopeDepartment: q.RoleScopeDepartment.replaceDB(db),
-		SystemSetting:       q.SystemSetting.replaceDB(db),
-		Tenant:              q.Tenant.replaceDB(db),
-		TenantMember:        q.TenantMember.replaceDB(db),
-		TenantResource:      q.TenantResource.replaceDB(db),
-		User:                q.User.replaceDB(db),
-		VerificationCode:    q.VerificationCode.replaceDB(db),
+		db:               db,
+		APIAccessLog:     q.APIAccessLog.replaceDB(db),
+		AppUser:          q.AppUser.replaceDB(db),
+		AuditLog:         q.AuditLog.replaceDB(db),
+		AuditOutbox:      q.AuditOutbox.replaceDB(db),
+		AuthSession:      q.AuthSession.replaceDB(db),
+		CasbinRule:       q.CasbinRule.replaceDB(db),
+		DictionaryItem:   q.DictionaryItem.replaceDB(db),
+		DictionaryType:   q.DictionaryType.replaceDB(db),
+		FailedTask:       q.FailedTask.replaceDB(db),
+		File:             q.File.replaceDB(db),
+		FileReference:    q.FileReference.replaceDB(db),
+		LogExport:        q.LogExport.replaceDB(db),
+		LoginLog:         q.LoginLog.replaceDB(db),
+		PlatformAdmin:    q.PlatformAdmin.replaceDB(db),
+		ProviderConfig:   q.ProviderConfig.replaceDB(db),
+		Resource:         q.Resource.replaceDB(db),
+		Role:             q.Role.replaceDB(db),
+		SystemSetting:    q.SystemSetting.replaceDB(db),
+		Tenant:           q.Tenant.replaceDB(db),
+		TenantAdmin:      q.TenantAdmin.replaceDB(db),
+		TenantResource:   q.TenantResource.replaceDB(db),
+		VerificationCode: q.VerificationCode.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	APIAccessLog        IAPIAccessLogDo
-	AuditLog            IAuditLogDo
-	AuditOutbox         IAuditOutboxDo
-	AuthSession         IAuthSessionDo
-	CasbinRule          ICasbinRuleDo
-	Department          IDepartmentDo
-	DictionaryItem      IDictionaryItemDo
-	DictionaryType      IDictionaryTypeDo
-	FailedTask          IFailedTaskDo
-	File                IFileDo
-	FileReference       IFileReferenceDo
-	LogExport           ILogExportDo
-	LoginLog            ILoginLogDo
-	MemberDepartment    IMemberDepartmentDo
-	Position            IPositionDo
-	ProviderConfig      IProviderConfigDo
-	Resource            IResourceDo
-	Role                IRoleDo
-	RoleScopeDepartment IRoleScopeDepartmentDo
-	SystemSetting       ISystemSettingDo
-	Tenant              ITenantDo
-	TenantMember        ITenantMemberDo
-	TenantResource      ITenantResourceDo
-	User                IUserDo
-	VerificationCode    IVerificationCodeDo
+	APIAccessLog     IAPIAccessLogDo
+	AppUser          IAppUserDo
+	AuditLog         IAuditLogDo
+	AuditOutbox      IAuditOutboxDo
+	AuthSession      IAuthSessionDo
+	CasbinRule       ICasbinRuleDo
+	DictionaryItem   IDictionaryItemDo
+	DictionaryType   IDictionaryTypeDo
+	FailedTask       IFailedTaskDo
+	File             IFileDo
+	FileReference    IFileReferenceDo
+	LogExport        ILogExportDo
+	LoginLog         ILoginLogDo
+	PlatformAdmin    IPlatformAdminDo
+	ProviderConfig   IProviderConfigDo
+	Resource         IResourceDo
+	Role             IRoleDo
+	SystemSetting    ISystemSettingDo
+	Tenant           ITenantDo
+	TenantAdmin      ITenantAdminDo
+	TenantResource   ITenantResourceDo
+	VerificationCode IVerificationCodeDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		APIAccessLog:        q.APIAccessLog.WithContext(ctx),
-		AuditLog:            q.AuditLog.WithContext(ctx),
-		AuditOutbox:         q.AuditOutbox.WithContext(ctx),
-		AuthSession:         q.AuthSession.WithContext(ctx),
-		CasbinRule:          q.CasbinRule.WithContext(ctx),
-		Department:          q.Department.WithContext(ctx),
-		DictionaryItem:      q.DictionaryItem.WithContext(ctx),
-		DictionaryType:      q.DictionaryType.WithContext(ctx),
-		FailedTask:          q.FailedTask.WithContext(ctx),
-		File:                q.File.WithContext(ctx),
-		FileReference:       q.FileReference.WithContext(ctx),
-		LogExport:           q.LogExport.WithContext(ctx),
-		LoginLog:            q.LoginLog.WithContext(ctx),
-		MemberDepartment:    q.MemberDepartment.WithContext(ctx),
-		Position:            q.Position.WithContext(ctx),
-		ProviderConfig:      q.ProviderConfig.WithContext(ctx),
-		Resource:            q.Resource.WithContext(ctx),
-		Role:                q.Role.WithContext(ctx),
-		RoleScopeDepartment: q.RoleScopeDepartment.WithContext(ctx),
-		SystemSetting:       q.SystemSetting.WithContext(ctx),
-		Tenant:              q.Tenant.WithContext(ctx),
-		TenantMember:        q.TenantMember.WithContext(ctx),
-		TenantResource:      q.TenantResource.WithContext(ctx),
-		User:                q.User.WithContext(ctx),
-		VerificationCode:    q.VerificationCode.WithContext(ctx),
+		APIAccessLog:     q.APIAccessLog.WithContext(ctx),
+		AppUser:          q.AppUser.WithContext(ctx),
+		AuditLog:         q.AuditLog.WithContext(ctx),
+		AuditOutbox:      q.AuditOutbox.WithContext(ctx),
+		AuthSession:      q.AuthSession.WithContext(ctx),
+		CasbinRule:       q.CasbinRule.WithContext(ctx),
+		DictionaryItem:   q.DictionaryItem.WithContext(ctx),
+		DictionaryType:   q.DictionaryType.WithContext(ctx),
+		FailedTask:       q.FailedTask.WithContext(ctx),
+		File:             q.File.WithContext(ctx),
+		FileReference:    q.FileReference.WithContext(ctx),
+		LogExport:        q.LogExport.WithContext(ctx),
+		LoginLog:         q.LoginLog.WithContext(ctx),
+		PlatformAdmin:    q.PlatformAdmin.WithContext(ctx),
+		ProviderConfig:   q.ProviderConfig.WithContext(ctx),
+		Resource:         q.Resource.WithContext(ctx),
+		Role:             q.Role.WithContext(ctx),
+		SystemSetting:    q.SystemSetting.WithContext(ctx),
+		Tenant:           q.Tenant.WithContext(ctx),
+		TenantAdmin:      q.TenantAdmin.WithContext(ctx),
+		TenantResource:   q.TenantResource.WithContext(ctx),
+		VerificationCode: q.VerificationCode.WithContext(ctx),
 	}
 }
 

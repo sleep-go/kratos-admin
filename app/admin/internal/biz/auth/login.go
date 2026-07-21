@@ -14,11 +14,11 @@ var (
 	ErrAccountLocked = errors.New("账号已被临时锁定")
 	// ErrAccountDisabled 表示全局账号已被管理员禁用。
 	ErrAccountDisabled = errors.New("账号已被禁用")
-	// ErrNoTenantMembership 表示用户没有可用的租户成员身份。
+	// ErrNoTenantMembership 表示租户管理员账号不可用（保留错误码以兼容 API）。
 	ErrNoTenantMembership = errors.New("没有可用的租户成员身份")
 )
 
-// UserStatus 表示全局用户状态。
+// UserStatus 表示账号状态。
 type UserStatus uint8
 
 const (
@@ -30,19 +30,10 @@ const (
 	UserStatusLocked UserStatus = 3
 )
 
-// MembershipStatus 表示租户成员状态。
-type MembershipStatus uint8
-
-const (
-	// MembershipStatusEnabled 表示成员可进入租户。
-	MembershipStatusEnabled MembershipStatus = 1
-	// MembershipStatusDisabled 表示成员已在租户内禁用。
-	MembershipStatusDisabled MembershipStatus = 2
-)
-
-// User 表示认证流程所需的全局租户用户信息。
+// User 表示租户管理员登录流程所需的账号信息（来源 tenant_admins）。
 type User struct {
 	ID               uint64
+	TenantID         uint64
 	Username         string
 	DisplayName      string
 	AvatarURL        string
@@ -54,15 +45,6 @@ type User struct {
 	Status           UserStatus
 	FailedLoginCount uint32
 	LockedUntil      *time.Time
-}
-
-// Membership 表示用户可进入的租户成员身份。
-type Membership struct {
-	ID                uint64
-	TenantID          uint64
-	TenantName        string
-	Status            MembershipStatus
-	PermissionVersion uint64
 }
 
 // Session 表示服务端持久化的 refresh 会话。
@@ -81,12 +63,11 @@ type Session struct {
 	ExpiresAt         time.Time
 }
 
-// UserRepository 定义登录流程需要的用户与成员数据访问接口。
+// UserRepository 定义租户管理员登录流程所需的数据访问接口。
 type UserRepository interface {
 	FindByIdentifier(ctx context.Context, identifier string) (*User, error)
 	FindByID(ctx context.Context, userID uint64) (*User, error)
-	ListMemberships(ctx context.Context, userID uint64) ([]Membership, error)
-	ListPermissions(ctx context.Context, realm Realm, tenantID, memberID, impersonatorID uint64) ([]string, error)
+	ListPermissions(ctx context.Context, realm Realm, tenantID, adminID, impersonatorID uint64) ([]string, error)
 	FindTenant(ctx context.Context, tenantID uint64) (TenantOption, error)
 	UpdateLoginFailure(ctx context.Context, userID uint64, count uint32, lockedUntil *time.Time) error
 	ResetLoginFailures(ctx context.Context, userID uint64) error
@@ -107,10 +88,11 @@ type LoginInput struct {
 	UserAgent  string
 }
 
-// TenantOption 描述登录用户可选择的租户。
+// TenantOption 描述登录账号绑定的租户。
 type TenantOption struct {
-	ID   uint64
-	Name string
+	ID                uint64
+	Name              string
+	PermissionVersion uint64
 }
 
 // LoginResult 描述成功登录后签发的令牌与租户上下文。
@@ -125,21 +107,21 @@ type LoginResult struct {
 
 // UserProfile 描述登录响应中可安全返回的用户资料。
 type UserProfile struct {
-	ID            uint64
-	Username      string
-	DisplayName   string
-	AvatarURL     string
-	Email         string
-	Phone         string
-	MFAEnabled    bool
-	MFAChannel    string
-	Realm         Realm
+	ID             uint64
+	Username       string
+	DisplayName    string
+	AvatarURL      string
+	Email          string
+	Phone          string
+	MFAEnabled     bool
+	MFAChannel     string
+	Realm          Realm
 	ImpersonatorID uint64
-	Impersonating bool
-	Permissions   []string
+	Impersonating  bool
+	Permissions    []string
 }
 
-// LoginUsecase 实施账号锁定、密码验证、租户选择与会话创建规则。
+// LoginUsecase 实施账号锁定、密码验证与会话创建规则。
 type LoginUsecase struct {
 	users        UserRepository
 	sessions     SessionRepository
@@ -154,7 +136,7 @@ func (u *LoginUsecase) ConfigureVerification(verification *VerificationUsecase) 
 	u.verification = verification
 }
 
-// NewLoginUsecase 创建账号密码登录用例。
+// NewLoginUsecase 创建租户管理员账号密码登录用例。
 func NewLoginUsecase(users UserRepository, sessions SessionRepository, hasher *PasswordHasher, tokens *TokenManager, now func() time.Time) *LoginUsecase {
 	if now == nil {
 		now = time.Now
@@ -162,7 +144,7 @@ func NewLoginUsecase(users UserRepository, sessions SessionRepository, hasher *P
 	return &LoginUsecase{users: users, sessions: sessions, hasher: hasher, tokens: tokens, now: now}
 }
 
-// Login 验证账号密码并创建绑定当前租户的 refresh 会话。
+// Login 验证租户管理员账号密码并创建绑定固定租户的 refresh 会话。
 func (u *LoginUsecase) Login(ctx context.Context, input LoginInput) (LoginResult, error) {
 	user, err := u.users.FindByIdentifier(ctx, input.Identifier)
 	if err != nil {
@@ -210,11 +192,7 @@ func (u *LoginUsecase) CompleteMFA(ctx context.Context, user User, input LoginIn
 }
 
 func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input LoginInput) (LoginResult, error) {
-	memberships, err := u.users.ListMemberships(ctx, user.ID)
-	if err != nil {
-		return LoginResult{}, fmt.Errorf("查询租户成员身份失败: %w", err)
-	}
-	selected, options, err := selectMembership(memberships, input.TenantID)
+	tenant, err := u.users.FindTenant(ctx, user.TenantID)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -222,13 +200,14 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 	if err != nil {
 		return LoginResult{}, err
 	}
+	// MemberID 字段复用为 tenant_admin_id，兼容现有 JWT 声明结构。
 	tokens, err := u.tokens.Issue(TokenSubject{
 		UserID:            user.ID,
-		TenantID:          selected.TenantID,
-		MemberID:          selected.ID,
+		TenantID:          user.TenantID,
+		MemberID:          user.ID,
 		Realm:             RealmTenant,
 		SessionID:         sessionID,
-		PermissionVersion: selected.PermissionVersion,
+		PermissionVersion: tenant.PermissionVersion,
 	})
 	if err != nil {
 		return LoginResult{}, err
@@ -237,9 +216,9 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 		ID:                sessionID,
 		Realm:             RealmTenant,
 		UserID:            user.ID,
-		TenantID:          selected.TenantID,
-		MemberID:          selected.ID,
-		PermissionVersion: selected.PermissionVersion,
+		TenantID:          user.TenantID,
+		MemberID:          user.ID,
+		PermissionVersion: tenant.PermissionVersion,
 		RefreshJTIHash:    HashJTI(tokens.RefreshJTI),
 		DeviceName:        input.DeviceName,
 		IP:                input.IP,
@@ -248,7 +227,7 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 	}); err != nil {
 		return LoginResult{}, fmt.Errorf("创建认证会话失败: %w", err)
 	}
-	permissions, err := u.users.ListPermissions(ctx, RealmTenant, selected.TenantID, selected.ID, 0)
+	permissions, err := u.users.ListPermissions(ctx, RealmTenant, user.TenantID, user.ID, 0)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("加载用户权限失败: %w", err)
 	}
@@ -258,8 +237,8 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 	return LoginResult{
 		Tokens:        tokens,
 		User:          user.toProfile(RealmTenant, permissions),
-		CurrentTenant: TenantOption{ID: selected.TenantID, Name: selected.TenantName},
-		Tenants:       options,
+		CurrentTenant: tenant,
+		Tenants:       []TenantOption{tenant},
 	}, nil
 }
 
@@ -283,23 +262,4 @@ func (u *LoginUsecase) recordFailure(ctx context.Context, user *User, now time.T
 		return fmt.Errorf("更新登录失败状态失败: %w", err)
 	}
 	return nil
-}
-
-// selectMembership 从可用成员列表中选择目标租户，不再支持 tenant_id=0 平台选项。
-func selectMembership(memberships []Membership, requestedTenantID uint64) (Membership, []TenantOption, error) {
-	options := make([]TenantOption, 0, len(memberships))
-	var selected Membership
-	for _, membership := range memberships {
-		if membership.Status != MembershipStatusEnabled {
-			continue
-		}
-		options = append(options, TenantOption{ID: membership.TenantID, Name: membership.TenantName})
-		if selected.ID == 0 && (requestedTenantID == 0 || membership.TenantID == requestedTenantID) {
-			selected = membership
-		}
-	}
-	if selected.ID == 0 {
-		return Membership{}, nil, ErrNoTenantMembership
-	}
-	return selected, options, nil
 }

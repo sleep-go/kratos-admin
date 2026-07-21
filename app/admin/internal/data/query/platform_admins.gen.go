@@ -35,6 +35,7 @@ func newPlatformAdmin(db *gorm.DB, opts ...gen.DOOption) platformAdmin {
 	_platformAdmin.PasswordHash = field.NewString(tableName, "password_hash")
 	_platformAdmin.DisplayName = field.NewString(tableName, "display_name")
 	_platformAdmin.AvatarURL = field.NewString(tableName, "avatar_url")
+	_platformAdmin.IsSuperAdmin = field.NewBool(tableName, "is_super_admin")
 	_platformAdmin.MFAEnabled = field.NewBool(tableName, "mfa_enabled")
 	_platformAdmin.MFAChannel = field.NewString(tableName, "mfa_channel")
 	_platformAdmin.Status = field.NewUint8(tableName, "status")
@@ -61,6 +62,7 @@ type platformAdmin struct {
 	PasswordHash     field.String // Argon2id密码哈希
 	DisplayName      field.String // 显示名称
 	AvatarURL        field.String // 头像地址
+	IsSuperAdmin     field.Bool   // 是否超级管理员：0否，1是（拥有*:*）
 	MFAEnabled       field.Bool   // 是否启用登录MFA：0否，1是
 	MFAChannel       field.String // MFA渠道：email邮件，sms短信
 	Status           field.Uint8  // 账号状态：1启用，2禁用，3锁定
@@ -92,6 +94,7 @@ func (p *platformAdmin) updateTableName(table string) *platformAdmin {
 	p.PasswordHash = field.NewString(table, "password_hash")
 	p.DisplayName = field.NewString(table, "display_name")
 	p.AvatarURL = field.NewString(table, "avatar_url")
+	p.IsSuperAdmin = field.NewBool(table, "is_super_admin")
 	p.MFAEnabled = field.NewBool(table, "mfa_enabled")
 	p.MFAChannel = field.NewString(table, "mfa_channel")
 	p.Status = field.NewUint8(table, "status")
@@ -128,7 +131,7 @@ func (p *platformAdmin) GetFieldByName(fieldName string) (field.OrderExpr, bool)
 }
 
 func (p *platformAdmin) fillFieldMap() {
-	p.fieldMap = make(map[string]field.Expr, 15)
+	p.fieldMap = make(map[string]field.Expr, 16)
 	p.fieldMap["id"] = p.ID
 	p.fieldMap["username"] = p.Username
 	p.fieldMap["email"] = p.Email
@@ -136,6 +139,7 @@ func (p *platformAdmin) fillFieldMap() {
 	p.fieldMap["password_hash"] = p.PasswordHash
 	p.fieldMap["display_name"] = p.DisplayName
 	p.fieldMap["avatar_url"] = p.AvatarURL
+	p.fieldMap["is_super_admin"] = p.IsSuperAdmin
 	p.fieldMap["mfa_enabled"] = p.MFAEnabled
 	p.fieldMap["mfa_channel"] = p.MFAChannel
 	p.fieldMap["status"] = p.Status

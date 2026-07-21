@@ -45,8 +45,11 @@ func (s *LogService) CreateExport(ctx context.Context, request *v1.CreateExportR
 	}
 	resource := request.GetLogType() + "-logs"
 	if !access.PlatformAdmin && s.permissions != nil {
+		claims, _ := bizauth.ClaimsFromContext(ctx)
+		impersonating := claims != nil && claims.ImpersonatorID > 0
 		allowed, checkErr := s.permissions.Allowed(ctx, managementbiz.Scope{
 			TenantID: access.TenantID, UserID: access.UserID, MemberID: access.MemberID,
+			Impersonating: impersonating,
 		}, resource, "export")
 		if checkErr != nil {
 			return nil, kratoserrors.InternalServer("PERMISSION_CHECK_FAILED", "权限校验失败")

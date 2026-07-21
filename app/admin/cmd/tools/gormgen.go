@@ -30,7 +30,7 @@ var (
 		"is_default":            {},
 		"is_primary":            {},
 		"is_secret":             {},
-		"is_tenant_admin":       {},
+		"is_super_admin":        {},
 		"mfa_enabled":           {},
 		"visible":               {},
 	}
@@ -247,21 +247,11 @@ func applyGeneratedRelations(generator *gen.Generator, models []interface{}, ind
 		}
 	}
 
-	tenantMemberForUser := generator.GenerateModelAs("tenant_members", modelNameForTable("tenant_members"), scalarModelOptionsForTable("tenant_members")...)
-	replace("users", generate("users", gen.FieldRelate(field.HasMany, "Members", tenantMemberForUser, relationConfig("UserID", "ID", true))))
-	tenantMemberForTenant := generator.GenerateModelAs("tenant_members", modelNameForTable("tenant_members"), scalarModelOptionsForTable("tenant_members")...)
-	replace("tenants", generate("tenants", gen.FieldRelate(field.HasMany, "Members", tenantMemberForTenant, relationConfig("TenantID", "ID", true))))
-
-	user := generator.GenerateModelAs("users", modelNameForTable("users"), scalarModelOptionsForTable("users")...)
-	department := generator.GenerateModelAs("departments", modelNameForTable("departments"), scalarModelOptionsForTable("departments")...)
-	position := generator.GenerateModelAs("positions", modelNameForTable("positions"), scalarModelOptionsForTable("positions")...)
-	replace("tenant_members", generate("tenant_members",
-		gen.FieldRelate(field.BelongsTo, "User", user, relationConfig("UserID", "ID", false)),
-		gen.FieldRelate(field.BelongsTo, "PrimaryDepartment", department, relationConfig("PrimaryDepartmentID", "ID", false)),
-		gen.FieldRelate(field.BelongsTo, "Position", position, relationConfig("PositionID", "ID", false)),
-	))
+	tenantAdminForTenant := generator.GenerateModelAs("tenant_admins", modelNameForTable("tenant_admins"), scalarModelOptionsForTable("tenant_admins")...)
+	replace("tenants", generate("tenants", gen.FieldRelate(field.HasMany, "TenantAdmins", tenantAdminForTenant, relationConfig("TenantID", "ID", true))))
 
 	tenant := generator.GenerateModelAs("tenants", modelNameForTable("tenants"), scalarModelOptionsForTable("tenants")...)
+	replace("tenant_admins", generate("tenant_admins", gen.FieldRelate(field.BelongsTo, "Tenant", tenant, relationConfig("TenantID", "ID", false))))
 	replace("roles", generate("roles", gen.FieldRelate(field.BelongsTo, "Tenant", tenant, relationConfig("TenantID", "ID", false))))
 	fileReference := generator.GenerateModelAs("file_references", modelNameForTable("file_references"), scalarModelOptionsForTable("file_references")...)
 	replace("files", generate("files", gen.FieldRelate(field.HasMany, "References", fileReference, relationConfig("FileID", "ID", true))))
@@ -324,6 +314,10 @@ func prepareGeneratedArtifacts(directories []generatedDirectory) (files []genera
 		matches, globErr := filepath.Glob(filepath.Join(directory.stagingPath, "*.gen.go"))
 		if globErr != nil {
 			return nil, nil, nil, globErr
+		}
+		// gen.go 不含 .gen 后缀，需单独纳入发布清单。
+		if extra, statErr := os.Stat(filepath.Join(directory.stagingPath, "gen.go")); statErr == nil && !extra.IsDir() {
+			matches = append(matches, filepath.Join(directory.stagingPath, "gen.go"))
 		}
 		sort.Strings(matches)
 		names := make([]string, 0, len(matches))

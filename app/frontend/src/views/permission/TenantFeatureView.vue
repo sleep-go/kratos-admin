@@ -6,7 +6,7 @@ import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
 import { Check } from '@/components/icons/actions'
 
-const props = defineProps<{ targetTenantId?: string }>()
+const props = defineProps<{ targetTenantId?: string; embedded?: boolean }>()
 const loading = ref(false)
 const saving = ref(false)
 const tenants = ref<ResourceRow[]>([])
@@ -87,12 +87,12 @@ onMounted(load)
 </script>
 
 <template>
-  <section v-loading="loading" class="feature-page">
-    <header class="page-heading">
+  <section v-loading="loading" class="feature-page" :class="{ 'feature-page--embedded': embedded }">
+    <header v-if="!embedded" class="page-heading">
       <div>
         <p>TENANT ENTITLEMENTS</p>
         <h1>租户功能授权</h1>
-        <span>租户只能在平台授权集合内继续配置角色权限。</span>
+        <span>为每个租户勾选可使用的业务功能模块；组织、权限、日志等治理能力请在「开通配置」中维护。</span>
       </div>
       <el-button
         v-permission="'tenant-resources:update'"
@@ -105,6 +105,19 @@ onMounted(load)
         保存授权
       </el-button>
     </header>
+    <div v-else class="embedded-toolbar">
+      <span>勾选租户可使用的业务功能模块（不含组织、权限、日志等平台治理能力）</span>
+      <el-button
+        v-permission="'tenant-resources:update'"
+        type="danger"
+        :icon="Check"
+        :loading="saving"
+        :disabled="!selectedTenant"
+        @click="save"
+      >
+        保存授权
+      </el-button>
+    </div>
     <div class="feature-layout" :class="{ 'fixed-tenant': targetTenantId }">
       <aside v-if="!targetTenantId" class="tenant-list">
         <header>
@@ -129,7 +142,12 @@ onMounted(load)
           </div>
           <span>已授权 {{ selectedResourceIDs.length }} 项</span>
         </header>
+        <el-empty
+          v-if="selectedTenant && resourceTree.length === 0"
+          description="暂无可授权的租户业务功能。请先在「菜单与权限资源」中创建适用范围含「仅租户」的资源。"
+        />
         <el-tree
+          v-else
           ref="featureTree"
           :data="resourceTree"
           node-key="id"
@@ -155,6 +173,20 @@ onMounted(load)
 .feature-page {
   display: grid;
   gap: 18px;
+}
+.feature-page--embedded {
+  gap: 12px;
+}
+.feature-page--embedded .feature-layout {
+  min-height: 420px;
+}
+.embedded-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ka-muted);
+  font-size: 13px;
 }
 .page-heading {
   display: flex;

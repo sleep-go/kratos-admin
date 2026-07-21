@@ -9,11 +9,13 @@ export {
   Delete,
   Download,
   Edit,
+  Hide,
   Plus,
   Refresh,
   RefreshLeft,
   Search,
   Setting,
   SwitchButton,
-  Upload
+  Upload,
+  View
 } from '@element-plus/icons-vue'

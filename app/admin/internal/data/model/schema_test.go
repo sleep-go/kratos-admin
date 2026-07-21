@@ -9,8 +9,8 @@ import (
 
 func Test核心模型映射固定表名(t *testing.T) {
 	tenant := Tenant{}
-	user := User{}
-	member := TenantMember{}
+	appUser := AppUser{}
+	tenantAdmin := TenantAdmin{}
 	session := AuthSession{}
 	outbox := AuditOutbox{}
 	tests := []struct {
@@ -19,8 +19,8 @@ func Test核心模型映射固定表名(t *testing.T) {
 		want string
 	}{
 		{"租户", tenant.TableName(), "tenants"},
-		{"用户", user.TableName(), "users"},
-		{"成员", member.TableName(), "tenant_members"},
+		{"App用户", appUser.TableName(), "app_users"},
+		{"租户管理员", tenantAdmin.TableName(), "tenant_admins"},
 		{"会话", session.TableName(), "auth_sessions"},
 		{"审计Outbox", outbox.TableName(), "audit_outbox"},
 	}
@@ -34,14 +34,14 @@ func Test核心模型映射固定表名(t *testing.T) {
 }
 
 func TestGeneratedModelCoreTypes(t *testing.T) {
-	userType := reflect.TypeOf(User{})
-	id, ok := userType.FieldByName("ID")
+	appUserType := reflect.TypeOf(AppUser{})
+	id, ok := appUserType.FieldByName("ID")
 	if !ok || id.Type.Kind() != reflect.Uint64 {
-		t.Fatal("User.ID 必须为 uint64")
+		t.Fatal("AppUser.ID 必须为 uint64")
 	}
-	status, ok := userType.FieldByName("Status")
+	status, ok := appUserType.FieldByName("Status")
 	if !ok || status.Type.Kind() != reflect.Uint8 {
-		t.Fatal("User.Status 必须为 uint8")
+		t.Fatal("AppUser.Status 必须为 uint8")
 	}
 }
 

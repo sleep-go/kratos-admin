@@ -39,6 +39,12 @@ service AuthService {
       body: "*"
     };
   }
+  rpc ExitImpersonation(ExitImpersonationRequest) returns (ExitImpersonationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/exit-impersonation"
+      body: "*"
+    };
+  }
   rpc ForgotPassword(ForgotPasswordRequest) returns (ForgotPasswordResponse) {
     option (google.api.http) = {
       post: "/api/v1/auth/forgot-password"
@@ -220,4 +226,14 @@ message ListNavigationRequest {}
 
 message ListNavigationResponse {
   repeated NavigationItem items = 1;
+}
+
+message ExitImpersonationRequest {}
+
+message ExitImpersonationResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  CurrentUser user = 3;
+  repeated TenantSummary tenants = 4;
+  TenantSummary current_tenant = 5;
 }

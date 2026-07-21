@@ -19,6 +19,7 @@ var _ = binding.EncodeURL
 
 const _ = http.SupportPackageIsVersion1
 
+const OperationAuthServiceExitImpersonation = "/admin.v1.AuthService/ExitImpersonation"
 const OperationAuthServiceForgotPassword = "/admin.v1.AuthService/ForgotPassword"
 const OperationAuthServiceGetCaptcha = "/admin.v1.AuthService/GetCaptcha"
 const OperationAuthServiceListNavigation = "/admin.v1.AuthService/ListNavigation"
@@ -33,6 +34,7 @@ const OperationAuthServiceUpdateProfile = "/admin.v1.AuthService/UpdateProfile"
 const OperationAuthServiceVerifyMfa = "/admin.v1.AuthService/VerifyMfa"
 
 type AuthServiceHTTPServer interface {
+	ExitImpersonation(context.Context, *ExitImpersonationRequest) (*ExitImpersonationResponse, error)
 	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
 	GetCaptcha(context.Context, *GetCaptchaRequest) (*GetCaptchaResponse, error)
 	ListNavigation(context.Context, *ListNavigationRequest) (*ListNavigationResponse, error)
@@ -55,6 +57,7 @@ func RegisterAuthServiceHTTPServer(s *http.Server, srv AuthServiceHTTPServer) {
 	r.POST("/api/v1/auth/refresh", _AuthService_Refresh0_HTTP_Handler(srv))
 	r.POST("/api/v1/auth/logout", _AuthService_Logout0_HTTP_Handler(srv))
 	r.POST("/api/v1/auth/switch-tenant", _AuthService_SwitchTenant0_HTTP_Handler(srv))
+	r.POST("/api/v1/auth/exit-impersonation", _AuthService_ExitImpersonation0_HTTP_Handler(srv))
 	r.POST("/api/v1/auth/forgot-password", _AuthService_ForgotPassword0_HTTP_Handler(srv))
 	r.POST("/api/v1/auth/reset-password", _AuthService_ResetPassword0_HTTP_Handler(srv))
 	r.GET("/api/v1/auth/sessions", _AuthService_ListSessions0_HTTP_Handler(srv))
@@ -189,6 +192,28 @@ func _AuthService_SwitchTenant0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx
 	}
 }
 
+func _AuthService_ExitImpersonation0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in ExitImpersonationRequest
+		if err := ctx.Bind(&in); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationAuthServiceExitImpersonation)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.ExitImpersonation(ctx, req.(*ExitImpersonationRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*ExitImpersonationResponse)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _AuthService_ForgotPassword0_HTTP_Handler(srv AuthServiceHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in ForgotPasswordRequest
@@ -316,6 +341,7 @@ func _AuthService_ListNavigation0_HTTP_Handler(srv AuthServiceHTTPServer) func(c
 }
 
 type AuthServiceHTTPClient interface {
+	ExitImpersonation(ctx context.Context, req *ExitImpersonationRequest, opts ...http.CallOption) (rsp *ExitImpersonationResponse, err error)
 	ForgotPassword(ctx context.Context, req *ForgotPasswordRequest, opts ...http.CallOption) (rsp *ForgotPasswordResponse, err error)
 	GetCaptcha(ctx context.Context, req *GetCaptchaRequest, opts ...http.CallOption) (rsp *GetCaptchaResponse, err error)
 	ListNavigation(ctx context.Context, req *ListNavigationRequest, opts ...http.CallOption) (rsp *ListNavigationResponse, err error)
@@ -336,6 +362,19 @@ type AuthServiceHTTPClientImpl struct {
 
 func NewAuthServiceHTTPClient(client *http.Client) AuthServiceHTTPClient {
 	return &AuthServiceHTTPClientImpl{client}
+}
+
+func (c *AuthServiceHTTPClientImpl) ExitImpersonation(ctx context.Context, in *ExitImpersonationRequest, opts ...http.CallOption) (*ExitImpersonationResponse, error) {
+	var out ExitImpersonationResponse
+	pattern := "/api/v1/auth/exit-impersonation"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationAuthServiceExitImpersonation))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 func (c *AuthServiceHTTPClientImpl) ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...http.CallOption) (*ForgotPasswordResponse, error) {

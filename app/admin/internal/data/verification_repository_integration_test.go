@@ -25,12 +25,19 @@ func TestVerificationRepositoryPersistsAttemptsAndRateLimit(t *testing.T) {
 	t.Cleanup(func() { tx.Rollback() })
 	now := time.Now().UTC()
 	email := "verification-integration@example.com"
-	user := &model.User{Username: "verification-integration", Email: &email, PasswordHash: "old-hash", DisplayName: "验证码用户", Status: 1, PasswordChangedAt: now}
-	if err := tx.Create(user).Error; err != nil {
+	tenant := &model.Tenant{Code: "verification-tenant", Name: "验证码租户", Status: 1, PermissionVersion: 1}
+	if err := tx.Create(tenant).Error; err != nil {
+		t.Fatal(err)
+	}
+	admin := &model.TenantAdmin{
+		TenantID: tenant.ID, Username: "verification-integration", Email: &email,
+		PasswordHash: "old-hash", DisplayName: "验证码用户", Status: 1, PasswordChangedAt: now,
+	}
+	if err := tx.Create(admin).Error; err != nil {
 		t.Fatal(err)
 	}
 	repository := &AuthRepository{db: tx, q: query.Use(tx)}
-	record := bizauth.VerificationRecord{UserID: user.ID, Target: email, Scene: "password_reset", Channel: "email", CodeHash: "correct-hash", ExpiresAt: now.Add(5 * time.Minute)}
+	record := bizauth.VerificationRecord{UserID: admin.ID, Target: email, Scene: "password_reset", Channel: "email", CodeHash: "correct-hash", ExpiresAt: now.Add(5 * time.Minute)}
 	id, err := repository.CreateVerification(context.Background(), record, time.Minute)
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +53,7 @@ func TestVerificationRepositoryPersistsAttemptsAndRateLimit(t *testing.T) {
 		t.Fatalf("attempt_count = %d, err %v", attempts, err)
 	}
 	consumed, err := repository.ConsumeVerification(context.Background(), id, "password_reset", "correct-hash", now, 5)
-	if err != nil || consumed.UserID != user.ID {
+	if err != nil || consumed.UserID != admin.ID {
 		t.Fatalf("ConsumeVerification() = %+v, %v", consumed, err)
 	}
 }

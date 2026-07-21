@@ -29,7 +29,7 @@ vi.mock('@/api/management', () => ({
 }))
 
 describe('角色授权', () => {
-  it('展示角色、权限树和五类数据范围入口', async () => {
+  it('展示角色与资源动作权限配置', async () => {
     const wrapper = mount(RolePermissionView, {
       global: {
         plugins: [createTestingPinia({ createSpy: vi.fn })],
@@ -37,10 +37,7 @@ describe('角色授权', () => {
         stubs: {
           ElButton: { template: '<button><slot /></button>' },
           ElCheckbox: { template: '<label><slot /></label>' },
-          ElCheckboxGroup: { template: '<div><slot /></div>' },
-          ElRadio: { template: '<label><slot /></label>' },
-          ElRadioGroup: { template: '<div><slot /></div>' },
-          ElTree: { template: '<div data-testid="department-tree" />' }
+          ElCheckboxGroup: { template: '<div><slot /></div>' }
         }
       }
     })
@@ -48,9 +45,8 @@ describe('角色授权', () => {
 
     expect(wrapper.get('h1').text()).toBe('角色授权')
     expect(wrapper.text()).toContain('文件管理')
-    expect(wrapper.text()).toContain('本部门及下级')
+    expect(wrapper.text()).not.toContain('本部门及下级')
     expect(wrapper.text()).toContain('新建角色')
-    expect(wrapper.find('[data-testid="department-tree"]').exists()).toBe(true)
   })
 
   it('为平台初始化页按目标租户加载角色和授权', async () => {
@@ -62,10 +58,7 @@ describe('角色授权', () => {
         stubs: {
           ElButton: { template: '<button><slot /></button>' },
           ElCheckbox: { template: '<label><slot /></label>' },
-          ElCheckboxGroup: { template: '<div><slot /></div>' },
-          ElRadio: { template: '<label><slot /></label>' },
-          ElRadioGroup: { template: '<div><slot /></div>' },
-          ElTree: { template: '<div />' }
+          ElCheckboxGroup: { template: '<div><slot /></div>' }
         }
       }
     })

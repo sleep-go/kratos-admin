@@ -10,26 +10,26 @@ import (
 )
 
 type fakeSessionManagerRepository struct {
-	session                 SessionRecord
-	sessions                []DeviceSession
-	memberships             map[uint64]Membership
-	user                    User
-	permissions             []string
-	rotated                 bool
-	revoked                 bool
-	profileName             string
-	profileURL              string
-	profileMail             string
-	profileTel              string
-	navigation              []NavigationItem
-	navigationTenantID      uint64
-	navigationMemberID      uint64
-	navigationRealm         Realm
+	session            SessionRecord
+	sessions           []DeviceSession
+	user               User
+	tenant             TenantOption
+	permissions        []string
+	rotated            bool
+	revoked            bool
+	profileName        string
+	profileURL         string
+	profileMail        string
+	profileTel         string
+	navigation         []NavigationItem
+	navigationTenantID uint64
+	navigationAdminID  uint64
+	navigationRealm    Realm
 }
 
-func (r *fakeSessionManagerRepository) ListNavigation(_ context.Context, tenantID, memberID uint64, realm Realm, impersonatorID uint64) ([]NavigationItem, error) {
+func (r *fakeSessionManagerRepository) ListNavigation(_ context.Context, tenantID, adminID uint64, realm Realm, _ uint64) ([]NavigationItem, error) {
 	r.navigationTenantID = tenantID
-	r.navigationMemberID = memberID
+	r.navigationAdminID = adminID
 	r.navigationRealm = realm
 	return r.navigation, nil
 }
@@ -41,7 +41,6 @@ func (r *fakeSessionManagerRepository) UpdateProfile(_ context.Context, _ uint64
 }
 
 func (r *fakeSessionManagerRepository) ListPermissions(_ context.Context, realm Realm, _, _, _ uint64) ([]string, error) {
-	// 平台域返回治理菜单的全权限占位。
 	if realm == RealmPlatform {
 		return []string{"*:*"}, nil
 	}
@@ -52,23 +51,15 @@ func (r *fakeSessionManagerRepository) FindUser(_ context.Context, _ uint64) (Us
 	return r.user, nil
 }
 
-func (r *fakeSessionManagerRepository) ListMemberships(_ context.Context, _ uint64) ([]Membership, error) {
-	items := make([]Membership, 0, len(r.memberships))
-	for _, membership := range r.memberships {
-		items = append(items, membership)
+func (r *fakeSessionManagerRepository) FindTenant(_ context.Context, tenantID uint64) (TenantOption, error) {
+	if r.tenant.ID == tenantID {
+		return r.tenant, nil
 	}
-	return items, nil
+	return TenantOption{}, ErrNoTenantMembership
 }
 
 func (r *fakeSessionManagerRepository) List(_ context.Context, _ uint64, _ Realm) ([]DeviceSession, error) {
 	return r.sessions, nil
-}
-
-func (r *fakeSessionManagerRepository) FindTenant(_ context.Context, tenantID uint64) (TenantOption, error) {
-	if membership, ok := r.memberships[tenantID]; ok {
-		return TenantOption{ID: membership.TenantID, Name: membership.TenantName}, nil
-	}
-	return TenantOption{}, ErrNoTenantMembership
 }
 
 func (r *fakeSessionManagerRepository) Find(_ context.Context, _ string) (SessionRecord, error) {
@@ -93,12 +84,14 @@ func (r *fakeSessionManagerRepository) Revoke(_ context.Context, _ string, _ uin
 	return nil
 }
 
-func (r *fakeSessionManagerRepository) FindMembership(_ context.Context, _ uint64, tenantID uint64) (Membership, error) {
-	membership, ok := r.memberships[tenantID]
-	if !ok {
-		return Membership{}, ErrNoTenantMembership
+func (r *fakeSessionManagerRepository) Create(_ context.Context, session Session) error {
+	r.session = SessionRecord{
+		ID: session.ID, Realm: session.Realm, UserID: session.UserID,
+		TenantID: session.TenantID, MemberID: session.MemberID,
+		ImpersonatorID: session.ImpersonatorID, RefreshJTIHash: session.RefreshJTIHash,
+		ExpiresAt: session.ExpiresAt,
 	}
-	return membership, nil
+	return nil
 }
 
 func newSessionUsecaseFixture(t *testing.T) (*SessionUsecase, *fakeSessionManagerRepository, *TokenManager, time.Time) {
@@ -109,24 +102,23 @@ func newSessionUsecaseFixture(t *testing.T) (*SessionUsecase, *fakeSessionManage
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
 	manager := NewTokenManager(privateKey, 15*time.Minute, 7*24*time.Hour, func() time.Time { return now })
-	pair, err := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
+	pair, err := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 1, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
 	if err != nil {
 		t.Fatalf("Issue() error = %v", err)
 	}
 	repository := &fakeSessionManagerRepository{session: SessionRecord{
-		ID: "session", Realm: RealmTenant, UserID: 1, TenantID: 10, MemberID: 20, ImpersonatorID: 0,
+		ID: "session", Realm: RealmTenant, UserID: 1, TenantID: 10, MemberID: 1, ImpersonatorID: 0,
 		RefreshJTIHash: HashJTI(pair.RefreshJTI), PermissionVersion: 3, ExpiresAt: pair.RefreshExpiresAt,
-	}, user: User{ID: 1, DisplayName: "管理员", Status: UserStatusEnabled}, permissions: []string{"roles:list"}, memberships: map[uint64]Membership{
-		10: {ID: 20, TenantID: 10, TenantName: "示例租户", Status: MembershipStatusEnabled, PermissionVersion: 3},
-	}}
+	}, user: User{ID: 1, TenantID: 10, DisplayName: "管理员", Status: UserStatusEnabled},
+		tenant: TenantOption{ID: 10, Name: "示例租户", PermissionVersion: 3},
+		permissions: []string{"roles:list"},
+	}
 	return NewSessionUsecase(repository, manager, func() time.Time { return now }), repository, manager, now
 }
 
 func TestProfileRestoresUserAndTenantContext(t *testing.T) {
 	usecase, repository, _, _ := newSessionUsecaseFixture(t)
-	repository.memberships = map[uint64]Membership{
-		10: {ID: 20, TenantID: 10, TenantName: "示例租户", Status: MembershipStatusEnabled},
-	}
+	repository.tenant = TenantOption{ID: 10, Name: "示例租户"}
 
 	profile, err := usecase.Profile(context.Background(), 1, 10)
 	if err != nil {
@@ -154,7 +146,7 @@ func TestUpdateProfilePersistsSafeAccountFields(t *testing.T) {
 
 func TestRefreshRotatesJTIAndRejectsReuse(t *testing.T) {
 	usecase, repository, manager, _ := newSessionUsecaseFixture(t)
-	initial, err := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
+	initial, err := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 1, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +163,7 @@ func TestRefreshRotatesJTIAndRejectsReuse(t *testing.T) {
 
 func TestRefreshRejectsRevokedSession(t *testing.T) {
 	usecase, repository, manager, now := newSessionUsecaseFixture(t)
-	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
+	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 1, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
 	repository.session.RefreshJTIHash = HashJTI(pair.RefreshJTI)
 	repository.session.RevokedAt = &now
 
@@ -180,41 +172,20 @@ func TestRefreshRejectsRevokedSession(t *testing.T) {
 	}
 }
 
-func TestSwitchTenantRevalidatesMembershipAndRotatesToken(t *testing.T) {
+func TestSwitchTenantIsNotSupportedForTenantAdmin(t *testing.T) {
 	usecase, repository, manager, _ := newSessionUsecaseFixture(t)
-	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
-	repository.session.RefreshJTIHash = HashJTI(pair.RefreshJTI)
-	repository.memberships = map[uint64]Membership{
-		11: {ID: 21, TenantID: 11, TenantName: "新租户", Status: MembershipStatusEnabled, PermissionVersion: 8},
-	}
-
-	result, err := usecase.SwitchTenant(context.Background(), pair.RefreshToken, 11)
-	if err != nil {
-		t.Fatalf("SwitchTenant() error = %v", err)
-	}
-	claims, err := manager.Parse(result.Tokens.AccessToken, TokenTypeAccess)
-	if err != nil || claims.TenantID != 11 || claims.MemberID != 21 || claims.PermissionVersion != 8 {
-		t.Fatalf("access claims = %+v, err %v", claims, err)
-	}
-	if result.Profile.CurrentTenant.ID != 11 || len(result.Profile.User.Permissions) != 1 || result.Profile.User.Permissions[0] != "roles:list" {
-		t.Fatalf("switch profile = %+v", result.Profile)
-	}
-}
-
-func TestTenantCannotSwitchBackToPlatformContext(t *testing.T) {
-	usecase, repository, manager, _ := newSessionUsecaseFixture(t)
-	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
+	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 1, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
 	repository.session.RefreshJTIHash = HashJTI(pair.RefreshJTI)
 
-	_, err := usecase.SwitchTenant(context.Background(), pair.RefreshToken, 0)
+	_, err := usecase.SwitchTenant(context.Background(), pair.RefreshToken, 11)
 	if !errors.Is(err, ErrNoTenantMembership) {
-		t.Fatalf("SwitchTenant(platform) error = %v, want ErrNoTenantMembership", err)
+		t.Fatalf("SwitchTenant() error = %v, want ErrNoTenantMembership", err)
 	}
 }
 
 func TestLogoutRevokesTokenSession(t *testing.T) {
 	usecase, repository, manager, _ := newSessionUsecaseFixture(t)
-	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
+	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 1, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
 
 	if err := usecase.Logout(context.Background(), pair.RefreshToken); err != nil {
 		t.Fatalf("Logout() error = %v", err)
@@ -227,7 +198,7 @@ func TestLogoutRevokesTokenSession(t *testing.T) {
 func TestValidateAccessRejectsPermissionVersionChange(t *testing.T) {
 	usecase, repository, manager, _ := newSessionUsecaseFixture(t)
 	repository.session.PermissionVersion = 4
-	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 20, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
+	pair, _ := manager.Issue(TokenSubject{UserID: 1, TenantID: 10, MemberID: 1, Realm: RealmTenant, ImpersonatorID: 0, SessionID: "session", PermissionVersion: 3})
 	claims, _ := manager.Parse(pair.AccessToken, TokenTypeAccess)
 
 	if err := usecase.ValidateAccess(context.Background(), claims); !errors.Is(err, ErrPermissionVersionChanged) {
@@ -252,7 +223,7 @@ func TestNavigationUsesTrustedTokenScope(t *testing.T) {
 	usecase, repository, _, _ := newSessionUsecaseFixture(t)
 	repository.navigation = []NavigationItem{{ID: 9, Code: "files", Name: "文件管理", RoutePath: "/files", ComponentKey: "files"}}
 
-	items, err := usecase.Navigation(context.Background(), 10, 20, RealmTenant)
+	items, err := usecase.Navigation(context.Background(), 10, 1, RealmTenant)
 	if err != nil || len(items) != 1 || items[0].ComponentKey != "files" {
 		t.Fatalf("Navigation() = %+v, err = %v", items, err)
 	}
@@ -262,11 +233,11 @@ func TestNavigationScopesPlatformAdministratorToSelectedTenant(t *testing.T) {
 	usecase, repository, _, _ := newSessionUsecaseFixture(t)
 	repository.navigation = []NavigationItem{{ID: 9, Code: "files", Name: "文件管理"}}
 
-	if _, err := usecase.Navigation(context.Background(), 10, 20, RealmPlatform); err != nil {
+	if _, err := usecase.Navigation(context.Background(), 10, 1, RealmPlatform); err != nil {
 		t.Fatal(err)
 	}
-	if repository.navigationTenantID != 10 || repository.navigationMemberID != 20 || repository.navigationRealm != RealmPlatform {
-		t.Fatalf("tenant navigation scope = tenant %d, member %d, realm %v", repository.navigationTenantID, repository.navigationMemberID, repository.navigationRealm)
+	if repository.navigationTenantID != 10 || repository.navigationAdminID != 1 || repository.navigationRealm != RealmPlatform {
+		t.Fatalf("tenant navigation scope = tenant %d, admin %d, realm %v", repository.navigationTenantID, repository.navigationAdminID, repository.navigationRealm)
 	}
 
 	if _, err := usecase.Navigation(context.Background(), 0, 0, RealmPlatform); err != nil {

@@ -6,7 +6,7 @@ import { SwitchButton } from '@element-plus/icons-vue'
 
 import AppIcon from '@/components/icons/AppIcon.vue'
 import TopNavigation from './components/TopNavigation.vue'
-import { resolveNavigation, resolveTopNavigation } from '@/features/navigation/registry'
+import { buildNavigationTree } from '@/features/navigation/registry'
 import { resolveNavigationIconName } from '@/components/icons/registry'
 import type { NavigationItem } from '@/features/navigation/types'
 import { useAuthStore } from '@/stores/auth'
@@ -18,9 +18,7 @@ const mobileOpen = shallowRef(false)
 const tenantDialogOpen = shallowRef(false)
 const tenantName = computed(() => currentTenant.value?.name ?? '请选择租户')
 const userName = computed(() => currentUser.value?.displayName ?? '租户管理员')
-const navigation = computed<NavigationItem[]>(() =>
-  resolveTopNavigation(resolveNavigation(authStore.navigationItems), 'console')
-)
+const navigation = computed<NavigationItem[]>(() => buildNavigationTree(authStore.navigationItems))
 
 function openMobileTenantDialog() {
   mobileOpen.value = false
@@ -33,9 +31,20 @@ async function selectTenant(tenantID: string) {
   await router.push('/console')
 }
 
-async function exitImpersonation() {
+async function returnToPlatform() {
   await authStore.exitImpersonation()
-  await router.push('/platform/login')
+  mobileOpen.value = false
+  await router.push('/platform/tenants')
+}
+
+async function handleLogout() {
+  if (currentUser.value?.impersonating) {
+    await returnToPlatform()
+    return
+  }
+  await authStore.logout()
+  mobileOpen.value = false
+  await router.push('/login')
 }
 </script>
 
@@ -43,7 +52,7 @@ async function exitImpersonation() {
   <div class="app-shell">
     <div v-if="currentUser?.impersonating" class="impersonation-banner" data-testid="impersonation-banner">
       <span>当前处于代维模式：{{ tenantName }}</span>
-      <button type="button" @click="exitImpersonation">退出代维</button>
+      <button type="button" @click="returnToPlatform">返回平台</button>
     </div>
 
     <TopNavigation
@@ -51,10 +60,11 @@ async function exitImpersonation() {
       :tenant-name="tenantName"
       :user-name="userName"
       :show-tenant-switcher="!currentUser?.impersonating && authStore.tenants.length > 1"
+      :logout-label="currentUser?.impersonating ? '返回平台' : '退出'"
       account-path="/console/account"
       @open-mobile="mobileOpen = true"
       @switch-tenant="tenantDialogOpen = true"
-      @logout="authStore.logout()"
+      @logout="handleLogout"
     />
 
     <div v-if="tenantDialogOpen" class="tenant-dialog" role="dialog" aria-label="切换租户">
@@ -145,9 +155,9 @@ async function exitImpersonation() {
         <AppIcon name="account" :size="15" />
         个人中心
       </RouterLink>
-      <button class="mobile-logout" type="button" @click="authStore.logout()">
+      <button class="mobile-logout" type="button" @click="handleLogout">
         <el-icon :size="15"><SwitchButton /></el-icon>
-        退出登录
+        {{ currentUser?.impersonating ? '返回平台' : '退出登录' }}
       </button>
     </div>
     <button

@@ -42,6 +42,7 @@ type SessionHandler interface {
 	Refresh(ctx context.Context, refreshToken string) (bizauth.RefreshResult, error)
 	Profile(ctx context.Context, userID, tenantID uint64) (bizauth.SessionProfile, error)
 	SwitchTenant(ctx context.Context, refreshToken string, tenantID uint64) (bizauth.SwitchTenantResult, error)
+	ExitImpersonation(ctx context.Context, refreshToken string) (bizauth.RefreshResult, error)
 	Logout(ctx context.Context, refreshToken string) error
 	List(ctx context.Context, userID uint64, realm bizauth.Realm, currentSessionID string) ([]bizauth.DeviceSession, error)
 	Revoke(ctx context.Context, sessionID string, userID uint64) error
@@ -269,6 +270,33 @@ func (s *AuthService) SwitchTenant(ctx context.Context, request *v1.SwitchTenant
 	}, nil
 }
 
+// ExitImpersonation 撤销代维会话并恢复平台管理员上下文。
+func (s *AuthService) ExitImpersonation(ctx context.Context, _ *v1.ExitImpersonationRequest) (*v1.ExitImpersonationResponse, error) {
+	claims, ok := bizauth.ClaimsFromContext(ctx)
+	if !ok || claims.ImpersonatorID == 0 {
+		return nil, kratoserrors.Forbidden("AUTH_NOT_IMPERSONATING", bizauth.ErrNotImpersonating.Error())
+	}
+	if s.sessionHandler == nil {
+		return nil, kratoserrors.ServiceUnavailable("AUTH_NOT_READY", "认证服务尚未就绪")
+	}
+	refreshToken, err := readRefreshCookie(ctx)
+	if err != nil {
+		return nil, kratoserrors.Unauthorized("AUTH_REFRESH_REQUIRED", err.Error())
+	}
+	result, err := s.sessionHandler.ExitImpersonation(ctx, refreshToken)
+	if err != nil {
+		return nil, mapAuthError(err)
+	}
+	setRefreshCookie(ctx, refreshCookie(result.Tokens.RefreshToken, result.Tokens.RefreshExpiresAt, s.secureCookie))
+	return &v1.ExitImpersonationResponse{
+		AccessToken:   result.Tokens.AccessToken,
+		ExpiresAt:     timestamppb.New(result.Tokens.AccessExpiresAt),
+		User:          mapCurrentUser(result.Profile.User),
+		Tenants:       mapTenantOptions(result.Profile.Tenants),
+		CurrentTenant: mapTenantOption(result.Profile.CurrentTenant),
+	}, nil
+}
+
 // Logout 撤销服务端会话并清除 refresh Cookie；重复退出保持幂等。
 func (s *AuthService) Logout(ctx context.Context, _ *v1.LogoutRequest) (*v1.LogoutResponse, error) {
 	if s.sessionHandler != nil {
@@ -463,6 +491,8 @@ func mapAuthError(err error) error {
 		return kratoserrors.Forbidden("AUTH_ACCOUNT_DISABLED", err.Error())
 	case errors.Is(err, bizauth.ErrNoTenantMembership):
 		return kratoserrors.Forbidden("AUTH_NO_TENANT", err.Error())
+	case errors.Is(err, bizauth.ErrNotImpersonating):
+		return kratoserrors.Forbidden("AUTH_NOT_IMPERSONATING", err.Error())
 	case errors.Is(err, bizauth.ErrInvalidRefresh), errors.Is(err, bizauth.ErrRefreshReused), errors.Is(err, bizauth.ErrSessionRevoked):
 		return kratoserrors.Unauthorized("AUTH_REFRESH_INVALID", err.Error())
 	default:

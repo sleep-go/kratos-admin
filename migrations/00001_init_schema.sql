@@ -22,6 +22,7 @@ CREATE TABLE platform_admins (
     password_hash VARCHAR(255) NOT NULL COMMENT 'Argon2id密码哈希',
     display_name VARCHAR(128) NOT NULL COMMENT '显示名称',
     avatar_url TEXT NULL COMMENT '头像地址',
+    is_super_admin TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否超级管理员：0否，1是（拥有*:*）',
     mfa_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否启用登录MFA：0否，1是',
     mfa_channel VARCHAR(16) NOT NULL DEFAULT 'email' COMMENT 'MFA渠道：email邮件，sms短信',
     status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '账号状态：1启用，2禁用，3锁定',
@@ -37,8 +38,31 @@ CREATE TABLE platform_admins (
     KEY idx_platform_admins_status (status, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='平台管理员表';
 
-CREATE TABLE users (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户主键',
+CREATE TABLE tenant_admins (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '租户管理员主键',
+    tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户ID',
+    username VARCHAR(64) NOT NULL COMMENT '租户内唯一用户名',
+    email VARCHAR(191) NULL COMMENT '租户内邮箱',
+    phone VARCHAR(32) NULL COMMENT '租户内手机号',
+    password_hash VARCHAR(255) NOT NULL COMMENT 'Argon2id密码哈希',
+    display_name VARCHAR(128) NOT NULL COMMENT '显示名称',
+    avatar_url TEXT NULL COMMENT '头像地址',
+    mfa_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否启用登录MFA：0否，1是',
+    mfa_channel VARCHAR(16) NOT NULL DEFAULT 'email' COMMENT 'MFA渠道：email邮件，sms短信',
+    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '账号状态：1启用，2禁用，3锁定',
+    failed_login_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '连续登录失败次数',
+    locked_until DATETIME(3) NULL COMMENT '锁定截止时间',
+    password_changed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '密码最后修改时间',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    deleted_at DATETIME(3) NULL COMMENT '逻辑删除时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_tenant_admins_tenant_username (tenant_id, username),
+    KEY idx_tenant_admins_tenant_status (tenant_id, status, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='租户管理员表';
+
+CREATE TABLE app_users (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'App用户主键',
     username VARCHAR(64) NOT NULL COMMENT '全局唯一用户名',
     email VARCHAR(191) NULL COMMENT '全局唯一邮箱',
     phone VARCHAR(32) NULL COMMENT '全局唯一手机号',
@@ -57,81 +81,18 @@ CREATE TABLE users (
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
     deleted_at DATETIME(3) NULL COMMENT '逻辑删除时间',
     PRIMARY KEY (id),
-    UNIQUE KEY uk_users_username (username),
-    UNIQUE KEY uk_users_email (email),
-    UNIQUE KEY uk_users_phone (phone),
-    KEY idx_users_status (status, deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='全局用户表';
-
-CREATE TABLE departments (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '部门主键',
-    tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户ID',
-    parent_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '父部门ID，0表示根部门',
-    name VARCHAR(128) NOT NULL COMMENT '部门名称',
-    code VARCHAR(64) NOT NULL COMMENT '租户内唯一部门编码',
-    path VARCHAR(1024) NOT NULL COMMENT '包含自身的部门层级路径',
-    sort_order INT NOT NULL DEFAULT 0 COMMENT '显示排序值',
-    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '部门状态：1启用，2禁用',
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
-    deleted_at DATETIME(3) NULL COMMENT '逻辑删除时间',
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_departments_tenant_code (tenant_id, code),
-    KEY idx_departments_tenant_parent (tenant_id, parent_id, deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='部门表';
-
-CREATE TABLE positions (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '岗位主键',
-    tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户ID',
-    code VARCHAR(64) NOT NULL COMMENT '租户内唯一岗位编码',
-    name VARCHAR(128) NOT NULL COMMENT '岗位名称',
-    sort_order INT NOT NULL DEFAULT 0 COMMENT '显示排序值',
-    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '岗位状态：1启用，2禁用',
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
-    deleted_at DATETIME(3) NULL COMMENT '逻辑删除时间',
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_positions_tenant_code (tenant_id, code),
-    KEY idx_positions_tenant_status (tenant_id, status, deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='岗位表';
-
-CREATE TABLE tenant_members (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '租户成员主键',
-    tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户ID',
-    user_id BIGINT UNSIGNED NOT NULL COMMENT '关联全局用户ID',
-    primary_department_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '主部门ID，0表示未分配',
-    position_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '岗位ID，0表示未分配',
-    display_name VARCHAR(128) NOT NULL COMMENT '租户内显示名称',
-    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '成员状态：1启用，2禁用',
-    is_tenant_admin TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否租户管理员：0否，1是',
-    joined_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '加入租户时间',
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
-    deleted_at DATETIME(3) NULL COMMENT '逻辑删除时间',
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_tenant_members_tenant_user (tenant_id, user_id),
-    KEY idx_tenant_members_user (user_id, status, deleted_at),
-    KEY idx_tenant_members_department (tenant_id, primary_department_id, deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='租户成员表';
-
-CREATE TABLE member_departments (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '成员部门关系主键',
-    tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户ID',
-    member_id BIGINT UNSIGNED NOT NULL COMMENT '租户成员ID',
-    department_id BIGINT UNSIGNED NOT NULL COMMENT '部门ID',
-    is_primary TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否主部门：0否，1是',
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_member_departments_relation (tenant_id, member_id, department_id),
-    KEY idx_member_departments_department (tenant_id, department_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='成员部门关系表';
+    UNIQUE KEY uk_app_users_username (username),
+    UNIQUE KEY uk_app_users_email (email),
+    UNIQUE KEY uk_app_users_phone (phone),
+    KEY idx_app_users_status (status, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='App用户表';
 
 CREATE TABLE roles (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '角色主键',
     tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户ID，0表示平台角色',
     code VARCHAR(64) NOT NULL COMMENT '作用域内唯一角色编码',
     name VARCHAR(128) NOT NULL COMMENT '角色名称',
-    data_scope TINYINT UNSIGNED NOT NULL DEFAULT 4 COMMENT '数据范围：1全部，2本部门及下级，3本部门，4仅本人，5自定义部门',
+    data_scope TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '数据范围：1全部，2本部门及下级，3本部门，4仅本人，5自定义部门',
     is_builtin TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否系统内置：0否，1是',
     status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '角色状态：1启用，2禁用',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
@@ -179,7 +140,7 @@ CREATE TABLE casbin_rules (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Casbin策略主键',
     ptype VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL COMMENT '策略类型：p资源策略，g角色继承策略',
     v0 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值0：租户域ID',
-    v1 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值1：角色或成员ID',
+    v1 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值1：角色或主体ID',
     v2 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值2：资源编码或角色ID',
     v3 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值3：资源动作',
     v4 VARCHAR(191) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT '' COMMENT '策略值4：预留',
@@ -189,22 +150,12 @@ CREATE TABLE casbin_rules (
     KEY idx_casbin_rules_domain (v0, ptype)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Casbin权限策略表';
 
-CREATE TABLE role_scope_departments (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '角色自定义部门范围主键',
-    tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户ID',
-    role_id BIGINT UNSIGNED NOT NULL COMMENT '角色ID',
-    department_id BIGINT UNSIGNED NOT NULL COMMENT '允许访问的部门ID',
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_role_scope_departments_relation (tenant_id, role_id, department_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色自定义部门数据范围表';
-
 CREATE TABLE auth_sessions (
     id CHAR(36) NOT NULL COMMENT '会话UUID',
-    realm VARCHAR(16) NOT NULL DEFAULT 'tenant' COMMENT '认证域：platform平台，tenant租户',
-    user_id BIGINT UNSIGNED NOT NULL COMMENT '主体ID：平台域为platform_admin.id，租户域为user.id',
+    realm VARCHAR(16) NOT NULL DEFAULT 'tenant' COMMENT '认证域：platform平台，tenant租户，app应用',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '主体ID：platform=platform_admin.id，tenant=tenant_admin.id，app=app_user.id',
     tenant_id BIGINT UNSIGNED NOT NULL COMMENT '当前租户ID，平台域为0',
-    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前租户成员ID，平台域或代维会话为0',
+    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '兼容字段，阶段1固定为0',
     impersonator_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '代维平台管理员ID，非代维为0',
     permission_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '会话最近一次签发时的权限版本号',
     refresh_jti_hash CHAR(64) NOT NULL COMMENT 'Refresh JWT jti的SHA256摘要',
@@ -275,7 +226,7 @@ CREATE TABLE audit_logs (
     event_id CHAR(36) NOT NULL COMMENT '来源Outbox事件UUID',
     tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属租户ID，0表示平台域',
     user_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作用户ID，系统任务为0',
-    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作成员ID，平台域或系统任务为0',
+    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '兼容字段，阶段1固定为0',
     impersonator_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '代维平台管理员ID，非代维为0',
     action VARCHAR(64) NOT NULL COMMENT '业务动作',
     resource_type VARCHAR(64) NOT NULL COMMENT '资源类型',
@@ -379,7 +330,7 @@ CREATE TABLE provider_configs (
 CREATE TABLE files (
     id CHAR(36) NOT NULL COMMENT '文件UUID',
     tenant_id BIGINT UNSIGNED NOT NULL COMMENT '所属租户ID',
-    uploader_member_id BIGINT UNSIGNED NOT NULL COMMENT '上传成员ID',
+    uploader_id BIGINT UNSIGNED NOT NULL COMMENT '上传者ID（租户管理员或App用户）',
     provider_name VARCHAR(64) NOT NULL COMMENT '存储Provider名称',
     object_key VARCHAR(512) NOT NULL COMMENT '对象存储键',
     original_name VARCHAR(255) NOT NULL COMMENT '原始文件名',
@@ -417,7 +368,7 @@ CREATE TABLE log_exports (
     id CHAR(36) NOT NULL COMMENT '日志导出任务UUID',
     tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属租户ID，0表示平台跨租户导出',
     user_id BIGINT UNSIGNED NOT NULL COMMENT '发起导出的用户ID',
-    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '发起导出的租户成员ID，平台域为0',
+    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '兼容字段，阶段1固定为0',
     log_type VARCHAR(16) NOT NULL COMMENT '日志类型：login登录日志，audit操作审计，api接口访问日志',
     keyword VARCHAR(191) NOT NULL DEFAULT '' COMMENT '导出查询关键词',
     filters JSON NULL COMMENT '导出查询白名单筛选条件',
@@ -458,37 +409,44 @@ CREATE TABLE failed_tasks (
     KEY idx_failed_tasks_status (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='异步失败任务记录表';
 
+-- 平台菜单树：四个一级目录（parent_id=0, scope_mask=1）
 INSERT INTO resources (parent_id, type, scope_mask, code, name, route_path, component_key, icon, sort_order, visible, status)
 VALUES
-    (0, 1, 1, 'menu.platform', '平台管理', '', '', 'OfficeBuilding', 10, 1, 1),
-    (0, 1, 2, 'menu.organization', '组织管理', '', '', 'UserFilled', 20, 1, 1),
-    (0, 1, 2, 'menu.permission', '权限中心', '', '', 'Lock', 30, 1, 1),
-    (0, 1, 3, 'menu.logs', '日志中心', '', '', 'Document', 40, 1, 1),
-    (0, 1, 2, 'menu.storage', '文件管理', '', '', 'Folder', 50, 1, 1),
-    (0, 1, 3, 'menu.settings', '系统设置', '', '', 'Setting', 60, 1, 1);
+    (0, 1, 1, 'menu.platform.tenants', '租户运营', '', '', 'OfficeBuilding', 10, 1, 1),
+    (0, 1, 1, 'menu.platform.identity', '身份与账号', '', '', 'UserFilled', 20, 1, 1),
+    (0, 1, 1, 'menu.platform.system', '系统配置', '', '', 'Setting', 30, 1, 1),
+    (0, 1, 1, 'menu.platform.logs', '日志审计', '', '', 'Document', 40, 1, 1),
+    (0, 1, 1, 'menu.platform', '平台管理', '', '', 'OfficeBuilding', 99, 0, 1);
 
 INSERT INTO resources (parent_id, type, scope_mask, code, name, route_path, component_key, icon, sort_order, visible, status)
 VALUES
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'users', '全局用户', '/platform/users', 'users', 'User', 11, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'tenants', '租户管理', '/platform/tenants', 'tenants', 'OfficeBuilding', 12, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 3, 1, 'tenant-setup', '租户初始化', '', 'tenant-setup', 'Tools', 13, 0, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'platform-admins', '平台管理员', '/platform/admins', 'platform-admins', 'UserFilled', 14, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'resources', '菜单与权限资源', '/platform/resources', 'resources', 'Menu', 15, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'tenant-resources', '租户功能授权', '/platform/tenant-features', 'tenant-resources', 'Connection', 16, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.organization') AS parent), 2, 2, 'members', '成员管理', '/console/organization/users', 'members', 'UserFilled', 21, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.organization') AS parent), 2, 2, 'departments', '部门管理', '/console/organization/departments', 'departments', 'Share', 22, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.organization') AS parent), 2, 2, 'positions', '岗位管理', '/console/organization/positions', 'positions', 'Postcard', 23, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.permission') AS parent), 2, 2, 'roles', '角色与数据权限', '/console/permission/roles', 'roles', 'Lock', 31, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.permission') AS parent), 2, 2, 'casbin-rules', '按钮与 API 授权', '/console/permission/policies', 'casbin-rules', 'Key', 32, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.logs') AS parent), 2, 3, 'login-logs', '登录日志', '/console/logs/login', 'login-logs', 'List', 41, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.logs') AS parent), 2, 3, 'audit-logs', '操作审计', '/console/logs/audit', 'audit-logs', 'DocumentChecked', 42, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.logs') AS parent), 2, 3, 'api-logs', 'API 日志', '/console/logs/api', 'api-logs', 'Monitor', 43, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.logs') AS parent), 2, 3, 'log-exports', '日志导出', '/console/logs/exports', 'log-exports', 'Download', 44, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.storage') AS parent), 2, 2, 'files', '文件管理', '/console/files', 'files', 'Folder', 51, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.settings') AS parent), 2, 3, 'settings', '系统设置', '/console/settings', 'settings', 'Setting', 61, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.settings') AS parent), 2, 3, 'providers', '渠道配置', '/platform/settings/providers', 'providers', 'Connection', 62, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.settings') AS parent), 2, 2, 'dictionary-types', '参数字典', '/console/settings/dictionaries', 'dictionary-types', 'Collection', 63, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.settings') AS parent), 2, 2, 'dictionary-items', '字典项', '/console/settings/dictionary-items', 'dictionary-items', 'Tickets', 64, 1, 1);
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.tenants') AS p), 2, 1, 'tenants', '租户管理', '/platform/tenants', 'tenants', 'OfficeBuilding', 11, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.tenants') AS p), 3, 1, 'tenant-setup', '开通配置', '', 'tenant-setup', 'Tools', 12, 0, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.tenants') AS p), 3, 1, 'tenant-resources', '功能授权', '', 'tenant-resources', 'Connection', 13, 0, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.tenants') AS p), 3, 1, 'tenant-admins', '租户管理员', '', 'tenant-admins', 'UserFilled', 14, 0, 1),
+
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 2, 1, 'app-users', 'App 用户', '/platform/app-users', 'app-users', 'User', 21, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 2, 1, 'platform-admins', '平台管理员', '/platform/admins', 'platform-admins', 'UserFilled', 22, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 2, 1, 'platform-roles', '平台角色', '/platform/permission/roles', 'platform-roles', 'Lock', 23, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 2, 1, 'platform-casbin-rules', '按钮与 API 授权', '/platform/permission/policies', 'platform-casbin-rules', 'Key', 24, 1, 1),
+
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.system') AS p), 2, 1, 'resources', '菜单与权限资源', '/platform/resources', 'resources', 'Menu', 31, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.system') AS p), 2, 1, 'providers', '渠道配置', '/platform/settings/providers', 'providers', 'Connection', 32, 1, 1),
+
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.logs') AS p), 2, 1, 'platform-login-logs', '登录日志', '/platform/logs/login', 'platform-login-logs', 'List', 41, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.logs') AS p), 2, 1, 'platform-audit-logs', '操作审计', '/platform/logs/audit', 'platform-audit-logs', 'DocumentChecked', 42, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.logs') AS p), 2, 1, 'platform-api-logs', 'API 日志', '/platform/logs/api', 'platform-api-logs', 'Monitor', 43, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.logs') AS p), 2, 1, 'platform-log-exports', '日志导出', '/platform/logs/exports', 'platform-log-exports', 'Download', 44, 1, 1);
+
+-- 租户侧角色资源（开通配置 Tab 使用，scope_mask=2 不在平台顶栏展示）
+INSERT INTO resources (parent_id, type, scope_mask, code, name, route_path, component_key, icon, sort_order, visible, status)
+VALUES
+    (0, 1, 2, 'menu.tenant.permission', '权限中心', '', '', 'Lock', 10, 0, 1);
+
+INSERT INTO resources (parent_id, type, scope_mask, code, name, route_path, component_key, icon, sort_order, visible, status)
+VALUES
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.tenant.permission') AS p), 2, 2, 'roles', '租户角色', '', 'roles', 'Lock', 11, 0, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.tenant.permission') AS p), 2, 2, 'casbin-rules', '按钮与 API 授权', '', 'casbin-rules', 'Key', 12, 0, 1);
 
 -- +goose Down
 DROP TABLE IF EXISTS failed_tasks;
@@ -505,15 +463,11 @@ DROP TABLE IF EXISTS audit_outbox;
 DROP TABLE IF EXISTS login_logs;
 DROP TABLE IF EXISTS verification_codes;
 DROP TABLE IF EXISTS auth_sessions;
-DROP TABLE IF EXISTS role_scope_departments;
 DROP TABLE IF EXISTS casbin_rules;
 DROP TABLE IF EXISTS tenant_resources;
 DROP TABLE IF EXISTS resources;
 DROP TABLE IF EXISTS roles;
-DROP TABLE IF EXISTS member_departments;
-DROP TABLE IF EXISTS tenant_members;
-DROP TABLE IF EXISTS positions;
-DROP TABLE IF EXISTS departments;
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS app_users;
+DROP TABLE IF EXISTS tenant_admins;
 DROP TABLE IF EXISTS platform_admins;
 DROP TABLE IF EXISTS tenants;

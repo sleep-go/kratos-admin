@@ -22,9 +22,9 @@ func (r *AuthRepository) CreateVerification(ctx context.Context, record bizauth.
 	var id uint64
 	err := r.q.Transaction(func(tx *query.Query) error {
 		if record.UserID != 0 {
-			u := tx.User
-			if _, err := u.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
-				Select(u.ID).Where(u.ID.Eq(record.UserID)).Take(); err != nil {
+			ta := tx.TenantAdmin
+			if _, err := ta.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+				Select(ta.ID).Where(ta.ID.Eq(record.UserID)).Take(); err != nil {
 				return err
 			}
 		}
@@ -100,14 +100,14 @@ func (r *AuthRepository) ConsumeVerification(ctx context.Context, challengeID ui
 // UpdatePassword 更新 Argon2id 密码并撤销用户所有未过期会话。
 func (r *AuthRepository) UpdatePassword(ctx context.Context, userID uint64, passwordHash string, changedAt time.Time) error {
 	return r.q.Transaction(func(tx *query.Query) error {
-		u := tx.User
-		result, err := u.WithContext(ctx).
-			Where(u.ID.Eq(userID), u.Status.Eq(1), u.DeletedAt.IsNull()).
+		ta := tx.TenantAdmin
+		result, err := ta.WithContext(ctx).
+			Where(ta.ID.Eq(userID), ta.Status.Eq(1), ta.DeletedAt.IsNull()).
 			UpdateSimple(
-				u.PasswordHash.Value(passwordHash),
-				u.PasswordChangedAt.Value(changedAt),
-				u.FailedLoginCount.Value(0),
-				u.LockedUntil.Null(),
+				ta.PasswordHash.Value(passwordHash),
+				ta.PasswordChangedAt.Value(changedAt),
+				ta.FailedLoginCount.Value(0),
+				ta.LockedUntil.Null(),
 			)
 		if err != nil {
 			return err

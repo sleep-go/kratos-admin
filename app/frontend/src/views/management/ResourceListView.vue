@@ -18,20 +18,58 @@ import {
 import {
   resourceDefinitions,
   type ResourceField,
-  type ResourceOption
+  type ResourceOption,
+  type ResourceScopeTab
 } from '@/features/management/resourceDefinitions'
 import { buildLookupOptions, resolveFieldLookup } from '@/features/management/resourceFormOptions'
+import {
+  buildResourceTree,
+  canAddResourceChild,
+  filterResourceRows,
+  filterResourceRowsByScopeSide,
+  flattenResourceTree,
+  type ResourceTreeRow
+} from '@/features/management/resourceTree'
 import type { ResourceRow } from '@/api/management'
 import type { AdminV1LogExport } from '@/api/generated'
 import { useAuthStore } from '@/stores/auth'
 
-const props = defineProps<{ resourceKey: string; targetTenantId?: string }>()
+const props = defineProps<{ resourceKey: string; targetTenantId?: string; embedded?: boolean }>()
 const router = useRouter()
 const authStore = useAuthStore()
 const definition = computed(() => resourceDefinitions[props.resourceKey])
-const tableFields = computed(() => definition.value.fields.filter((field) => field.table))
-const formFields = computed(() =>
-  definition.value.fields.filter(
+const scopeTabs = computed(() => definition.value?.scopeTabs ?? [])
+const activeScopeTab = ref('')
+const activeScopeTabDefinition = computed<ResourceScopeTab | undefined>(() =>
+  scopeTabs.value.find((tab) => tab.key === activeScopeTab.value)
+)
+const pageDescription = computed(
+  () => activeScopeTabDefinition.value?.description ?? definition.value?.description ?? ''
+)
+const isTreeList = computed(() => definition.value?.listMode === 'tree')
+const treePageSize = 500
+const tableFields = computed(() => definition.value?.fields.filter((field) => field.table) ?? [])
+const treeTableFields = computed(() => {
+  const fields = tableFields.value
+  const nameField = fields.find((field) => field.key === 'name')
+  const rest = fields.filter((field) => field.key !== 'name')
+  return nameField ? [nameField, ...rest] : fields
+})
+const visibleItems = computed(() => {
+  if (!isTreeList.value) return items.value
+  const scopeSide = activeScopeTabDefinition.value?.scopeSide
+  const scoped = filterResourceRowsByScopeSide(
+    items.value,
+    scopeSide === 'platform' || scopeSide === 'tenant' ? scopeSide : undefined
+  )
+  return filterResourceRows(scoped, keyword.value)
+})
+const treeItems = computed(() => (isTreeList.value ? buildResourceTree(visibleItems.value) : []))
+const flattenedTreeItems = computed(() => flattenResourceTree(treeItems.value))
+const tableRows = computed(() => (isTreeList.value ? treeItems.value : items.value))
+const formFields = computed(() => {
+  if (!definition.value) return []
+  return definition.value.fields.filter(
     (field) =>
       field.form !== false &&
       ![
@@ -44,7 +82,16 @@ const formFields = computed(() =>
       ].includes(field.key) &&
       !(editingID.value && field.createOnly)
   )
-)
+})
+const resolvedFormFields = computed(() => {
+  const tab = activeScopeTabDefinition.value
+  if (!tab) return formFields.value
+  return formFields.value.map((field) =>
+    field.key === 'scope_mask'
+      ? { ...field, options: tab.scopeMaskOptions, default: tab.defaultScopeMask }
+      : field
+  )
+})
 const loading = ref(false)
 const items = ref<ResourceRow[]>([])
 const total = ref(0)
@@ -68,22 +115,36 @@ async function enterTenant(tenantId: string) {
 }
 
 function scopeOptions(resource: string) {
-  if (!props.targetTenantId || ['users', 'tenants', 'resources'].includes(resource))
+  if (!props.targetTenantId || ['app-users', 'tenants', 'resources'].includes(resource))
     return undefined
   return { targetTenantId: props.targetTenantId }
 }
 
+function listScopeFilters(resource: string) {
+  if (resource !== 'resources' || !activeScopeTabDefinition.value || isTreeList.value) return {}
+  if (activeScopeTabDefinition.value.scopeSide === 'all') return {}
+  return { scope_side: activeScopeTabDefinition.value.scopeSide }
+}
+
 async function load() {
+  if (!definition.value) return
   loading.value = true
   try {
     const response = await managementApi.listResources(
       definition.value.resource,
-      {
-        page: page.value,
-        page_size: pageSize.value,
-        keyword: keyword.value,
-        filters: activeFilters()
-      },
+      isTreeList.value
+        ? {
+            page: 1,
+            page_size: treePageSize,
+            sort: 'sort_order:asc',
+            filters: activeFilters()
+          }
+        : {
+            page: page.value,
+            page_size: pageSize.value,
+            keyword: keyword.value,
+            filters: activeFilters()
+          },
       scopeOptions(definition.value.resource)
     )
     items.value = response.items ?? []
@@ -97,11 +158,14 @@ function resetQuery() {
   keyword.value = ''
   clearFilters()
   page.value = 1
-  void load()
+  if (!isTreeList.value) void load()
 }
 
 function activeFilters() {
-  return Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ''))
+  return {
+    ...listScopeFilters(definition.value?.resource ?? ''),
+    ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ''))
+  }
 }
 
 function clearFilters() {
@@ -110,18 +174,19 @@ function clearFilters() {
 
 function query() {
   page.value = 1
-  void load()
+  if (!isTreeList.value) void load()
 }
 
-function openCreate() {
+function openCreate(parent?: ResourceRow) {
   editingID.value = ''
   for (const key of Object.keys(form)) delete form[key]
-  for (const field of formFields.value) {
+  for (const field of resolvedFormFields.value) {
     if (field.default !== undefined) form[field.key] = field.default
     if (field.type === 'status') form[field.key] = 1
     if (field.type === 'boolean') form[field.key] = false
     if (field.type === 'number') form[field.key] = 0
   }
+  if (parent?.id) form.parent_id = parent.id
   drawerOpen.value = true
   void loadFormOptions()
 }
@@ -129,15 +194,21 @@ function openCreate() {
 function openEdit(row: ResourceRow) {
   editingID.value = String(row.id ?? '')
   for (const key of Object.keys(form)) delete form[key]
-  for (const field of formFields.value) {
+  for (const field of resolvedFormFields.value) {
     if (field.key in row) form[field.key] = row[field.key]
   }
   drawerOpen.value = true
   void loadFormOptions()
 }
 
+function rowIndent(row: ResourceRow) {
+  if (!isTreeList.value) return undefined
+  const depth = (row as ResourceTreeRow & { depth?: number }).depth ?? 0
+  return { marginLeft: `${depth * 16}px` }
+}
+
 async function loadFormOptions() {
-  const fields = formFields.value
+  const fields = resolvedFormFields.value
     .map((field) => ({ field, lookup: resolveFieldLookup(field, form) }))
     .filter(
       (entry): entry is { field: ResourceField; lookup: NonNullable<ResourceField['lookup']> } =>
@@ -164,7 +235,12 @@ async function loadFormOptions() {
             resource,
             await managementApi.listResources(
               resource,
-              { page: 1, page_size: 200, sort: 'id:asc' },
+              {
+                page: 1,
+                page_size: resource === 'resources' ? treePageSize : 200,
+                sort: resource === 'resources' ? 'sort_order:asc' : 'id:asc',
+                filters: listScopeFilters(resource)
+              },
               scopeOptions(resource)
             )
           ] as const
@@ -202,7 +278,7 @@ async function loadFormOptions() {
 }
 
 async function save() {
-  const missingField = formFields.value.find((field) => {
+  const missingField = resolvedFormFields.value.find((field) => {
     if (!field.required) return false
     const value = form[field.key]
     return (
@@ -215,7 +291,7 @@ async function save() {
   }
 
   const payload: ResourceRow = {}
-  for (const field of formFields.value) {
+  for (const field of resolvedFormFields.value) {
     if (
       field.key in form &&
       ![
@@ -338,6 +414,27 @@ watch(
   { flush: 'sync' }
 )
 
+function onScopeTabChange() {
+  drawerOpen.value = false
+  if (isTreeList.value) return
+  page.value = 1
+  void load()
+}
+
+watch(
+  scopeTabs,
+  (tabs) => {
+    if (tabs.length === 0) {
+      activeScopeTab.value = ''
+      return
+    }
+    if (!tabs.some((tab) => tab.key === activeScopeTab.value)) {
+      activeScopeTab.value = tabs[0]?.key ?? ''
+    }
+  },
+  { immediate: true }
+)
+
 watch(
   () => [props.resourceKey, props.targetTenantId],
   () => {
@@ -346,6 +443,9 @@ watch(
     clearFilters()
     drawerOpen.value = false
     fieldOptions.value = {}
+    if (scopeTabs.value.length > 0) {
+      activeScopeTab.value = scopeTabs.value[0]?.key ?? ''
+    }
     void load()
   }
 )
@@ -356,12 +456,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section v-if="definition" class="resource-page">
-    <header class="resource-heading">
+  <section v-if="definition" class="resource-page" :class="{ 'resource-page--embedded': embedded }">
+    <header v-if="!embedded" class="resource-heading">
       <div>
         <p>MANAGEMENT</p>
         <h1>{{ definition.title }}</h1>
-        <span>{{ definition.description }}</span>
+        <span>{{ pageDescription }}</span>
       </div>
       <div class="heading-actions">
         <el-button
@@ -382,12 +482,40 @@ onBeforeUnmount(() => {
           v-permission="`${definition.resource}:create`"
           type="danger"
           :icon="Plus"
-          @click="openCreate"
+          @click="openCreate()"
         >
           新建
         </el-button>
       </div>
     </header>
+    <div
+      v-if="embedded && !definition.readOnly"
+      class="embedded-toolbar"
+    >
+      <span>{{ pageDescription }}</span>
+      <el-button
+        v-permission="`${definition.resource}:create`"
+        type="danger"
+        :icon="Plus"
+        @click="openCreate()"
+      >
+        新建
+      </el-button>
+    </div>
+    <el-tabs
+      v-if="scopeTabs.length"
+      v-model="activeScopeTab"
+      class="scope-tabs"
+      data-testid="resource-scope-tabs"
+      @tab-change="onScopeTabChange"
+    >
+      <el-tab-pane
+        v-for="tab in scopeTabs"
+        :key="tab.key"
+        :label="tab.label"
+        :name="tab.key"
+      />
+    </el-tabs>
     <div v-if="exportTask" class="export-status" role="status">
       <div>
         <strong>导出任务 {{ exportTask.id }}</strong>
@@ -435,26 +563,39 @@ onBeforeUnmount(() => {
       <el-button data-testid="reset-button" :icon="RefreshLeft" @click="resetQuery">重置</el-button>
     </div>
     <div class="table-panel">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="id" label="ID" min-width="82" />
+      <el-table
+        v-loading="loading"
+        :data="tableRows"
+        :row-key="isTreeList ? 'id' : undefined"
+        :tree-props="isTreeList ? { children: 'children' } : undefined"
+        :default-expand-all="isTreeList"
+        stripe
+      >
+        <el-table-column v-if="!isTreeList" prop="id" label="ID" min-width="82" />
         <el-table-column
-          v-for="field in tableFields"
+          v-for="field in isTreeList ? treeTableFields : tableFields"
           :key="field.key"
           :prop="field.key"
           :label="field.label"
-          min-width="125"
+          :min-width="field.key === 'name' && isTreeList ? 220 : 125"
         >
           <template #default="scope">{{
             displayValue(scope.row[field.key], field, scope.row)
           }}</template>
         </el-table-column>
-        <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" width="280">
+        <el-table-column
+          v-if="isTreeList"
+          prop="id"
+          label="ID"
+          width="82"
+        />
+        <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" :width="isTreeList ? 360 : 280">
           <template #default="scope">
             <router-link
               v-if="definition.resource === 'tenants'"
               :to="`/platform/tenants/${scope.row.id}/setup`"
             >
-              <el-button link>初始化</el-button>
+              <el-button link>开通配置</el-button>
             </router-link>
             <el-button
               v-if="definition.resource === 'tenants'"
@@ -463,6 +604,16 @@ onBeforeUnmount(() => {
               @click="enterTenant(String(scope.row.id))"
             >
               进入租户
+            </el-button>
+            <el-button
+              v-if="isTreeList && canAddResourceChild(scope.row)"
+              v-permission="`${definition.resource}:create`"
+              link
+              data-testid="add-child-resource"
+              :icon="Plus"
+              @click="openCreate(scope.row)"
+            >
+              添加子级
             </el-button>
             <el-button
               v-permission="`${definition.resource}:update`"
@@ -501,9 +652,13 @@ onBeforeUnmount(() => {
           </template>
         </el-table-column>
       </el-table>
-      <div v-if="!loading && items.length === 0" class="mobile-empty">暂无数据</div>
+      <div v-if="!loading && tableRows.length === 0" class="mobile-empty">暂无数据</div>
       <div class="mobile-cards">
-        <article v-for="row in items" :key="String(row.id)">
+        <article
+          v-for="row in isTreeList ? flattenedTreeItems : items"
+          :key="String(row.id)"
+          :style="rowIndent(row)"
+        >
           <strong
             >#{{ row.id }} ·
             {{
@@ -522,11 +677,12 @@ onBeforeUnmount(() => {
               :to="`/platform/tenants/${row.id}/setup`"
               :data-testid="`tenant-setup-${row.id}`"
             >
-              <el-button link>初始化</el-button>
+              <el-button link>开通配置</el-button>
             </router-link>
             <el-button
               v-if="definition.resource === 'tenants'"
               link
+              data-testid="impersonate-tenant"
               @click="enterTenant(String(row.id))"
             >
               进入租户
@@ -561,12 +717,14 @@ onBeforeUnmount(() => {
         </article>
       </div>
       <el-pagination
+        v-if="!isTreeList"
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
         layout="total, prev, pager, next"
         @change="load"
       />
+      <p v-else-if="!loading" class="tree-summary">共 {{ visibleItems.length }} 项资源</p>
     </div>
     <el-drawer
       v-model="drawerOpen"
@@ -576,7 +734,7 @@ onBeforeUnmount(() => {
     >
       <el-form label-position="top">
         <el-form-item
-          v-for="field in formFields"
+          v-for="field in resolvedFormFields"
           :key="field.key"
           :label="field.label"
           :required="field.required"
@@ -595,12 +753,31 @@ onBeforeUnmount(() => {
       </template>
     </el-drawer>
   </section>
+  <section v-else class="resource-page resource-page--missing">
+    <p>未找到资源定义：{{ resourceKey }}</p>
+  </section>
 </template>
 
 <style scoped lang="scss">
 .resource-page {
   display: grid;
   gap: 18px;
+}
+.resource-page--embedded {
+  gap: 12px;
+}
+.embedded-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 4px;
+  color: var(--ka-muted);
+  font-size: 13px;
+}
+.resource-page--missing p {
+  margin: 0;
+  color: var(--ka-muted);
 }
 .resource-heading {
   display: flex;
@@ -628,6 +805,12 @@ onBeforeUnmount(() => {
 .heading-actions {
   display: flex;
   gap: 10px;
+}
+.scope-tabs {
+  margin-top: -6px;
+}
+.scope-tabs :deep(.el-tabs__header) {
+  margin: 0;
 }
 .export-status {
   display: flex;
@@ -673,6 +856,12 @@ onBeforeUnmount(() => {
 .el-pagination {
   justify-content: flex-end;
   margin-top: 18px;
+}
+.tree-summary {
+  margin: 18px 0 0;
+  color: var(--ka-muted);
+  font-size: 12px;
+  text-align: right;
 }
 .mobile-cards,
 .mobile-empty {

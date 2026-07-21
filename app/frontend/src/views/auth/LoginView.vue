@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { onMounted, reactive, shallowRef } from 'vue'
+import { computed, onMounted, reactive, ref, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import * as authApi from '@/api/auth'
-import { Refresh } from '@/components/icons/actions'
+import { Hide, Refresh, View } from '@/components/icons/actions'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -13,6 +13,8 @@ const route = useRoute()
 const { loading } = storeToRefs(authStore)
 const form = reactive({ identifier: '', password: '', captchaId: '', captchaCode: '' })
 const captchaImage = shallowRef('')
+const passwordVisible = ref(false)
+const isPlatformLogin = computed(() => route.path === '/platform/login')
 
 async function refreshCaptcha() {
   const response = await authApi.getCaptcha()
@@ -23,8 +25,7 @@ async function refreshCaptcha() {
 
 async function submit() {
   try {
-    const isPlatformLogin = route.path === '/platform/login'
-    const response = isPlatformLogin
+    const response = isPlatformLogin.value
       ? await authStore.platformLogin({ ...form })
       : await authStore.login({ ...form })
     if (response.mfaRequired) {
@@ -32,12 +33,12 @@ async function submit() {
         name: 'mfa',
         query: {
           challenge: response.mfaChallengeId,
-          ...(isPlatformLogin ? { from: 'platform' } : {})
+          ...(isPlatformLogin.value ? { from: 'platform' } : {})
         }
       })
       return
     }
-    const defaultRedirect = isPlatformLogin ? '/platform/tenants' : '/console'
+    const defaultRedirect = isPlatformLogin.value ? '/platform/tenants' : '/console'
     await router.replace(
       typeof route.query.redirect === 'string' ? route.query.redirect : defaultRedirect
     )
@@ -50,8 +51,11 @@ onMounted(refreshCaptcha)
 </script>
 
 <template>
-  <main class="login-page">
-    <section class="login-atmosphere" aria-label="Kratos Admin 产品介绍">
+  <main
+    class="login-page"
+    :class="isPlatformLogin ? 'login-page--platform' : 'login-page--tenant'"
+  >
+    <section v-if="!isPlatformLogin" class="login-atmosphere" aria-label="Kratos Admin 产品介绍">
       <div class="atmosphere-grid"></div>
       <div class="product-mark">KA</div>
       <div class="product-copy">
@@ -63,10 +67,24 @@ onMounted(refreshCaptcha)
 
     <section class="login-panel">
       <div class="login-card">
-        <div class="login-brand"><strong>KRATOS</strong><span>Administration System</span></div>
-        <p class="login-kicker">SECURE CONSOLE</p>
-        <h1>欢迎回来</h1>
-        <p class="login-description">使用你的管理账号进入控制台</p>
+        <template v-if="isPlatformLogin">
+          <div class="platform-brand">
+            <span class="platform-mark">PG</span>
+            <div>
+              <strong>KRATOS PLATFORM</strong>
+              <span>Governance Console</span>
+            </div>
+          </div>
+          <p class="login-kicker login-kicker--platform">PLATFORM ACCESS</p>
+          <h1>平台治理中心</h1>
+          <p class="login-description">使用平台管理员账号进入租户与资源治理界面</p>
+        </template>
+        <template v-else>
+          <div class="login-brand"><strong>KRATOS</strong><span>Administration System</span></div>
+          <p class="login-kicker">SECURE CONSOLE</p>
+          <h1>欢迎回来</h1>
+          <p class="login-description">使用你的管理账号进入控制台</p>
+        </template>
 
         <form class="login-form" @submit.prevent="submit">
           <label class="field">
@@ -105,28 +123,47 @@ onMounted(refreshCaptcha)
               </span>
             </button>
           </div>
-          <label class="field">
+          <label class="field password-field">
             <span>密码</span>
-            <input
-              v-model="form.password"
-              name="password"
-              type="password"
-              autocomplete="current-password"
-              placeholder="请输入密码"
-              required
-            />
+            <div class="password-input-wrap">
+              <input
+                v-model="form.password"
+                name="password"
+                :type="passwordVisible ? 'text' : 'password'"
+                autocomplete="current-password"
+                placeholder="请输入密码"
+                required
+              />
+              <button
+                type="button"
+                class="password-toggle"
+                :aria-label="passwordVisible ? '隐藏密码' : '显示密码'"
+                :aria-pressed="passwordVisible"
+                @click="passwordVisible = !passwordVisible"
+              >
+                <el-icon :size="16">
+                  <Hide v-if="passwordVisible" />
+                  <View v-else />
+                </el-icon>
+              </button>
+            </div>
           </label>
           <div class="form-meta">
             <label><input type="checkbox" /> 保持登录状态</label>
-            <RouterLink to="/forgot-password">忘记密码？</RouterLink>
+            <RouterLink v-if="!isPlatformLogin" to="/forgot-password">忘记密码？</RouterLink>
           </div>
           <button class="submit-button" type="submit" :disabled="loading">
-            {{ loading ? '正在验证…' : '安全登录' }}
+            {{ loading ? '正在验证…' : isPlatformLogin ? '进入平台' : '安全登录' }}
           </button>
         </form>
 
         <p class="security-note">
-          <span aria-hidden="true">◆</span> 登录行为受安全策略和审计日志保护
+          <span aria-hidden="true">◆</span>
+          {{ isPlatformLogin ? '平台操作将记录审计日志并受 MFA 策略保护' : '登录行为受安全策略和审计日志保护' }}
+        </p>
+
+        <p v-if="isPlatformLogin" class="login-switch">
+          <RouterLink to="/login">前往租户控制台登录</RouterLink>
         </p>
       </div>
     </section>
@@ -137,8 +174,20 @@ onMounted(refreshCaptcha)
 .login-page {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(420px, 1.15fr) minmax(420px, 0.85fr);
   background: #ededed;
+}
+
+.login-page--tenant {
+  grid-template-columns: minmax(420px, 1.15fr) minmax(420px, 0.85fr);
+}
+
+.login-page--platform {
+  place-items: center;
+  padding: clamp(24px, 4vw, 48px);
+  background:
+    radial-gradient(circle at 12% 18%, rgb(212 168 83 / 14%), transparent 34%),
+    radial-gradient(circle at 88% 82%, rgb(56 189 248 / 10%), transparent 30%),
+    linear-gradient(160deg, #0b1220 0%, #111827 42%, #1a2332 100%);
 }
 
 .login-atmosphere {
@@ -200,19 +249,74 @@ onMounted(refreshCaptcha)
   letter-spacing: 0.18em;
 }
 
+.login-kicker--platform {
+  color: #d4a853;
+}
+
 .login-panel {
   display: grid;
   place-items: center;
   padding: 40px;
 }
 
+.login-page--platform .login-panel {
+  width: min(100%, 480px);
+  padding: 0;
+}
+
 .login-card {
   width: min(100%, 430px);
   padding: clamp(30px, 4vw, 54px);
-  border-top: 3px solid var(--ka-accent);
   background: #fff;
-  box-shadow: 0 18px 48px rgb(0 0 0 / 10%);
   animation: card-in 420ms ease-out both;
+}
+
+.login-page--tenant .login-card {
+  border-top: 3px solid var(--ka-accent);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 10%);
+}
+
+.login-page--platform .login-card {
+  border: 1px solid rgb(212 168 83 / 28%);
+  border-radius: 16px;
+  color: #e5e7eb;
+  background: rgb(15 23 42 / 88%);
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 35%),
+    inset 0 1px 0 rgb(255 255 255 / 6%);
+  backdrop-filter: blur(12px);
+}
+
+.platform-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 42px;
+}
+
+.platform-mark {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(212 168 83 / 55%);
+  border-radius: 12px;
+  color: #f3d08a;
+  background: rgb(212 168 83 / 8%);
+  font-family: 'Arial Black', sans-serif;
+  font-size: 18px;
+}
+
+.platform-brand strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+}
+
+.platform-brand span {
+  color: rgb(148 163 184);
+  font-size: 11px;
 }
 
 .login-brand {
@@ -241,10 +345,21 @@ onMounted(refreshCaptcha)
   letter-spacing: -0.04em;
 }
 
+.login-page--platform .login-card h1 {
+  color: #f8fafc;
+}
+
 .login-description {
   margin: 0 0 34px;
-  color: #888;
   font-size: 13px;
+}
+
+.login-page--tenant .login-description {
+  color: #888;
+}
+
+.login-page--platform .login-description {
+  color: rgb(148 163 184);
 }
 
 .login-form {
@@ -257,7 +372,6 @@ onMounted(refreshCaptcha)
   gap: 8px;
 
   span {
-    color: #333;
     font-size: 12px;
     font-weight: 700;
   }
@@ -266,31 +380,101 @@ onMounted(refreshCaptcha)
     width: 100%;
     height: 46px;
     box-sizing: border-box;
-    border: 1px solid #d8d8d8;
     border-radius: 2px;
     padding: 0 14px;
     outline: none;
     transition:
       border 150ms ease,
       box-shadow 150ms ease;
+  }
+}
 
-    &:focus {
-      border-color: var(--ka-accent);
-      box-shadow: 0 0 0 3px rgb(237 21 21 / 8%);
-    }
+.login-page--tenant .field span {
+  color: #333;
+}
+
+.login-page--tenant .field input {
+  border: 1px solid #d8d8d8;
+
+  &:focus {
+    border-color: var(--ka-accent);
+    box-shadow: 0 0 0 3px rgb(237 21 21 / 8%);
+  }
+}
+
+.login-page--platform .field span {
+  color: rgb(203 213 225);
+}
+
+.login-page--platform .field input {
+  border: 1px solid rgb(148 163 184 / 28%);
+  color: #f8fafc;
+  background: rgb(15 23 42 / 72%);
+
+  &::placeholder {
+    color: rgb(100 116 139);
+  }
+
+  &:focus {
+    border-color: #d4a853;
+    box-shadow: 0 0 0 3px rgb(212 168 83 / 14%);
+  }
+}
+
+.password-input-wrap {
+  position: relative;
+
+  input {
+    padding-right: 44px;
+  }
+}
+
+.password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+
+  &:hover {
+    color: #333;
+  }
+}
+
+.login-page--platform .password-toggle {
+  color: rgb(148 163 184);
+
+  &:hover {
+    color: #f8fafc;
   }
 }
 
 .form-meta {
   display: flex;
   justify-content: space-between;
-  color: #777;
   font-size: 11px;
 
   a {
-    color: #333;
     text-decoration: none;
   }
+}
+
+.login-page--tenant .form-meta {
+  color: #777;
+
+  a {
+    color: #333;
+  }
+}
+
+.login-page--platform .form-meta {
+  color: rgb(148 163 184);
 }
 
 .captcha-row {
@@ -315,6 +499,13 @@ onMounted(refreshCaptcha)
   }
 }
 
+.login-page--platform .captcha-image {
+  overflow: hidden;
+  border-color: rgb(148 163 184 / 28%);
+  border-radius: 2px;
+  background: rgb(15 23 42 / 72%);
+}
+
 .captcha-loading {
   display: inline-flex;
   align-items: center;
@@ -329,8 +520,6 @@ onMounted(refreshCaptcha)
   border: 0;
   border-radius: 2px;
   color: #fff;
-  background: linear-gradient(100deg, #f12626, #c80808);
-  box-shadow: 0 9px 20px rgb(220 12 12 / 20%);
   font-weight: 750;
   letter-spacing: 0.08em;
   cursor: pointer;
@@ -341,15 +530,52 @@ onMounted(refreshCaptcha)
   }
 }
 
+.login-page--tenant .submit-button {
+  background: linear-gradient(100deg, #f12626, #c80808);
+  box-shadow: 0 9px 20px rgb(220 12 12 / 20%);
+}
+
+.login-page--platform .submit-button {
+  border-radius: 8px;
+  background: linear-gradient(100deg, #e8c068, #c8943a);
+  box-shadow: 0 10px 24px rgb(200 148 58 / 28%);
+  color: #1a1205;
+}
+
 .security-note {
   margin: 28px 0 0;
-  color: #9a9a9a;
   font-size: 10px;
   text-align: center;
 
   span {
     color: var(--ka-accent);
   }
+}
+
+.login-page--platform .security-note {
+  color: rgb(100 116 139);
+
+  span {
+    color: #d4a853;
+  }
+}
+
+.login-switch {
+  margin: 18px 0 0;
+  font-size: 12px;
+  text-align: center;
+
+  a {
+    text-decoration: none;
+  }
+}
+
+.login-page--tenant .login-switch a {
+  color: #666;
+}
+
+.login-page--platform .login-switch a {
+  color: #d4a853;
 }
 
 @keyframes card-in {
@@ -364,7 +590,7 @@ onMounted(refreshCaptcha)
 }
 
 @media (max-width: 900px) {
-  .login-page {
+  .login-page--tenant {
     grid-template-columns: 1fr;
   }
 
@@ -413,6 +639,10 @@ onMounted(refreshCaptcha)
 
   .login-brand {
     margin-bottom: 36px;
+  }
+
+  .platform-brand {
+    margin-bottom: 28px;
   }
 }
 </style>

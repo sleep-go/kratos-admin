@@ -15,49 +15,10 @@ import (
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
-// AuthRepository 使用 GORM Gen 实现认证所需的用户、成员与会话仓储。
+// AuthRepository 使用 GORM Gen 实现认证所需的租户管理员与会话仓储。
 type AuthRepository struct {
 	db *gorm.DB
 	q  *query.Query
-}
-
-// ListPermissions 按认证域和 Casbin domain 规则加载权限。
-// platform 域返回 *:*；tenant 域代维（impersonatorID>0）时等同租户管理员。
-func (r *AuthRepository) ListPermissions(ctx context.Context, realm bizauth.Realm, tenantID, memberID, impersonatorID uint64) ([]string, error) {
-	if realm == bizauth.RealmPlatform && tenantID == 0 {
-		return []string{"*:*"}, nil
-	}
-	// 代维会话等同租户管理员
-	if impersonatorID > 0 {
-		return r.tenantAdminPermissions(ctx, tenantID)
-	}
-	tenantAdmin, err := r.isTenantAdmin(ctx, tenantID, memberID)
-	if err != nil {
-		return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)
-	}
-	permissions := make([]string, 0)
-	if tenantAdmin {
-		return r.tenantAdminPermissions(ctx, tenantID)
-	} else {
-		g := r.q.CasbinRule.As("g")
-		p := r.q.CasbinRule.As("p")
-		resource := r.q.Resource.As("res")
-		tr := r.q.TenantResource.As("tr")
-		var rows []struct{ V2, V3 string }
-		if err := g.WithContext(ctx).
-			Join(p, p.Ptype.Eq("p"), p.V0.EqCol(g.V0), p.V1.EqCol(g.V2)).
-			Join(resource, resource.Code.EqCol(p.V2), resource.ScopeMask.BitAnd(2).Eq(2), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
-			Join(tr, tr.TenantID.Eq(tenantID), tr.ResourceID.EqCol(resource.ID)).
-			Where(g.Ptype.Eq("g"), g.V0.Eq(fmt.Sprint(tenantID)), g.V1.Eq(fmt.Sprint(memberID))).
-			Distinct(p.V2, p.V3).Select(p.V2, p.V3).Scan(&rows); err != nil {
-			return nil, fmt.Errorf("查询成员权限失败: %w", err)
-		}
-		for _, row := range rows {
-			permissions = append(permissions, row.V2+":"+row.V3)
-		}
-	}
-	sort.Strings(permissions)
-	return permissions, nil
 }
 
 // NewAuthRepository 创建认证仓储。
@@ -65,34 +26,81 @@ func NewAuthRepository(data *Data) *AuthRepository {
 	return &AuthRepository{db: data.DB, q: data.Query}
 }
 
-// FindByIdentifier 按全局唯一用户名、邮箱或手机号查询用户。
-func (r *AuthRepository) FindByIdentifier(ctx context.Context, identifier string) (*bizauth.User, error) {
-	u := r.q.User
-	row, err := u.WithContext(ctx).
-		Where(u.Username.Eq(identifier)).
-		Or(u.Email.Eq(identifier)).
-		Or(u.Phone.Eq(identifier)).
-		First()
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, bizauth.ErrInvalidCredentials
-		}
-		return nil, fmt.Errorf("查询登录用户失败: %w", err)
+// ListPermissions 按认证域和 Casbin domain 规则加载权限。
+// platform 域：super admin 返回 *:*，普通平台管理员按 Casbin v0=0 查询。
+// tenant 域：代维会话等同租户管理员；租户管理员拥有已授权资源的通配权限。
+func (r *AuthRepository) ListPermissions(ctx context.Context, realm bizauth.Realm, tenantID, adminID, impersonatorID uint64) ([]string, error) {
+	if realm == bizauth.RealmPlatform && tenantID == 0 {
+		return r.platformAdminPermissions(ctx, adminID)
 	}
-	return mapAuthUser(row), nil
+	if impersonatorID > 0 {
+		return impersonatingPermissions(), nil
+	}
+	return r.tenantAdminPermissions(ctx, tenantID)
 }
 
-// FindUser 按用户 ID 重新加载当前有效的全局用户资料。
+func (r *AuthRepository) platformAdminPermissions(ctx context.Context, adminID uint64) ([]string, error) {
+	if adminID == 0 {
+		return nil, errors.New("平台管理员 ID 不能为空")
+	}
+	pa := r.q.PlatformAdmin
+	row, err := pa.WithContext(ctx).Where(pa.ID.Eq(adminID)).First()
+	if err != nil {
+		return nil, fmt.Errorf("查询平台管理员失败: %w", err)
+	}
+	if row.IsSuperAdmin {
+		return []string{"*:*"}, nil
+	}
+	g := r.q.CasbinRule.As("g")
+	p := r.q.CasbinRule.As("p")
+	resource := r.q.Resource.As("res")
+	var rows []struct{ V2, V3 string }
+	if err := g.WithContext(ctx).
+		Join(p, p.Ptype.Eq("p"), p.V0.EqCol(g.V0), p.V1.EqCol(g.V2)).
+		Join(resource, resource.Code.EqCol(p.V2), resource.ScopeMask.BitAnd(1).Eq(1), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+		Where(g.Ptype.Eq("g"), g.V0.Eq("0"), g.V1.Eq(fmt.Sprint(adminID))).
+		Distinct(p.V2, p.V3).Select(p.V2, p.V3).Scan(&rows); err != nil {
+		return nil, fmt.Errorf("查询平台管理员权限失败: %w", err)
+	}
+	permissions := make([]string, 0, len(rows))
+	for _, row := range rows {
+		permissions = append(permissions, row.V2+":"+row.V3)
+	}
+	sort.Strings(permissions)
+	return permissions, nil
+}
+
+// FindByIdentifier 按用户名、邮箱或手机号查询租户管理员。
+func (r *AuthRepository) FindByIdentifier(ctx context.Context, identifier string) (*bizauth.User, error) {
+	ta := r.q.TenantAdmin
+	rows, err := ta.WithContext(ctx).
+		Where(ta.Username.Eq(identifier)).
+		Or(ta.Email.Eq(identifier)).
+		Or(ta.Phone.Eq(identifier)).
+		Find()
+	if err != nil {
+		return nil, fmt.Errorf("查询租户管理员失败: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, bizauth.ErrInvalidCredentials
+	}
+	if len(rows) > 1 {
+		return nil, bizauth.ErrInvalidCredentials
+	}
+	return mapTenantAdminUser(rows[0]), nil
+}
+
+// FindUser 按租户管理员 ID 重新加载当前有效资料。
 func (r *AuthRepository) FindUser(ctx context.Context, userID uint64) (bizauth.User, error) {
-	u := r.q.User
-	row, err := u.WithContext(ctx).Where(u.ID.Eq(userID)).First()
+	ta := r.q.TenantAdmin
+	row, err := ta.WithContext(ctx).Where(ta.ID.Eq(userID)).First()
 	if err != nil {
 		return bizauth.User{}, err
 	}
-	return *mapAuthUser(row), nil
+	return *mapTenantAdminUser(row), nil
 }
 
-// FindByID 按用户 ID 查询全局用户。
+// FindByID 按租户管理员 ID 查询账号。
 func (r *AuthRepository) FindByID(ctx context.Context, userID uint64) (*bizauth.User, error) {
 	user, err := r.FindUser(ctx, userID)
 	if err != nil {
@@ -101,7 +109,7 @@ func (r *AuthRepository) FindByID(ctx context.Context, userID uint64) (*bizauth.
 	return &user, nil
 }
 
-func mapAuthUser(row *model.User) *bizauth.User {
+func mapTenantAdminUser(row *model.TenantAdmin) *bizauth.User {
 	avatarURL := ""
 	if row.AvatarURL != nil {
 		avatarURL = *row.AvatarURL
@@ -114,73 +122,44 @@ func mapAuthUser(row *model.User) *bizauth.User {
 		phone = *row.Phone
 	}
 	return &bizauth.User{
-		ID: row.ID, Username: row.Username, DisplayName: row.DisplayName, AvatarURL: avatarURL,
+		ID: row.ID, TenantID: row.TenantID, Username: row.Username, DisplayName: row.DisplayName, AvatarURL: avatarURL,
 		Email: email, Phone: phone, MFAEnabled: row.MFAEnabled, MFAChannel: row.MFAChannel,
 		PasswordHash: row.PasswordHash,
 		Status: bizauth.UserStatus(row.Status), FailedLoginCount: row.FailedLoginCount, LockedUntil: row.LockedUntil,
 	}
 }
 
-// ListMemberships 返回用户在所有启用租户中的可用成员身份。
-func (r *AuthRepository) ListMemberships(ctx context.Context, userID uint64) ([]bizauth.Membership, error) {
-	var rows []struct {
-		ID                uint64
-		TenantID          uint64
-		TenantName        string
-		Status            uint8
-		PermissionVersion uint64
-	}
-	tm, tenant := r.q.TenantMember, r.q.Tenant
-	err := tm.WithContext(ctx).
-		Join(tenant, tenant.ID.EqCol(tm.TenantID)).
-		Where(tm.UserID.Eq(userID), tm.DeletedAt.IsNull(), tenant.DeletedAt.IsNull(), tenant.Status.Eq(1)).
-		Select(tm.ID, tm.TenantID, tenant.Name.As("tenant_name"), tm.Status, tenant.PermissionVersion).
-		Order(tm.ID.Asc()).
-		Scan(&rows)
-	if err != nil {
-		return nil, fmt.Errorf("查询用户租户成员身份失败: %w", err)
-	}
-	result := make([]bizauth.Membership, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, bizauth.Membership{
-			ID: row.ID, TenantID: row.TenantID, TenantName: row.TenantName,
-			Status: bizauth.MembershipStatus(row.Status), PermissionVersion: row.PermissionVersion,
-		})
-	}
-	return result, nil
-}
-
 // UpdateLoginFailure 原子记录连续登录失败次数与锁定截止时间。
 func (r *AuthRepository) UpdateLoginFailure(ctx context.Context, userID uint64, count uint32, lockedUntil *time.Time) error {
-	u := r.q.User
-	assignments := []field.AssignExpr{u.FailedLoginCount.Value(count)}
+	ta := r.q.TenantAdmin
+	assignments := []field.AssignExpr{ta.FailedLoginCount.Value(count)}
 	if lockedUntil == nil {
-		assignments = append(assignments, u.LockedUntil.Null())
+		assignments = append(assignments, ta.LockedUntil.Null())
 	} else {
-		assignments = append(assignments, u.LockedUntil.Value(*lockedUntil))
+		assignments = append(assignments, ta.LockedUntil.Value(*lockedUntil))
 	}
-	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID)).UpdateSimple(assignments...)
+	_, err := ta.WithContext(ctx).Where(ta.ID.Eq(userID)).UpdateSimple(assignments...)
 	return err
 }
 
-// ResetLoginFailures 清除成功登录用户的失败计数和锁定状态。
+// ResetLoginFailures 清除成功登录账号的失败计数和锁定状态。
 func (r *AuthRepository) ResetLoginFailures(ctx context.Context, userID uint64) error {
-	u := r.q.User
-	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID)).UpdateSimple(
-		u.FailedLoginCount.Value(0),
-		u.LockedUntil.Null(),
+	ta := r.q.TenantAdmin
+	_, err := ta.WithContext(ctx).Where(ta.ID.Eq(userID)).UpdateSimple(
+		ta.FailedLoginCount.Value(0),
+		ta.LockedUntil.Null(),
 	)
 	return err
 }
 
-// UpdateProfile 更新当前账号允许自行维护的资料字段。
+// UpdateProfile 更新当前租户管理员允许自行维护的资料字段。
 func (r *AuthRepository) UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) error {
-	u := r.q.User
-	assignments := []field.AssignExpr{u.DisplayName.Value(displayName)}
-	assignments = append(assignments, nullableStringAssignment(u.AvatarURL, avatarURL))
-	assignments = append(assignments, nullableStringAssignment(u.Email, email))
-	assignments = append(assignments, nullableStringAssignment(u.Phone, phone))
-	_, err := u.WithContext(ctx).Where(u.ID.Eq(userID), u.DeletedAt.IsNull()).UpdateSimple(assignments...)
+	ta := r.q.TenantAdmin
+	assignments := []field.AssignExpr{ta.DisplayName.Value(displayName)}
+	assignments = append(assignments, nullableStringAssignment(ta.AvatarURL, avatarURL))
+	assignments = append(assignments, nullableStringAssignment(ta.Email, email))
+	assignments = append(assignments, nullableStringAssignment(ta.Phone, phone))
+	_, err := ta.WithContext(ctx).Where(ta.ID.Eq(userID), ta.DeletedAt.IsNull()).UpdateSimple(assignments...)
 	return err
 }
 
@@ -202,7 +181,7 @@ func (r *AuthRepository) Create(ctx context.Context, session bizauth.Session) er
 	})
 }
 
-// Find 查询有效会话，并重新加载当前租户的权限版本和成员状态。
+// Find 查询有效会话，并重新加载当前租户的权限版本。
 func (r *AuthRepository) Find(ctx context.Context, sessionID string) (bizauth.SessionRecord, error) {
 	s := r.q.AuthSession
 	row, err := s.WithContext(ctx).Where(s.ID.Eq(sessionID)).First()
@@ -212,7 +191,6 @@ func (r *AuthRepository) Find(ctx context.Context, sessionID string) (bizauth.Se
 	realm := bizauth.Realm(row.Realm)
 	permissionVersion := uint64(0)
 	if realm == bizauth.RealmPlatform {
-		// 平台域会话：校验 platform_admins 账号
 		pa := r.q.PlatformAdmin
 		_, paErr := pa.WithContext(ctx).
 			Where(pa.ID.Eq(row.UserID), pa.Status.Eq(uint8(bizauth.UserStatusEnabled))).
@@ -221,12 +199,21 @@ func (r *AuthRepository) Find(ctx context.Context, sessionID string) (bizauth.Se
 			return bizauth.SessionRecord{}, bizauth.ErrInvalidRefresh
 		}
 	} else if row.TenantID > 0 && row.ImpersonatorID == 0 {
-		// 租户域非代维会话：校验成员身份
-		membership, memberErr := r.FindMembership(ctx, row.UserID, row.TenantID)
-		if memberErr != nil {
-			return bizauth.SessionRecord{}, memberErr
+		ta := r.q.TenantAdmin
+		_, taErr := ta.WithContext(ctx).
+			Where(ta.ID.Eq(row.UserID), ta.TenantID.Eq(row.TenantID), ta.Status.Eq(uint8(bizauth.UserStatusEnabled))).
+			First()
+		if taErr != nil {
+			return bizauth.SessionRecord{}, bizauth.ErrInvalidRefresh
 		}
-		permissionVersion = membership.PermissionVersion
+		t := r.q.Tenant
+		tenant, tenantErr := t.WithContext(ctx).
+			Where(t.ID.Eq(row.TenantID), t.Status.Eq(1), t.DeletedAt.IsNull()).
+			First()
+		if tenantErr != nil {
+			return bizauth.SessionRecord{}, bizauth.ErrNoTenantMembership
+		}
+		permissionVersion = tenant.PermissionVersion
 	}
 	return bizauth.SessionRecord{
 		ID: row.ID, Realm: realm, UserID: row.UserID, TenantID: row.TenantID, MemberID: row.MemberID,
@@ -263,20 +250,6 @@ func (r *AuthRepository) Revoke(ctx context.Context, sessionID string, userID ui
 	return err
 }
 
-// FindMembership 查询用户在目标启用租户中的有效成员身份。
-func (r *AuthRepository) FindMembership(ctx context.Context, userID, tenantID uint64) (bizauth.Membership, error) {
-	memberships, err := r.ListMemberships(ctx, userID)
-	if err != nil {
-		return bizauth.Membership{}, err
-	}
-	for _, membership := range memberships {
-		if membership.TenantID == tenantID && membership.Status == bizauth.MembershipStatusEnabled {
-			return membership, nil
-		}
-	}
-	return bizauth.Membership{}, bizauth.ErrNoTenantMembership
-}
-
 // List 返回用户在指定认证域下当前有效的全部设备会话。
 func (r *AuthRepository) List(ctx context.Context, userID uint64, realm bizauth.Realm) ([]bizauth.DeviceSession, error) {
 	s := r.q.AuthSession
@@ -298,7 +271,7 @@ func (r *AuthRepository) List(ctx context.Context, userID uint64, realm bizauth.
 }
 
 // ListNavigation 仅返回当前认证域可见的目录与菜单资源。
-func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID uint64, realm bizauth.Realm, impersonatorID uint64) ([]bizauth.NavigationItem, error) {
+func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, adminID uint64, realm bizauth.Realm, impersonatorID uint64) ([]bizauth.NavigationItem, error) {
 	type row struct {
 		ID           uint64
 		ParentID     uint64
@@ -317,23 +290,9 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID 
 		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(1).Eq(1))
 	} else {
 		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(2).Eq(2))
-		tenantAdmin := impersonatorID > 0
-		var err error
-		if !tenantAdmin {
-			tenantAdmin, err = r.isTenantAdmin(ctx, tenantID, memberID)
-			if err != nil {
-				return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)
-			}
-		}
 		tr := r.q.TenantResource.As("tr")
 		navigationQuery = navigationQuery.Join(tr, tr.ResourceID.EqCol(resource.ID), tr.TenantID.Eq(tenantID))
-		if !tenantAdmin {
-			p := r.q.CasbinRule.As("p")
-			g := r.q.CasbinRule.As("g")
-			navigationQuery = navigationQuery.
-				Join(p, p.Ptype.Eq("p"), p.V0.Eq(fmt.Sprint(tenantID)), p.V2.EqCol(resource.Code)).
-				Join(g, g.Ptype.Eq("g"), g.V0.EqCol(p.V0), g.V2.EqCol(p.V1), g.V1.Eq(fmt.Sprint(memberID)))
-		}
+		// 租户管理员与代维会话均可见全部已授权租户菜单，不再按成员角色过滤。
 	}
 	var rows []row
 	if err := navigationQuery.Distinct(resource.ID, resource.ParentID, resource.Code, resource.Name, resource.RoutePath, resource.ComponentKey, resource.Icon, resource.SortOrder).
@@ -363,7 +322,16 @@ func (r *AuthRepository) FindTenant(ctx context.Context, tenantID uint64) (bizau
 	if err != nil {
 		return bizauth.TenantOption{}, fmt.Errorf("查询租户失败: %w", err)
 	}
-	return bizauth.TenantOption{ID: row.ID, Name: row.Name}, nil
+	return bizauth.TenantOption{ID: row.ID, Name: row.Name, PermissionVersion: row.PermissionVersion}, nil
+}
+
+func impersonatingPermissions() []string {
+	codes := impersonatingPermissionCodes()
+	permissions := make([]string, 0, len(codes))
+	for _, code := range codes {
+		permissions = append(permissions, code+":*")
+	}
+	return permissions
 }
 
 // tenantAdminPermissions 返回目标租户中所有已授权资源的通配权限。
@@ -382,21 +350,6 @@ func (r *AuthRepository) tenantAdminPermissions(ctx context.Context, tenantID ui
 	}
 	sort.Strings(permissions)
 	return permissions, nil
-}
-
-func (r *AuthRepository) isTenantAdmin(ctx context.Context, tenantID, memberID uint64) (bool, error) {
-	m := r.q.TenantMember
-	row, err := m.WithContext(ctx).
-		Select(m.IsTenantAdmin).
-		Where(m.ID.Eq(memberID), m.TenantID.Eq(tenantID), m.Status.Eq(1), m.DeletedAt.IsNull()).
-		Take()
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return row.IsTenantAdmin, nil
 }
 
 var _ bizauth.UserRepository = (*AuthRepository)(nil)

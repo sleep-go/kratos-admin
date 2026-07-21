@@ -59,7 +59,7 @@ describe('路由鉴权', () => {
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
 
-  it('仅允许平台上下文管理员从租户菜单进入初始化页', async () => {
+  it('仅允许平台上下文管理员从租户菜单进入开通配置页', async () => {
     const authStore = useAuthStore()
     authStore.accessToken = 'token'
     authStore.sessionRestored = true

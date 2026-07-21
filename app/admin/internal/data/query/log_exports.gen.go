@@ -67,7 +67,7 @@ type logExport struct {
 	ID             field.String // 日志导出任务UUID
 	TenantID       field.Uint64 // 所属租户ID，0表示平台跨租户导出
 	UserID         field.Uint64 // 发起导出的用户ID
-	MemberID       field.Uint64 // 发起导出的租户成员ID，平台域为0
+	MemberID       field.Uint64 // 兼容字段，阶段1固定为0
 	LogType        field.String // 日志类型：login登录日志，audit操作审计，api接口访问日志
 	Keyword        field.String // 导出查询关键词
 	Filters        field.Field  // 导出查询白名单筛选条件

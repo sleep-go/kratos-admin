@@ -1655,6 +1655,118 @@ func (x *ListNavigationResponse) GetItems() []*NavigationItem {
 	return nil
 }
 
+type ExitImpersonationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExitImpersonationRequest) Reset() {
+	*x = ExitImpersonationRequest{}
+	mi := &file_admin_v1_auth_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExitImpersonationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExitImpersonationRequest) ProtoMessage() {}
+
+func (x *ExitImpersonationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_auth_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExitImpersonationRequest.ProtoReflect.Descriptor instead.
+func (*ExitImpersonationRequest) Descriptor() ([]byte, []int) {
+	return file_admin_v1_auth_proto_rawDescGZIP(), []int{28}
+}
+
+type ExitImpersonationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	User          *CurrentUser           `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	Tenants       []*TenantSummary       `protobuf:"bytes,4,rep,name=tenants,proto3" json:"tenants,omitempty"`
+	CurrentTenant *TenantSummary         `protobuf:"bytes,5,opt,name=current_tenant,json=currentTenant,proto3" json:"current_tenant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExitImpersonationResponse) Reset() {
+	*x = ExitImpersonationResponse{}
+	mi := &file_admin_v1_auth_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExitImpersonationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExitImpersonationResponse) ProtoMessage() {}
+
+func (x *ExitImpersonationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_admin_v1_auth_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExitImpersonationResponse.ProtoReflect.Descriptor instead.
+func (*ExitImpersonationResponse) Descriptor() ([]byte, []int) {
+	return file_admin_v1_auth_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ExitImpersonationResponse) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
+	}
+	return ""
+}
+
+func (x *ExitImpersonationResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *ExitImpersonationResponse) GetUser() *CurrentUser {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+func (x *ExitImpersonationResponse) GetTenants() []*TenantSummary {
+	if x != nil {
+		return x.Tenants
+	}
+	return nil
+}
+
+func (x *ExitImpersonationResponse) GetCurrentTenant() *TenantSummary {
+	if x != nil {
+		return x.CurrentTenant
+	}
+	return nil
+}
+
 var File_admin_v1_auth_proto protoreflect.FileDescriptor
 
 const file_admin_v1_auth_proto_rawDesc = "" +
@@ -1790,8 +1902,15 @@ const file_admin_v1_auth_proto_rawDesc = "" +
 	"sort_order\x18\b \x01(\rR\tsortOrder\"\x17\n" +
 	"\x15ListNavigationRequest\"H\n" +
 	"\x16ListNavigationResponse\x12.\n" +
-	"\x05items\x18\x01 \x03(\v2\x18.admin.v1.NavigationItemR\x05items2\xb5\n" +
+	"\x05items\x18\x01 \x03(\v2\x18.admin.v1.NavigationItemR\x05items\"\x1a\n" +
+	"\x18ExitImpersonationRequest\"\x97\x02\n" +
+	"\x19ExitImpersonationResponse\x12!\n" +
+	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x129\n" +
 	"\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12)\n" +
+	"\x04user\x18\x03 \x01(\v2\x15.admin.v1.CurrentUserR\x04user\x121\n" +
+	"\atenants\x18\x04 \x03(\v2\x17.admin.v1.TenantSummaryR\atenants\x12>\n" +
+	"\x0ecurrent_tenant\x18\x05 \x01(\v2\x17.admin.v1.TenantSummaryR\rcurrentTenant2\xc0\v\n" +
 	"\vAuthService\x12e\n" +
 	"\n" +
 	"GetCaptcha\x12\x1b.admin.v1.GetCaptchaRequest\x1a\x1c.admin.v1.GetCaptchaResponse\"\x1c\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/auth/captcha\x12W\n" +
@@ -1799,7 +1918,8 @@ const file_admin_v1_auth_proto_rawDesc = "" +
 	"\tVerifyMfa\x12\x1a.admin.v1.VerifyMfaRequest\x1a\x1b.admin.v1.VerifyMfaResponse\"\"\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/api/v1/auth/mfa/verify\x12_\n" +
 	"\aRefresh\x12\x18.admin.v1.RefreshRequest\x1a\x19.admin.v1.RefreshResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/auth/refresh\x12X\n" +
 	"\x06Logout\x12\x17.admin.v1.LogoutRequest\x1a\x18.admin.v1.LogoutResponse\"\x1b\x82\xd3\xe4\x93\x02\x15\"\x13/api/v1/auth/logout\x12t\n" +
-	"\fSwitchTenant\x12\x1d.admin.v1.SwitchTenantRequest\x1a\x1e.admin.v1.SwitchTenantResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/auth/switch-tenant\x12|\n" +
+	"\fSwitchTenant\x12\x1d.admin.v1.SwitchTenantRequest\x1a\x1e.admin.v1.SwitchTenantResponse\"%\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/auth/switch-tenant\x12\x88\x01\n" +
+	"\x11ExitImpersonation\x12\".admin.v1.ExitImpersonationRequest\x1a#.admin.v1.ExitImpersonationResponse\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/auth/exit-impersonation\x12|\n" +
 	"\x0eForgotPassword\x12\x1f.admin.v1.ForgotPasswordRequest\x1a .admin.v1.ForgotPasswordResponse\"'\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/api/v1/auth/forgot-password\x12x\n" +
 	"\rResetPassword\x12\x1e.admin.v1.ResetPasswordRequest\x1a\x1f.admin.v1.ResetPasswordResponse\"&\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/auth/reset-password\x12l\n" +
 	"\fListSessions\x12\x1d.admin.v1.ListSessionsRequest\x1a\x1e.admin.v1.ListSessionsResponse\"\x1d\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/auth/sessions\x12|\n" +
@@ -1819,91 +1939,99 @@ func file_admin_v1_auth_proto_rawDescGZIP() []byte {
 	return file_admin_v1_auth_proto_rawDescData
 }
 
-var file_admin_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_admin_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_admin_v1_auth_proto_goTypes = []any{
-	(*GetCaptchaRequest)(nil),      // 0: admin.v1.GetCaptchaRequest
-	(*GetCaptchaResponse)(nil),     // 1: admin.v1.GetCaptchaResponse
-	(*TenantSummary)(nil),          // 2: admin.v1.TenantSummary
-	(*CurrentUser)(nil),            // 3: admin.v1.CurrentUser
-	(*LoginRequest)(nil),           // 4: admin.v1.LoginRequest
-	(*LoginResponse)(nil),          // 5: admin.v1.LoginResponse
-	(*VerifyMfaRequest)(nil),       // 6: admin.v1.VerifyMfaRequest
-	(*VerifyMfaResponse)(nil),      // 7: admin.v1.VerifyMfaResponse
-	(*RefreshRequest)(nil),         // 8: admin.v1.RefreshRequest
-	(*RefreshResponse)(nil),        // 9: admin.v1.RefreshResponse
-	(*LogoutRequest)(nil),          // 10: admin.v1.LogoutRequest
-	(*LogoutResponse)(nil),         // 11: admin.v1.LogoutResponse
-	(*SwitchTenantRequest)(nil),    // 12: admin.v1.SwitchTenantRequest
-	(*SwitchTenantResponse)(nil),   // 13: admin.v1.SwitchTenantResponse
-	(*ForgotPasswordRequest)(nil),  // 14: admin.v1.ForgotPasswordRequest
-	(*ForgotPasswordResponse)(nil), // 15: admin.v1.ForgotPasswordResponse
-	(*ResetPasswordRequest)(nil),   // 16: admin.v1.ResetPasswordRequest
-	(*ResetPasswordResponse)(nil),  // 17: admin.v1.ResetPasswordResponse
-	(*Session)(nil),                // 18: admin.v1.Session
-	(*ListSessionsRequest)(nil),    // 19: admin.v1.ListSessionsRequest
-	(*ListSessionsResponse)(nil),   // 20: admin.v1.ListSessionsResponse
-	(*RevokeSessionRequest)(nil),   // 21: admin.v1.RevokeSessionRequest
-	(*RevokeSessionResponse)(nil),  // 22: admin.v1.RevokeSessionResponse
-	(*UpdateProfileRequest)(nil),   // 23: admin.v1.UpdateProfileRequest
-	(*UpdateProfileResponse)(nil),  // 24: admin.v1.UpdateProfileResponse
-	(*NavigationItem)(nil),         // 25: admin.v1.NavigationItem
-	(*ListNavigationRequest)(nil),  // 26: admin.v1.ListNavigationRequest
-	(*ListNavigationResponse)(nil), // 27: admin.v1.ListNavigationResponse
-	(*timestamppb.Timestamp)(nil),  // 28: google.protobuf.Timestamp
+	(*GetCaptchaRequest)(nil),         // 0: admin.v1.GetCaptchaRequest
+	(*GetCaptchaResponse)(nil),        // 1: admin.v1.GetCaptchaResponse
+	(*TenantSummary)(nil),             // 2: admin.v1.TenantSummary
+	(*CurrentUser)(nil),               // 3: admin.v1.CurrentUser
+	(*LoginRequest)(nil),              // 4: admin.v1.LoginRequest
+	(*LoginResponse)(nil),             // 5: admin.v1.LoginResponse
+	(*VerifyMfaRequest)(nil),          // 6: admin.v1.VerifyMfaRequest
+	(*VerifyMfaResponse)(nil),         // 7: admin.v1.VerifyMfaResponse
+	(*RefreshRequest)(nil),            // 8: admin.v1.RefreshRequest
+	(*RefreshResponse)(nil),           // 9: admin.v1.RefreshResponse
+	(*LogoutRequest)(nil),             // 10: admin.v1.LogoutRequest
+	(*LogoutResponse)(nil),            // 11: admin.v1.LogoutResponse
+	(*SwitchTenantRequest)(nil),       // 12: admin.v1.SwitchTenantRequest
+	(*SwitchTenantResponse)(nil),      // 13: admin.v1.SwitchTenantResponse
+	(*ForgotPasswordRequest)(nil),     // 14: admin.v1.ForgotPasswordRequest
+	(*ForgotPasswordResponse)(nil),    // 15: admin.v1.ForgotPasswordResponse
+	(*ResetPasswordRequest)(nil),      // 16: admin.v1.ResetPasswordRequest
+	(*ResetPasswordResponse)(nil),     // 17: admin.v1.ResetPasswordResponse
+	(*Session)(nil),                   // 18: admin.v1.Session
+	(*ListSessionsRequest)(nil),       // 19: admin.v1.ListSessionsRequest
+	(*ListSessionsResponse)(nil),      // 20: admin.v1.ListSessionsResponse
+	(*RevokeSessionRequest)(nil),      // 21: admin.v1.RevokeSessionRequest
+	(*RevokeSessionResponse)(nil),     // 22: admin.v1.RevokeSessionResponse
+	(*UpdateProfileRequest)(nil),      // 23: admin.v1.UpdateProfileRequest
+	(*UpdateProfileResponse)(nil),     // 24: admin.v1.UpdateProfileResponse
+	(*NavigationItem)(nil),            // 25: admin.v1.NavigationItem
+	(*ListNavigationRequest)(nil),     // 26: admin.v1.ListNavigationRequest
+	(*ListNavigationResponse)(nil),    // 27: admin.v1.ListNavigationResponse
+	(*ExitImpersonationRequest)(nil),  // 28: admin.v1.ExitImpersonationRequest
+	(*ExitImpersonationResponse)(nil), // 29: admin.v1.ExitImpersonationResponse
+	(*timestamppb.Timestamp)(nil),     // 30: google.protobuf.Timestamp
 }
 var file_admin_v1_auth_proto_depIdxs = []int32{
-	28, // 0: admin.v1.GetCaptchaResponse.expires_at:type_name -> google.protobuf.Timestamp
-	28, // 1: admin.v1.LoginResponse.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 0: admin.v1.GetCaptchaResponse.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 1: admin.v1.LoginResponse.expires_at:type_name -> google.protobuf.Timestamp
 	3,  // 2: admin.v1.LoginResponse.user:type_name -> admin.v1.CurrentUser
 	2,  // 3: admin.v1.LoginResponse.tenants:type_name -> admin.v1.TenantSummary
 	2,  // 4: admin.v1.LoginResponse.current_tenant:type_name -> admin.v1.TenantSummary
-	28, // 5: admin.v1.VerifyMfaResponse.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 5: admin.v1.VerifyMfaResponse.expires_at:type_name -> google.protobuf.Timestamp
 	3,  // 6: admin.v1.VerifyMfaResponse.user:type_name -> admin.v1.CurrentUser
 	2,  // 7: admin.v1.VerifyMfaResponse.tenants:type_name -> admin.v1.TenantSummary
 	2,  // 8: admin.v1.VerifyMfaResponse.current_tenant:type_name -> admin.v1.TenantSummary
-	28, // 9: admin.v1.RefreshResponse.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 9: admin.v1.RefreshResponse.expires_at:type_name -> google.protobuf.Timestamp
 	3,  // 10: admin.v1.RefreshResponse.user:type_name -> admin.v1.CurrentUser
 	2,  // 11: admin.v1.RefreshResponse.tenants:type_name -> admin.v1.TenantSummary
 	2,  // 12: admin.v1.RefreshResponse.current_tenant:type_name -> admin.v1.TenantSummary
-	28, // 13: admin.v1.SwitchTenantResponse.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 13: admin.v1.SwitchTenantResponse.expires_at:type_name -> google.protobuf.Timestamp
 	2,  // 14: admin.v1.SwitchTenantResponse.current_tenant:type_name -> admin.v1.TenantSummary
 	3,  // 15: admin.v1.SwitchTenantResponse.user:type_name -> admin.v1.CurrentUser
 	2,  // 16: admin.v1.SwitchTenantResponse.tenants:type_name -> admin.v1.TenantSummary
-	28, // 17: admin.v1.ForgotPasswordResponse.expires_at:type_name -> google.protobuf.Timestamp
-	28, // 18: admin.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	28, // 19: admin.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 17: admin.v1.ForgotPasswordResponse.expires_at:type_name -> google.protobuf.Timestamp
+	30, // 18: admin.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	30, // 19: admin.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
 	18, // 20: admin.v1.ListSessionsResponse.items:type_name -> admin.v1.Session
 	3,  // 21: admin.v1.UpdateProfileResponse.user:type_name -> admin.v1.CurrentUser
 	25, // 22: admin.v1.ListNavigationResponse.items:type_name -> admin.v1.NavigationItem
-	0,  // 23: admin.v1.AuthService.GetCaptcha:input_type -> admin.v1.GetCaptchaRequest
-	4,  // 24: admin.v1.AuthService.Login:input_type -> admin.v1.LoginRequest
-	6,  // 25: admin.v1.AuthService.VerifyMfa:input_type -> admin.v1.VerifyMfaRequest
-	8,  // 26: admin.v1.AuthService.Refresh:input_type -> admin.v1.RefreshRequest
-	10, // 27: admin.v1.AuthService.Logout:input_type -> admin.v1.LogoutRequest
-	12, // 28: admin.v1.AuthService.SwitchTenant:input_type -> admin.v1.SwitchTenantRequest
-	14, // 29: admin.v1.AuthService.ForgotPassword:input_type -> admin.v1.ForgotPasswordRequest
-	16, // 30: admin.v1.AuthService.ResetPassword:input_type -> admin.v1.ResetPasswordRequest
-	19, // 31: admin.v1.AuthService.ListSessions:input_type -> admin.v1.ListSessionsRequest
-	21, // 32: admin.v1.AuthService.RevokeSession:input_type -> admin.v1.RevokeSessionRequest
-	23, // 33: admin.v1.AuthService.UpdateProfile:input_type -> admin.v1.UpdateProfileRequest
-	26, // 34: admin.v1.AuthService.ListNavigation:input_type -> admin.v1.ListNavigationRequest
-	1,  // 35: admin.v1.AuthService.GetCaptcha:output_type -> admin.v1.GetCaptchaResponse
-	5,  // 36: admin.v1.AuthService.Login:output_type -> admin.v1.LoginResponse
-	7,  // 37: admin.v1.AuthService.VerifyMfa:output_type -> admin.v1.VerifyMfaResponse
-	9,  // 38: admin.v1.AuthService.Refresh:output_type -> admin.v1.RefreshResponse
-	11, // 39: admin.v1.AuthService.Logout:output_type -> admin.v1.LogoutResponse
-	13, // 40: admin.v1.AuthService.SwitchTenant:output_type -> admin.v1.SwitchTenantResponse
-	15, // 41: admin.v1.AuthService.ForgotPassword:output_type -> admin.v1.ForgotPasswordResponse
-	17, // 42: admin.v1.AuthService.ResetPassword:output_type -> admin.v1.ResetPasswordResponse
-	20, // 43: admin.v1.AuthService.ListSessions:output_type -> admin.v1.ListSessionsResponse
-	22, // 44: admin.v1.AuthService.RevokeSession:output_type -> admin.v1.RevokeSessionResponse
-	24, // 45: admin.v1.AuthService.UpdateProfile:output_type -> admin.v1.UpdateProfileResponse
-	27, // 46: admin.v1.AuthService.ListNavigation:output_type -> admin.v1.ListNavigationResponse
-	35, // [35:47] is the sub-list for method output_type
-	23, // [23:35] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	30, // 23: admin.v1.ExitImpersonationResponse.expires_at:type_name -> google.protobuf.Timestamp
+	3,  // 24: admin.v1.ExitImpersonationResponse.user:type_name -> admin.v1.CurrentUser
+	2,  // 25: admin.v1.ExitImpersonationResponse.tenants:type_name -> admin.v1.TenantSummary
+	2,  // 26: admin.v1.ExitImpersonationResponse.current_tenant:type_name -> admin.v1.TenantSummary
+	0,  // 27: admin.v1.AuthService.GetCaptcha:input_type -> admin.v1.GetCaptchaRequest
+	4,  // 28: admin.v1.AuthService.Login:input_type -> admin.v1.LoginRequest
+	6,  // 29: admin.v1.AuthService.VerifyMfa:input_type -> admin.v1.VerifyMfaRequest
+	8,  // 30: admin.v1.AuthService.Refresh:input_type -> admin.v1.RefreshRequest
+	10, // 31: admin.v1.AuthService.Logout:input_type -> admin.v1.LogoutRequest
+	12, // 32: admin.v1.AuthService.SwitchTenant:input_type -> admin.v1.SwitchTenantRequest
+	28, // 33: admin.v1.AuthService.ExitImpersonation:input_type -> admin.v1.ExitImpersonationRequest
+	14, // 34: admin.v1.AuthService.ForgotPassword:input_type -> admin.v1.ForgotPasswordRequest
+	16, // 35: admin.v1.AuthService.ResetPassword:input_type -> admin.v1.ResetPasswordRequest
+	19, // 36: admin.v1.AuthService.ListSessions:input_type -> admin.v1.ListSessionsRequest
+	21, // 37: admin.v1.AuthService.RevokeSession:input_type -> admin.v1.RevokeSessionRequest
+	23, // 38: admin.v1.AuthService.UpdateProfile:input_type -> admin.v1.UpdateProfileRequest
+	26, // 39: admin.v1.AuthService.ListNavigation:input_type -> admin.v1.ListNavigationRequest
+	1,  // 40: admin.v1.AuthService.GetCaptcha:output_type -> admin.v1.GetCaptchaResponse
+	5,  // 41: admin.v1.AuthService.Login:output_type -> admin.v1.LoginResponse
+	7,  // 42: admin.v1.AuthService.VerifyMfa:output_type -> admin.v1.VerifyMfaResponse
+	9,  // 43: admin.v1.AuthService.Refresh:output_type -> admin.v1.RefreshResponse
+	11, // 44: admin.v1.AuthService.Logout:output_type -> admin.v1.LogoutResponse
+	13, // 45: admin.v1.AuthService.SwitchTenant:output_type -> admin.v1.SwitchTenantResponse
+	29, // 46: admin.v1.AuthService.ExitImpersonation:output_type -> admin.v1.ExitImpersonationResponse
+	15, // 47: admin.v1.AuthService.ForgotPassword:output_type -> admin.v1.ForgotPasswordResponse
+	17, // 48: admin.v1.AuthService.ResetPassword:output_type -> admin.v1.ResetPasswordResponse
+	20, // 49: admin.v1.AuthService.ListSessions:output_type -> admin.v1.ListSessionsResponse
+	22, // 50: admin.v1.AuthService.RevokeSession:output_type -> admin.v1.RevokeSessionResponse
+	24, // 51: admin.v1.AuthService.UpdateProfile:output_type -> admin.v1.UpdateProfileResponse
+	27, // 52: admin.v1.AuthService.ListNavigation:output_type -> admin.v1.ListNavigationResponse
+	40, // [40:53] is the sub-list for method output_type
+	27, // [27:40] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_admin_v1_auth_proto_init() }
@@ -1917,7 +2045,7 @@ func file_admin_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_admin_v1_auth_proto_rawDesc), len(file_admin_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -28,7 +28,7 @@ func NewFileRepository(data *Data) *FileRepository {
 func (r *FileRepository) Create(ctx context.Context, record filebiz.Record) error {
 	return r.q.Transaction(func(tx *query.Query) error {
 		row := &model.File{
-			ID: record.ID, TenantID: record.TenantID, UploaderMemberID: record.UploaderMemberID,
+			ID: record.ID, TenantID: record.TenantID, UploaderID: record.UploaderID,
 			ProviderName: record.ProviderName, ObjectKey: record.ObjectKey, OriginalName: record.OriginalName,
 			ContentType: record.ContentType, SizeBytes: uint64(record.Size), SHA256: record.SHA256,
 			Status: record.Status, CreatedAt: record.CreatedAt, UpdatedAt: record.CreatedAt,
@@ -37,7 +37,7 @@ func (r *FileRepository) Create(ctx context.Context, record filebiz.Record) erro
 			return err
 		}
 		return writeAuditOutboxGen(ctx, tx, managementbiz.Scope{
-			TenantID: record.TenantID, MemberID: record.UploaderMemberID,
+			TenantID: record.TenantID, MemberID: record.UploaderID,
 		}, "create-upload", "files", record.ID, map[string]any{
 			"provider_name": record.ProviderName, "object_key": record.ObjectKey,
 			"original_name": record.OriginalName, "content_type": record.ContentType, "size_bytes": record.Size,
@@ -53,7 +53,7 @@ func (r *FileRepository) Find(ctx context.Context, tenantID uint64, fileID strin
 		return filebiz.Record{}, err
 	}
 	return filebiz.Record{
-		ID: row.ID, TenantID: row.TenantID, UploaderMemberID: row.UploaderMemberID,
+		ID: row.ID, TenantID: row.TenantID, UploaderID: row.UploaderID,
 		ProviderName: row.ProviderName, ObjectKey: row.ObjectKey, OriginalName: row.OriginalName,
 		ContentType: row.ContentType, Size: int64(row.SizeBytes), SHA256: row.SHA256, ETag: row.ETag,
 		Status: row.Status, CreatedAt: row.CreatedAt,

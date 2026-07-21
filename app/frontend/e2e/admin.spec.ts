@@ -170,7 +170,7 @@ test('管理员核心链路：登录、租户、权限、日志、文件和会�
     if (!(await checkbox.locator('input').isChecked())) await checkbox.click()
   }
   await page.getByRole('button', { name: '保存并生效' }).click()
-  await expect(page.getByText(/角色授权与数据范围已生效/)).toBeVisible()
+  await expect(page.getByText(/角色授权已生效/)).toBeVisible()
 
   await createBackgroundSession(request)
   await page.goto('/account')

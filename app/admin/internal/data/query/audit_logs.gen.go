@@ -59,7 +59,7 @@ type auditLog struct {
 	EventID        field.String // 来源Outbox事件UUID
 	TenantID       field.Uint64 // 所属租户ID，0表示平台域
 	UserID         field.Uint64 // 操作用户ID，系统任务为0
-	MemberID       field.Uint64 // 操作成员ID，平台域或系统任务为0
+	MemberID       field.Uint64 // 兼容字段，阶段1固定为0
 	ImpersonatorID field.Uint64 // 代维平台管理员ID，非代维为0
 	Action         field.String // 业务动作
 	ResourceType   field.String // 资源类型

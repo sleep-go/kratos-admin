@@ -11,7 +11,7 @@ type CasbinRule struct {
 	ID    uint64 `gorm:"column:id;type:bigint unsigned;primaryKey;autoIncrement:true;comment:Casbin策略主键" json:"id"`                                                                             // Casbin策略主键
 	Ptype string `gorm:"column:ptype;type:varchar(16);not null;uniqueIndex:uk_casbin_rules_policy,priority:1;index:idx_casbin_rules_domain,priority:2;comment:策略类型：p资源策略，g角色继承策略" json:"ptype"` // 策略类型：p资源策略，g角色继承策略
 	V0    string `gorm:"column:v0;type:varchar(191);not null;uniqueIndex:uk_casbin_rules_policy,priority:2;index:idx_casbin_rules_domain,priority:1;comment:策略值0：租户域ID" json:"v0"`              // 策略值0：租户域ID
-	V1    string `gorm:"column:v1;type:varchar(191);not null;uniqueIndex:uk_casbin_rules_policy,priority:3;comment:策略值1：角色或成员ID" json:"v1"`                                                     // 策略值1：角色或成员ID
+	V1    string `gorm:"column:v1;type:varchar(191);not null;uniqueIndex:uk_casbin_rules_policy,priority:3;comment:策略值1：角色或主体ID" json:"v1"`                                                     // 策略值1：角色或主体ID
 	V2    string `gorm:"column:v2;type:varchar(191);not null;uniqueIndex:uk_casbin_rules_policy,priority:4;comment:策略值2：资源编码或角色ID" json:"v2"`                                                   // 策略值2：资源编码或角色ID
 	V3    string `gorm:"column:v3;type:varchar(191);not null;uniqueIndex:uk_casbin_rules_policy,priority:5;comment:策略值3：资源动作" json:"v3"`                                                        // 策略值3：资源动作
 	V4    string `gorm:"column:v4;type:varchar(191);not null;uniqueIndex:uk_casbin_rules_policy,priority:6;comment:策略值4：预留" json:"v4"`                                                          // 策略值4：预留

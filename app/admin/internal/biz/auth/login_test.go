@@ -11,7 +11,7 @@ import (
 
 type fakeUserRepository struct {
 	user          *User
-	memberships   []Membership
+	tenant        TenantOption
 	failureCount  uint32
 	lockedUntil   *time.Time
 	resetFailures bool
@@ -34,15 +34,9 @@ func (r *fakeUserRepository) FindByID(_ context.Context, _ uint64) (*User, error
 	return r.FindByIdentifier(context.Background(), "")
 }
 
-func (r *fakeUserRepository) ListMemberships(_ context.Context, _ uint64) ([]Membership, error) {
-	return r.memberships, nil
-}
-
 func (r *fakeUserRepository) FindTenant(_ context.Context, tenantID uint64) (TenantOption, error) {
-	for _, membership := range r.memberships {
-		if membership.TenantID == tenantID {
-			return TenantOption{ID: membership.TenantID, Name: membership.TenantName}, nil
-		}
+	if r.tenant.ID == tenantID {
+		return r.tenant, nil
 	}
 	return TenantOption{}, ErrNoTenantMembership
 }
@@ -79,8 +73,8 @@ func TestLoginCreatesTenantBoundSession(t *testing.T) {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
 	users := &fakeUserRepository{
-		user:        &User{ID: 100, PasswordHash: passwordHash, Status: UserStatusEnabled},
-		memberships: []Membership{{ID: 300, TenantID: 200, TenantName: "示例租户", Status: MembershipStatusEnabled, PermissionVersion: 9}},
+		user:        &User{ID: 100, TenantID: 200, PasswordHash: passwordHash, Status: UserStatusEnabled},
+		tenant:      TenantOption{ID: 200, Name: "示例租户", PermissionVersion: 9},
 		permissions: []string{"roles:list", "roles:update"},
 	}
 	sessions := &fakeSessionRepository{}
@@ -96,7 +90,7 @@ func TestLoginCreatesTenantBoundSession(t *testing.T) {
 	if result.Tokens.AccessToken == "" || result.Tokens.RefreshToken == "" {
 		t.Fatal("Login() must issue access and refresh tokens")
 	}
-	if sessions.session.UserID != 100 || sessions.session.TenantID != 200 || sessions.session.MemberID != 300 {
+	if sessions.session.UserID != 100 || sessions.session.TenantID != 200 || sessions.session.MemberID != 100 {
 		t.Fatalf("session = %+v", sessions.session)
 	}
 	if sessions.session.RefreshJTIHash != HashJTI(result.Tokens.RefreshJTI) {
@@ -145,7 +139,7 @@ func TestPlatformAdminCanLoginWithoutTenantMembership(t *testing.T) {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
 	admins := &fakePlatformAdminRepository{admin: &PlatformAdmin{
-		ID: 1, PasswordHash: passwordHash, Status: UserStatusEnabled,
+		ID: 1, IsSuperAdmin: true, PasswordHash: passwordHash, Status: UserStatusEnabled,
 	}}
 	sessions := &fakeSessionRepository{}
 	usecase := NewPlatformLoginUsecase(admins, sessions, hasher, NewTokenManager(privateKey, 15*time.Minute, 7*24*time.Hour, func() time.Time { return now }), func() time.Time { return now })
@@ -173,6 +167,13 @@ func (r *fakePlatformAdminRepository) FindByIdentifier(_ context.Context, _ stri
 
 func (r *fakePlatformAdminRepository) FindByID(_ context.Context, _ uint64) (*PlatformAdmin, error) {
 	return r.FindByIdentifier(context.Background(), "")
+}
+
+func (r *fakePlatformAdminRepository) ListPermissions(_ context.Context, _ uint64) ([]string, error) {
+	if r.admin != nil && r.admin.IsSuperAdmin {
+		return []string{"*:*"}, nil
+	}
+	return nil, nil
 }
 
 func (r *fakePlatformAdminRepository) UpdateLoginFailure(_ context.Context, _ uint64, _ uint32, _ *time.Time) error {

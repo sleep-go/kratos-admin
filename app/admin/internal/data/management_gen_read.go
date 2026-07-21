@@ -27,26 +27,22 @@ func newManagementReadQuery(ctx context.Context, q *query.Query, resource string
 	}
 	var dao gen.Dao
 	switch resource {
-	case "users":
-		dao = q.User.WithContext(ctx).As(definition.table)
+	case "app-users":
+		dao = q.AppUser.WithContext(ctx).As(definition.table)
+	case "platform-admins":
+		dao = q.PlatformAdmin.WithContext(ctx).As(definition.table)
+	case "tenant-admins":
+		dao = q.TenantAdmin.WithContext(ctx).As(definition.table)
 	case "tenants":
 		dao = q.Tenant.WithContext(ctx).As(definition.table)
-	case "members":
-		dao = q.TenantMember.WithContext(ctx).As(definition.table)
-	case "departments":
-		dao = q.Department.WithContext(ctx).As(definition.table)
-	case "positions":
-		dao = q.Position.WithContext(ctx).As(definition.table)
-	case "roles":
+	case "roles", "platform-roles":
 		dao = q.Role.WithContext(ctx).As(definition.table)
 	case "resources":
 		dao = q.Resource.WithContext(ctx).As(definition.table)
 	case "tenant-resources":
 		dao = q.TenantResource.WithContext(ctx).As(definition.table)
-	case "casbin-rules":
+	case "casbin-rules", "platform-casbin-rules":
 		dao = q.CasbinRule.WithContext(ctx).As(definition.table)
-	case "role-scope-departments":
-		dao = q.RoleScopeDepartment.WithContext(ctx).As(definition.table)
 	case "login-logs":
 		dao = q.LoginLog.WithContext(ctx).As(definition.table)
 	case "audit-logs":
@@ -88,6 +84,20 @@ func (q managementReadQuery) field(name string) field.Field {
 	return field.NewField(q.table, name)
 }
 
+func isLogResource(resource string) bool {
+	switch resource {
+	case "audit-logs", "login-logs", "api-logs", "log-exports":
+		return true
+	default:
+		return false
+	}
+}
+
+// isPlatformLogScope 表示平台域直接上下文，可查询 tenant_id=0 的日志。
+func isPlatformLogScope(scope managementbiz.Scope) bool {
+	return scope.PlatformAdmin && scope.TenantID == 0 && !scope.Impersonating
+}
+
 func (r *ManagementRepository) scopedManagementRead(ctx context.Context, scope managementbiz.Scope, resource string) (managementReadQuery, error) {
 	if err := validatePlatformTargetTenantGen(ctx, r.gen(), scope); err != nil {
 		return managementReadQuery{}, err
@@ -97,7 +107,17 @@ func (r *ManagementRepository) scopedManagementRead(ctx context.Context, scope m
 	if err != nil {
 		return managementReadQuery{}, err
 	}
-	if definition.tenantScoped && (scope.TenantID != 0 || resource == "settings" || resource == "providers") {
+	if isLogResource(resource) {
+		tenantID := scope.TenantID
+		if isPlatformLogScope(scope) {
+			tenantID = 0
+		}
+		read.dao = read.dao.Where(read.field("tenant_id").Eq(managementSQLValue{tenantID}))
+	} else if resource == "platform-roles" {
+		read.dao = read.dao.Where(read.field("tenant_id").Eq(managementSQLValue{uint64(0)}))
+	} else if resource == "platform-casbin-rules" {
+		read.dao = read.dao.Where(read.field("v0").Eq(managementSQLValue{"0"}))
+	} else if definition.tenantScoped && (scope.TenantID != 0 || resource == "settings" || resource == "providers") {
 		read.dao = read.dao.Where(read.field(definition.tenantColumn).Eq(managementSQLValue{scope.TenantID}))
 	}
 	if definition.softDelete {
@@ -107,64 +127,8 @@ func (r *ManagementRepository) scopedManagementRead(ctx context.Context, scope m
 	return read, err
 }
 
-func (r *ManagementRepository) applyDataScopeGen(ctx context.Context, dao gen.Dao, scope managementbiz.Scope, resource string, read managementReadQuery) (gen.Dao, error) {
-	switch resource {
-	case "members", "departments", "files", "audit-logs", "login-logs", "api-logs":
-	default:
-		return dao, nil
-	}
-	resolved, err := r.resolveDataScope(ctx, scope)
-	if err != nil {
-		return nil, err
-	}
-	if resolved.All {
-		return dao, nil
-	}
-	if resolved.SelfOnly {
-		switch resource {
-		case "members":
-			return dao.Where(read.field("id").Eq(managementSQLValue{scope.MemberID})), nil
-		case "departments":
-			return dao.Where(read.field("id").Eq(managementSQLValue{resolved.PrimaryDepartmentID})), nil
-		case "files":
-			return dao.Where(read.field("uploader_member_id").Eq(managementSQLValue{scope.MemberID})), nil
-		case "audit-logs":
-			return dao.Where(read.field("member_id").Eq(managementSQLValue{scope.MemberID})), nil
-		case "login-logs", "api-logs":
-			return dao.Where(read.field("user_id").Eq(managementSQLValue{scope.UserID})), nil
-		}
-	}
-	departmentIDs := resolved.DepartmentIDs
-	if len(departmentIDs) == 0 {
-		return dao.Where(read.field("id").Eq(managementSQLValue{uint64(0)})), nil
-	}
-	member := r.gen().TenantMember
-	members, err := member.WithContext(ctx).Select(member.ID, member.UserID).Where(
-		member.TenantID.Eq(scope.TenantID), member.PrimaryDepartmentID.In(departmentIDs...), member.DeletedAt.IsNull(),
-	).Find()
-	if err != nil {
-		return nil, err
-	}
-	memberIDs := make([]driver.Valuer, 0, len(members))
-	userIDs := make([]driver.Valuer, 0, len(members))
-	for _, memberRow := range members {
-		memberIDs = append(memberIDs, managementSQLValue{memberRow.ID})
-		userIDs = append(userIDs, managementSQLValue{memberRow.UserID})
-	}
-	switch resource {
-	case "members":
-		dao = dao.Where(read.field("primary_department_id").In(managementSQLValues(departmentIDs)...))
-	case "departments":
-		dao = dao.Where(read.field("id").In(managementSQLValues(departmentIDs)...))
-	case "files", "audit-logs":
-		column := "uploader_member_id"
-		if resource == "audit-logs" {
-			column = "member_id"
-		}
-		dao = dao.Where(read.field(column).In(memberIDs...))
-	case "login-logs", "api-logs":
-		dao = dao.Where(read.field("user_id").In(userIDs...))
-	}
+func (r *ManagementRepository) applyDataScopeGen(_ context.Context, dao gen.Dao, _ managementbiz.Scope, _ string, _ managementReadQuery) (gen.Dao, error) {
+	// 阶段 1 数据范围固定为全部，不再按部门过滤。
 	return dao, nil
 }
 
@@ -187,6 +151,17 @@ func managementSQLValues(values []uint64) []driver.Valuer {
 	return result
 }
 
+func resourceScopeMasks(scopeSide string) ([]uint64, bool) {
+	switch scopeSide {
+	case "platform":
+		return []uint64{1, 3}, true
+	case "tenant":
+		return []uint64{2, 3}, true
+	default:
+		return nil, false
+	}
+}
+
 func applyManagementPage(read managementReadQuery, definition resourceDefinition, page managementbiz.PageQuery) gen.Dao {
 	dao := read.dao
 	if page.Keyword != "" && len(definition.keywordFields) > 0 {
@@ -197,6 +172,12 @@ func applyManagementPage(read managementReadQuery, definition resourceDefinition
 		dao = dao.Where(field.Or(conditions...))
 	}
 	for name, value := range page.Filters {
+		if name == "scope_side" && definition.table == "resources" {
+			if scopeMasks, ok := resourceScopeMasks(value); ok {
+				dao = dao.Where(read.field("scope_mask").In(managementSQLValues(scopeMasks)...))
+			}
+			continue
+		}
 		if _, allowed := definition.filterFields[name]; allowed {
 			dao = dao.Where(read.field(name).Eq(managementSQLValue{value}))
 		}

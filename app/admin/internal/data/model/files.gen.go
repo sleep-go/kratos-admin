@@ -16,7 +16,7 @@ const TableNameFile = "files"
 type File struct {
 	ID                   string         `gorm:"column:id;type:char(36);primaryKey;comment:文件UUID" json:"id"`                                                                                                                        // 文件UUID
 	TenantID             uint64         `gorm:"column:tenant_id;type:bigint unsigned;not null;index:idx_files_tenant,priority:1;comment:所属租户ID" json:"tenant_id"`                                                                   // 所属租户ID
-	UploaderMemberID     uint64         `gorm:"column:uploader_member_id;type:bigint unsigned;not null;comment:上传成员ID" json:"uploader_member_id"`                                                                                   // 上传成员ID
+	UploaderID           uint64         `gorm:"column:uploader_id;type:bigint unsigned;not null;comment:上传者ID（租户管理员或App用户）" json:"uploader_id"`                                                                                     // 上传者ID（租户管理员或App用户）
 	ProviderName         string         `gorm:"column:provider_name;type:varchar(64);not null;uniqueIndex:uk_files_provider_object,priority:1;comment:存储Provider名称" json:"provider_name"`                                           // 存储Provider名称
 	ObjectKey            string         `gorm:"column:object_key;type:varchar(512);not null;uniqueIndex:uk_files_provider_object,priority:2;comment:对象存储键" json:"object_key"`                                                       // 对象存储键
 	OriginalName         string         `gorm:"column:original_name;type:varchar(255);not null;comment:原始文件名" json:"original_name"`                                                                                                 // 原始文件名

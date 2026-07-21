@@ -15,10 +15,12 @@ const props = withDefaults(
     userName: string
     showTenantSwitcher?: boolean
     accountPath?: string
+    logoutLabel?: string
   }>(),
   {
     showTenantSwitcher: true,
-    accountPath: '/console/account'
+    accountPath: '/console/account',
+    logoutLabel: '退出'
   }
 )
 
@@ -106,7 +108,7 @@ const emit = defineEmits<{
       </RouterLink>
       <button class="logout-button" type="button" @click="emit('logout')">
         <el-icon :size="14"><SwitchButton /></el-icon>
-        退出
+        {{ logoutLabel }}
       </button>
     </div>
 

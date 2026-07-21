@@ -73,6 +73,11 @@ export async function switchTenant(tenantId: string): Promise<SwitchTenantRespon
   return response.data
 }
 
+export async function exitImpersonation(): Promise<RefreshResponse> {
+  const response = await http.post<RefreshResponse>('/auth/exit-impersonation', {})
+  return response.data
+}
+
 export async function impersonate(tenantId: string): Promise<LoginResponse> {
   const response = await http.post<LoginResponse>('/platform/auth/impersonate', { tenantId })
   return response.data

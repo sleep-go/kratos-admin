@@ -55,10 +55,10 @@ type authSession struct {
 
 	ALL               field.Asterisk
 	ID                field.String // 会话UUID
-	Realm             field.String // 认证域：platform平台，tenant租户
-	UserID            field.Uint64 // 主体ID：平台域为platform_admin.id，租户域为user.id
+	Realm             field.String // 认证域：platform平台，tenant租户，app应用
+	UserID            field.Uint64 // 主体ID：platform=platform_admin.id，tenant=tenant_admin.id，app=app_user.id
 	TenantID          field.Uint64 // 当前租户ID，平台域为0
-	MemberID          field.Uint64 // 当前租户成员ID，平台域或代维会话为0
+	MemberID          field.Uint64 // 兼容字段，阶段1固定为0
 	ImpersonatorID    field.Uint64 // 代维平台管理员ID，非代维为0
 	PermissionVersion field.Uint64 // 会话最近一次签发时的权限版本号
 	RefreshJTIHash    field.String // Refresh JWT jti的SHA256摘要

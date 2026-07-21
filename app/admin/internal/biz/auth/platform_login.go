@@ -14,6 +14,7 @@ type PlatformAdmin struct {
 	AvatarURL        string
 	Email            string
 	Phone            string
+	IsSuperAdmin     bool
 	MFAEnabled       bool
 	MFAChannel       string
 	PasswordHash     string
@@ -35,6 +36,7 @@ func (a PlatformAdmin) toProfile(permissions []string) UserProfile {
 type PlatformAdminRepository interface {
 	FindByIdentifier(ctx context.Context, identifier string) (*PlatformAdmin, error)
 	FindByID(ctx context.Context, adminID uint64) (*PlatformAdmin, error)
+	ListPermissions(ctx context.Context, adminID uint64) ([]string, error)
 	UpdateLoginFailure(ctx context.Context, adminID uint64, count uint32, lockedUntil *time.Time) error
 	ResetLoginFailures(ctx context.Context, adminID uint64) error
 }
@@ -79,6 +81,10 @@ func (u *PlatformLoginUsecase) Login(ctx context.Context, input LoginInput) (Log
 		}
 		return LoginResult{}, ErrInvalidCredentials
 	}
+	permissions, err := u.admins.ListPermissions(ctx, admin.ID)
+	if err != nil {
+		return LoginResult{}, fmt.Errorf("加载平台管理员权限失败: %w", err)
+	}
 	sessionID, err := randomTokenID()
 	if err != nil {
 		return LoginResult{}, err
@@ -108,7 +114,7 @@ func (u *PlatformLoginUsecase) Login(ctx context.Context, input LoginInput) (Log
 	}
 	return LoginResult{
 		Tokens:        tokens,
-		User:          admin.toProfile([]string{"*:*"}),
+		User:          admin.toProfile(permissions),
 		CurrentTenant: TenantOption{Name: "平台管理"},
 	}, nil
 }

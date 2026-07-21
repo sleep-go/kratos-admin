@@ -22,7 +22,7 @@ func TestModelNameForTable(t *testing.T) {
 		{table: "api_access_logs", model: "APIAccessLog"},
 		{table: "auth_sessions", model: "AuthSession"},
 		{table: "casbin_rules", model: "CasbinRule"},
-		{table: "tenant_members", model: "TenantMember"},
+		{table: "tenant_admins", model: "TenantAdmin"},
 	}
 	for _, test := range tests {
 		t.Run(test.table, func(t *testing.T) {
@@ -36,7 +36,7 @@ func TestModelNameForTable(t *testing.T) {
 func TestModelTypeForBooleanColumns(t *testing.T) {
 	columns := []string{
 		"mfa_enabled",
-		"is_tenant_admin",
+		"is_super_admin",
 		"visible",
 		"is_secret",
 		"allow_tenant_override",

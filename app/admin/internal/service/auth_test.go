@@ -79,6 +79,9 @@ func (h *fakeSessionHandler) ProfileByRealm(_ context.Context, _, _ uint64, real
 func (h *fakeSessionHandler) SwitchTenant(context.Context, string, uint64) (bizauth.SwitchTenantResult, error) {
 	return bizauth.SwitchTenantResult{}, nil
 }
+func (h *fakeSessionHandler) ExitImpersonation(context.Context, string) (bizauth.RefreshResult, error) {
+	return bizauth.RefreshResult{}, nil
+}
 func (h *fakeSessionHandler) Logout(context.Context, string) error { return nil }
 func (h *fakeSessionHandler) List(_ context.Context, _ uint64, _ bizauth.Realm, _ string) ([]bizauth.DeviceSession, error) {
 	return h.sessions, nil

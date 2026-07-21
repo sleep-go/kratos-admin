@@ -127,10 +127,17 @@ func (s *FileService) RemoveReference(ctx context.Context, request *v1.RemoveRef
 
 func (s *FileService) fileScope(ctx context.Context, action, fileID string) (managementbiz.Scope, error) {
 	claims, ok := bizauth.ClaimsFromContext(ctx)
-	if !ok || claims.TenantID == 0 || claims.MemberID == 0 {
+	if !ok || claims.TenantID == 0 {
 		return managementbiz.Scope{}, kratoserrors.Unauthorized("TENANT_AUTH_REQUIRED", "请先进入租户")
 	}
-	scope := managementbiz.Scope{TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID}
+	impersonating := claims.ImpersonatorID > 0
+	if !impersonating && claims.MemberID == 0 {
+		return managementbiz.Scope{}, kratoserrors.Unauthorized("TENANT_AUTH_REQUIRED", "请先进入租户")
+	}
+	scope := managementbiz.Scope{
+		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID,
+		Impersonating: impersonating,
+	}
 	if s.permissions != nil {
 		allowed, err := s.permissions.Allowed(ctx, scope, "files", action)
 		if err != nil {
