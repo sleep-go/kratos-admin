@@ -125,7 +125,7 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 	if err != nil || len(permissions) != 2 || permissions[0] != "integration-audit-logs:list" || permissions[1] != "integration-menu:list" {
 		t.Fatalf("ListPermissions() = %+v, %v", permissions, err)
 	}
-	allowed, err := (&ManagementRepository{db: tx}).Allowed(context.Background(), managementbiz.Scope{
+	allowed, err := (&ManagementRepository{q: query.Use(tx)}).Allowed(context.Background(), managementbiz.Scope{
 		TenantID: tenant.ID, UserID: user.ID, MemberID: member.ID,
 	}, "integration-audit-logs", "list")
 	if err != nil || !allowed {

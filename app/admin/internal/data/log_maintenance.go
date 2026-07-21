@@ -7,7 +7,10 @@ import (
 	"strconv"
 	"time"
 
+	"gorm.io/gen"
 	"gorm.io/gorm"
+
+	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 const logCleanupBatchSize = 1000
@@ -29,22 +32,30 @@ type LogCleanupResult struct {
 }
 
 // LogMaintenanceRepository 按平台配置分批清理到期日志。
-type LogMaintenanceRepository struct{ db *gorm.DB }
+type LogMaintenanceRepository struct {
+	db *gorm.DB
+	q  *query.Query
+}
 
 // NewLogMaintenanceRepository 创建日志保留策略仓储。
 func NewLogMaintenanceRepository(data *Data) *LogMaintenanceRepository {
-	return &LogMaintenanceRepository{db: data.DB}
+	return &LogMaintenanceRepository{db: data.DB, q: data.Query}
+}
+
+func (r *LogMaintenanceRepository) gen() *query.Query {
+	if r.q != nil {
+		return r.q
+	}
+	return query.Use(r.db)
 }
 
 // Retention 返回代码安全默认值与平台覆盖值合并后的保留策略。
 func (r *LogMaintenanceRepository) Retention(ctx context.Context) (LogRetention, error) {
 	retention := LogRetention{AuditDays: 365, LoginDays: 180, APIDays: 30}
-	var rows []struct {
-		SettingKey   string
-		SettingValue []byte
-	}
-	if err := r.db.WithContext(ctx).Table("system_settings").
-		Select("setting_key, setting_value").Where("tenant_id = 0 AND category = ?", "logs").Find(&rows).Error; err != nil {
+	s := r.gen().SystemSetting
+	rows, err := s.WithContext(ctx).Select(s.SettingKey, s.SettingValue).
+		Where(s.TenantID.Eq(0), s.Category.Eq("logs")).Find()
+	if err != nil {
 		return LogRetention{}, err
 	}
 	for _, row := range rows {
@@ -87,19 +98,27 @@ func (r *LogMaintenanceRepository) cleanupUnlocked(ctx context.Context, now time
 	}
 	result := LogCleanupResult{}
 	for _, target := range []struct {
-		table string
-		days  uint32
-		set   func(uint64)
+		days   uint32
+		delete func(time.Time) (gen.ResultInfo, error)
+		set    func(uint64)
 	}{
-		{table: "audit_logs", days: retention.AuditDays, set: func(value uint64) { result.Audit = value }},
-		{table: "login_logs", days: retention.LoginDays, set: func(value uint64) { result.Login = value }},
-		{table: "api_access_logs", days: retention.APIDays, set: func(value uint64) { result.API = value }},
+		{days: retention.AuditDays, delete: func(cutoff time.Time) (gen.ResultInfo, error) {
+			t := r.gen().AuditLog
+			return t.WithContext(ctx).Where(t.CreatedAt.Lt(cutoff)).Order(t.CreatedAt.Asc()).Limit(logCleanupBatchSize).Delete()
+		}, set: func(value uint64) { result.Audit = value }},
+		{days: retention.LoginDays, delete: func(cutoff time.Time) (gen.ResultInfo, error) {
+			t := r.gen().LoginLog
+			return t.WithContext(ctx).Where(t.CreatedAt.Lt(cutoff)).Order(t.CreatedAt.Asc()).Limit(logCleanupBatchSize).Delete()
+		}, set: func(value uint64) { result.Login = value }},
+		{days: retention.APIDays, delete: func(cutoff time.Time) (gen.ResultInfo, error) {
+			t := r.gen().APIAccessLog
+			return t.WithContext(ctx).Where(t.CreatedAt.Lt(cutoff)).Order(t.CreatedAt.Asc()).Limit(logCleanupBatchSize).Delete()
+		}, set: func(value uint64) { result.API = value }},
 	} {
 		cutoff := now.UTC().AddDate(0, 0, -int(target.days))
-		query := fmt.Sprintf("DELETE FROM %s WHERE created_at < ? ORDER BY created_at ASC LIMIT %d", target.table, logCleanupBatchSize)
-		execution := r.db.WithContext(ctx).Exec(query, cutoff)
-		if execution.Error != nil {
-			return result, execution.Error
+		execution, err := target.delete(cutoff)
+		if err != nil {
+			return result, err
 		}
 		target.set(uint64(execution.RowsAffected))
 	}

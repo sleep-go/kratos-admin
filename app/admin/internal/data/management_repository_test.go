@@ -131,7 +131,7 @@ func TestSettingsAndProviderConfigsAreEncryptedAndResolvedInMySQL(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	repository := &ManagementRepository{db: tx, providerCodec: providerconfig.NewCodec(cipher)}
+	repository := &ManagementRepository{q: query.Use(tx), providerCodec: providerconfig.NewCodec(cipher)}
 	tenant := &model.Tenant{Code: "config-encryption", Name: "配置加密测试", Status: 1, PermissionVersion: 1}
 	if err := tx.Create(tenant).Error; err != nil {
 		t.Fatal(err)
@@ -245,7 +245,7 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	}
 	tx := db.Begin()
 	t.Cleanup(func() { tx.Rollback() })
-	repository := &ManagementRepository{db: tx}
+	repository := &ManagementRepository{q: query.Use(tx)}
 	now := time.Now().UTC()
 	admin := &model.User{
 		Username:          "integration-auto-id-admin",
@@ -303,7 +303,7 @@ func TestManagementRepositoryValidatesAssociationsAndMaintainsDepartmentPathInMy
 			t.Fatal(err)
 		}
 	}
-	repository := &ManagementRepository{db: tx}
+	repository := &ManagementRepository{q: query.Use(tx)}
 	scope := managementbiz.Scope{TenantID: tenant.ID, UserID: user.ID, PlatformAdmin: true}
 	rootID, err := repository.Create(context.Background(), scope, "departments", map[string]any{
 		"name": "总部", "code": "root", "status": 1,
@@ -359,7 +359,7 @@ func TestPermissionMutationIncrementsTenantVersion(t *testing.T) {
 	if err := tx.Create(tenant).Error; err != nil {
 		t.Fatal(err)
 	}
-	repository := &ManagementRepository{db: tx}
+	repository := &ManagementRepository{q: query.Use(tx)}
 
 	if _, err := repository.Create(context.Background(), managementbiz.Scope{TenantID: tenant.ID, UserID: 1}, "roles", map[string]any{
 		"code": "auditor", "name": "审计员", "data_scope": float64(4), "status": float64(1),
@@ -422,7 +422,7 @@ func TestManagementRepositoryEnforcesRoleDataScope(t *testing.T) {
 	if err := tx.Create(&model.CasbinRule{Ptype: "g", V0: fmt.Sprint(tenant.ID), V1: fmt.Sprint(actor.ID), V2: fmt.Sprint(role.ID)}).Error; err != nil {
 		t.Fatal(err)
 	}
-	repository := &ManagementRepository{db: tx}
+	repository := &ManagementRepository{q: query.Use(tx)}
 	scope := managementbiz.Scope{TenantID: tenant.ID, UserID: actor.UserID, MemberID: actor.ID}
 	rows, total, err := repository.List(context.Background(), scope, "members", managementbiz.PageQuery{Page: 1, PageSize: 20})
 	if err != nil {
@@ -464,7 +464,7 @@ func TestRoleAuthorizationAndTenantFeaturesAreAtomicInMySQL(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	repository := &ManagementRepository{db: tx}
+	repository := &ManagementRepository{q: query.Use(tx)}
 	platformScope := managementbiz.Scope{UserID: 1, PlatformAdmin: true}
 	if err := repository.UpdateTenantFeatures(context.Background(), platformScope, tenant.ID, []uint64{resource.ID}); err != nil {
 		t.Fatal(err)
@@ -510,7 +510,7 @@ func TestPlatformAdminTenantContextStillEnforcesSelectedTenant(t *testing.T) {
 	if err := tx.Create(&model.Role{TenantID: second.ID, Code: "role-b", Name: "角色乙", DataScope: 1, Status: 1}).Error; err != nil {
 		t.Fatal(err)
 	}
-	repository := &ManagementRepository{db: tx}
+	repository := &ManagementRepository{q: query.Use(tx)}
 	rows, total, err := repository.List(context.Background(), managementbiz.Scope{
 		TenantID: first.ID, UserID: 1, PlatformAdmin: true,
 	}, "roles", managementbiz.PageQuery{Page: 1, PageSize: 20})

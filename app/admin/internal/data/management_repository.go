@@ -141,14 +141,13 @@ func casbinAssociationTargets(values map[string]any) ([]associationReference, er
 
 // ManagementRepository 使用编译期白名单访问后台资源。
 type ManagementRepository struct {
-	db            *gorm.DB
 	q             *query.Query
 	providerCodec *providerconfig.Codec
 }
 
 // NewManagementRepository 创建统一后台资源仓储。
 func NewManagementRepository(data *Data, codecs ...*providerconfig.Codec) *ManagementRepository {
-	repository := &ManagementRepository{db: data.DB, q: data.Query}
+	repository := &ManagementRepository{q: data.Query}
 	if len(codecs) > 0 {
 		repository.providerCodec = codecs[0]
 	}
@@ -156,10 +155,7 @@ func NewManagementRepository(data *Data, codecs ...*providerconfig.Codec) *Manag
 }
 
 func (r *ManagementRepository) gen() *query.Query {
-	if r.q != nil {
-		return r.q
-	}
-	return query.Use(r.db)
+	return r.q
 }
 
 // Allowed 按 tenant、member、role 的 Casbin domain 关系校验资源动作，并限制在租户功能授权集合内。
@@ -196,23 +192,15 @@ func (r *ManagementRepository) Allowed(ctx context.Context, scope managementbiz.
 
 // AllowedRecord 按可信租户和角色数据范围校验单条资源可见性。
 func (r *ManagementRepository) AllowedRecord(ctx context.Context, scope managementbiz.Scope, resource, id string) (bool, error) {
-	definition, ok := managementResources[resource]
+	_, ok := managementResources[resource]
 	if !ok || id == "" {
 		return false, nil
 	}
-	query := r.db.WithContext(ctx).Table(definition.table).Where("id = ?", id)
-	if definition.tenantScoped {
-		query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
-	}
-	if definition.softDelete {
-		query = query.Where("deleted_at IS NULL")
-	}
-	query, err := r.applyDataScope(ctx, query, scope, resource)
+	read, err := r.scopedManagementRead(ctx, scope, resource)
 	if err != nil {
 		return false, err
 	}
-	var count int64
-	err = query.Count(&count).Error
+	count, err := read.dao.Where(read.field("id").Eq(managementSQLValue{id})).Count()
 	return count == 1, err
 }
 
@@ -222,39 +210,22 @@ func (r *ManagementRepository) List(ctx context.Context, scope managementbiz.Sco
 	if !ok {
 		return nil, 0, errors.New("资源类型不存在")
 	}
-	query := r.db.WithContext(ctx).Table(definition.table)
-	if definition.tenantScoped && (scope.TenantID != 0 || resource == "settings" || resource == "providers") {
-		query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
-	}
-	if definition.softDelete {
-		query = query.Where("deleted_at IS NULL")
-	}
-	query, err := r.applyDataScope(ctx, query, scope, resource)
+	read, err := r.scopedManagementRead(ctx, scope, resource)
 	if err != nil {
 		return nil, 0, err
 	}
-	if page.Keyword != "" && len(definition.keywordFields) > 0 {
-		parts := make([]string, 0, len(definition.keywordFields))
-		args := make([]any, 0, len(definition.keywordFields))
-		for _, field := range definition.keywordFields {
-			parts = append(parts, field+" LIKE ?")
-			args = append(args, "%"+page.Keyword+"%")
-		}
-		query = query.Where("("+strings.Join(parts, " OR ")+")", args...)
-	}
-	for key, value := range page.Filters {
-		if _, allowed := definition.filterFields[key]; allowed {
-			query = query.Where(key+" = ?", value)
-		}
-	}
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	read.dao = applyManagementPage(read, definition, page)
+	total, err := read.dao.Count()
+	if err != nil {
 		return nil, 0, err
 	}
-	order := resourceOrder(definition, page.Sort)
+	columns := make([]field.Expr, 0, len(definition.columns))
+	for _, name := range definition.columns {
+		columns = append(columns, read.field(name))
+	}
 	var rows []map[string]any
-	err = query.Select(strings.Join(definition.columns, ",")).Order(order).
-		Offset(int((page.Page - 1) * page.PageSize)).Limit(int(page.PageSize)).Find(&rows).Error
+	err = read.dao.Select(columns...).Order(managementOrder(read, definition, page.Sort)).
+		Offset(int((page.Page - 1) * page.PageSize)).Limit(int(page.PageSize)).Scan(&rows)
 	r.redactManagementRows(resource, rows)
 	return rows, uint64(total), err
 }
@@ -386,30 +357,26 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 		values["password_changed_at"] = time.Now().UTC()
 	}
 	var id uint64
-	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = r.gen().Transaction(func(tx *query.Query) error {
 		tenantID := numericID(values[definition.tenantColumn])
-		if err := validateManagementAssociations(tx, resource, values, tenantID, 0, true); err != nil {
+		if err := validateManagementAssociationsGen(ctx, tx, resource, values, tenantID, 0, true); err != nil {
 			return err
 		}
-		if err := validateSettingOverride(tx, resource, values); err != nil {
+		if err := validateSettingOverrideGen(ctx, tx, resource, values); err != nil {
 			return err
 		}
-		result := tx.Table(definition.table).Create(&values)
-		if result.Error != nil {
-			return result.Error
+		createdID, err := createManagementResource(ctx, tx, resource, values)
+		if err != nil {
+			return err
 		}
-		id = numericID(values["id"])
-		if id == 0 {
-			if err := tx.Raw("SELECT LAST_INSERT_ID()").Scan(&id).Error; err != nil {
-				return fmt.Errorf("读取资源自增主键失败: %w", err)
-			}
-		}
+		id = createdID
 		if resource == "departments" {
-			path, err := resolveDepartmentPath(tx, tenantID, numericID(values["parent_id"]), id)
+			path, err := resolveDepartmentPathGen(ctx, tx, tenantID, numericID(values["parent_id"]), id)
 			if err != nil {
 				return err
 			}
-			if err := tx.Table(definition.table).Where("id = ?", id).Update("path", path).Error; err != nil {
+			d := tx.Department
+			if _, err := d.WithContext(ctx).Where(d.ID.Eq(id), d.TenantID.Eq(tenantID)).Update(d.Path, path); err != nil {
 				return err
 			}
 			values["path"] = path
@@ -419,22 +386,14 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 			if adminUserID == 0 {
 				adminUserID = scope.UserID
 			}
-			var displayName string
-			if err := tx.Table("users").Where("id = ? AND status = 1 AND deleted_at IS NULL", adminUserID).
-				Pluck("display_name", &displayName).Error; err != nil || displayName == "" {
-				return errors.New("指定的租户管理员不存在或已禁用")
-			}
-			if err := tx.Table("tenant_members").Create(map[string]any{
-				"tenant_id": id, "user_id": adminUserID, "display_name": displayName,
-				"status": 1, "is_tenant_admin": true, "joined_at": time.Now().UTC(),
-			}).Error; err != nil {
+			if err := createTenantAdministratorGen(ctx, tx, id, adminUserID); err != nil {
 				return fmt.Errorf("创建租户管理员成员关系失败: %w", err)
 			}
 		}
-		if err := incrementPermissionVersion(tx, scope, resource, values, id); err != nil {
+		if err := incrementPermissionVersionGen(ctx, tx, scope, resource, values, id); err != nil {
 			return err
 		}
-		return writeAuditOutbox(tx, scope, "create", resource, fmt.Sprint(id), values)
+		return writeAuditOutboxGen(ctx, tx, scope, "create", resource, fmt.Sprint(id), values)
 	})
 	return id, err
 }
@@ -478,50 +437,50 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 	if err := validateManagementEnumValues(resource, values); err != nil {
 		return err
 	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		query := tx.Table(definition.table).Where("id = ?", id)
-		if definition.tenantScoped && (scope.TenantID != 0 || !scope.PlatformAdmin) {
-			query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
-		}
-		query, err = r.applyDataScope(ctx, query, scope, resource)
-		if err != nil {
-			return err
-		}
+	allowed, err := r.AllowedRecord(ctx, scope, resource, fmt.Sprint(id))
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return errors.New("资源不存在或无权访问")
+	}
+	return r.gen().Transaction(func(tx *query.Query) error {
 		tenantID := scope.TenantID
 		if definition.tenantScoped && scope.PlatformAdmin && tenantID == 0 {
-			if err := query.Session(&gorm.Session{}).Pluck(definition.tenantColumn, &tenantID).Error; err != nil {
-				return err
-			}
-		}
-		if err := validateManagementAssociations(tx, resource, values, tenantID, id, false); err != nil {
-			return err
-		}
-		var departmentChange *departmentPathChange
-		if resource == "departments" {
-			departmentChange, err = prepareDepartmentPathUpdate(tx, query, values, tenantID, id)
+			tenantID, err = tenantIDForManagementResource(ctx, tx, resource, id)
 			if err != nil {
 				return err
 			}
 		}
-		if err := r.prepareUpdateValues(tx, query, resource, values, scope); err != nil {
+		if err := validateManagementAssociationsGen(ctx, tx, resource, values, tenantID, id, false); err != nil {
 			return err
 		}
-		result := query.Updates(values)
-		if result.Error != nil {
-			return result.Error
+		var departmentChange *departmentPathChange
+		if resource == "departments" {
+			departmentChange, err = prepareDepartmentPathUpdateGen(ctx, tx, values, tenantID, id)
+			if err != nil {
+				return err
+			}
+		}
+		if err := r.prepareUpdateValuesGen(ctx, tx, resource, id, tenantID, values, scope); err != nil {
+			return err
+		}
+		result, err := updateManagementResource(ctx, tx, resource, id, tenantID, values)
+		if err != nil {
+			return err
 		}
 		if result.RowsAffected != 1 {
 			return errors.New("资源不存在或无权访问")
 		}
 		if departmentChange != nil && departmentChange.oldPath != departmentChange.newPath {
-			if err := updateDepartmentDescendantPaths(tx, *departmentChange); err != nil {
+			if err := updateDepartmentDescendantPathsGen(ctx, tx, *departmentChange); err != nil {
 				return err
 			}
 		}
-		if err := incrementPermissionVersion(tx, scope, resource, values, id); err != nil {
+		if err := incrementPermissionVersionGen(ctx, tx, scope, resource, values, id); err != nil {
 			return err
 		}
-		return writeAuditOutbox(tx, scope, "update", resource, fmt.Sprint(id), values)
+		return writeAuditOutboxGen(ctx, tx, scope, "update", resource, fmt.Sprint(id), values)
 	})
 }
 
@@ -727,49 +686,6 @@ func (r *ManagementRepository) prepareCreateValues(resource string, values map[s
 	}
 }
 
-func (r *ManagementRepository) prepareUpdateValues(tx *gorm.DB, query *gorm.DB, resource string, values map[string]any, scope managementbiz.Scope) error {
-	switch resource {
-	case "settings":
-		var current model.SystemSetting
-		if err := query.Take(&current).Error; err != nil {
-			return errors.New("资源不存在或无权访问")
-		}
-		isSecret := current.IsSecret
-		if value, exists := values["is_secret"]; exists {
-			isSecret = truthyDatabaseValue(value)
-		}
-		if err := r.encryptSettingValue(values, isSecret); err != nil {
-			return err
-		}
-		values["updated_by"] = scope.UserID
-		values["version"] = gorm.Expr("version + 1")
-		merged := map[string]any{"tenant_id": current.TenantID, "category": current.Category, "setting_key": current.SettingKey}
-		for key, value := range values {
-			merged[key] = value
-		}
-		return validateSettingOverride(tx, resource, merged)
-	case "providers":
-		var current model.ProviderConfig
-		if err := query.Take(&current).Error; err != nil {
-			return errors.New("资源不存在或无权访问")
-		}
-		var existing map[string]any
-		if r.providerCodec != nil && current.EncryptedConfig != "" {
-			existing, _ = r.providerCodec.Decode(current.EncryptedConfig)
-		}
-		if _, exists := values["provider_type"]; !exists {
-			values["provider_type"] = current.ProviderType
-		}
-		if _, exists := values["provider_name"]; !exists {
-			values["provider_name"] = current.ProviderName
-		}
-		values["updated_by"] = scope.UserID
-		return r.encryptProviderConfig(values, existing)
-	default:
-		return nil
-	}
-}
-
 func (r *ManagementRepository) encryptSettingValue(values map[string]any, isSecret bool) error {
 	value, exists := values["setting_value"]
 	if !exists {
@@ -845,24 +761,6 @@ func isProviderSecretKey(key string) bool {
 	}
 }
 
-func validateSettingOverride(tx *gorm.DB, resource string, values map[string]any) error {
-	if resource != "settings" || numericID(values["tenant_id"]) == 0 {
-		return nil
-	}
-	var count int64
-	err := tx.Table("system_settings").Where(
-		"tenant_id = 0 AND category = ? AND setting_key = ? AND allow_tenant_override = 1",
-		fmt.Sprint(values["category"]), fmt.Sprint(values["setting_key"]),
-	).Count(&count).Error
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return errors.New("平台未允许租户覆盖该配置")
-	}
-	return nil
-}
-
 // Delete 在可信作用域内逻辑删除资源并写入审计 Outbox。
 func (r *ManagementRepository) Delete(ctx context.Context, scope managementbiz.Scope, resource string, id uint64) error {
 	definition, ok := managementResources[resource]
@@ -872,89 +770,40 @@ func (r *ManagementRepository) Delete(ctx context.Context, scope managementbiz.S
 	if definition.readOnly {
 		return errors.New("该资源只读")
 	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	allowed, err := r.AllowedRecord(ctx, scope, resource, fmt.Sprint(id))
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return errors.New("资源不存在或无权访问")
+	}
+	return r.gen().Transaction(func(tx *query.Query) error {
 		permissionValues := map[string]any{}
 		if resource == "tenant-resources" {
-			if err := tx.Table(definition.table).Select("tenant_id").Where("id = ?", id).Take(&permissionValues).Error; err != nil {
+			tr := tx.TenantResource
+			row, err := tr.WithContext(ctx).Select(tr.TenantID).Where(tr.ID.Eq(id)).Take()
+			if err != nil {
 				return errors.New("资源不存在或无权访问")
 			}
+			permissionValues["tenant_id"] = row.TenantID
 		}
-		query := tx.Table(definition.table).Where("id = ?", id)
-		if definition.tenantScoped && (scope.TenantID != 0 || !scope.PlatformAdmin) {
-			query = query.Where(definition.tenantColumn+" = ?", scope.TenantID)
-		}
-		query, err := r.applyDataScope(ctx, query, scope, resource)
+		result, err := deleteManagementResource(ctx, tx, resource, id, scope.TenantID, definition.softDelete)
 		if err != nil {
 			return err
-		}
-		var result *gorm.DB
-		if definition.softDelete {
-			result = query.Update("deleted_at", time.Now().UTC())
-		} else {
-			result = query.Delete(map[string]any{})
-		}
-		if result.Error != nil {
-			return result.Error
 		}
 		if result.RowsAffected != 1 {
 			return errors.New("资源不存在或无权访问")
 		}
-		if err := incrementPermissionVersion(tx, scope, resource, permissionValues, id); err != nil {
+		if err := incrementPermissionVersionGen(ctx, tx, scope, resource, permissionValues, id); err != nil {
 			return err
 		}
-		return writeAuditOutbox(tx, scope, "delete", resource, fmt.Sprint(id), nil)
+		return writeAuditOutboxGen(ctx, tx, scope, "delete", resource, fmt.Sprint(id), nil)
 	})
 }
 
 type resolvedDataScope struct {
 	permissionbiz.QueryDataScope
 	PrimaryDepartmentID uint64
-}
-
-func (r *ManagementRepository) applyDataScope(ctx context.Context, query *gorm.DB, scope managementbiz.Scope, resource string) (*gorm.DB, error) {
-	switch resource {
-	case "members", "departments", "files", "audit-logs", "login-logs", "api-logs":
-	default:
-		return query, nil
-	}
-	resolved, err := r.resolveDataScope(ctx, scope)
-	if err != nil {
-		return nil, err
-	}
-	if resolved.All {
-		return query, nil
-	}
-	if resolved.SelfOnly {
-		switch resource {
-		case "members":
-			return query.Where("id = ?", scope.MemberID), nil
-		case "departments":
-			return query.Where("id = ?", resolved.PrimaryDepartmentID), nil
-		case "files":
-			return query.Where("uploader_member_id = ?", scope.MemberID), nil
-		case "audit-logs":
-			return query.Where("member_id = ?", scope.MemberID), nil
-		case "login-logs", "api-logs":
-			return query.Where("user_id = ?", scope.UserID), nil
-		}
-	}
-	departmentIDs := resolved.DepartmentIDs
-	if len(departmentIDs) == 0 {
-		return query.Where("1 = 0"), nil
-	}
-	switch resource {
-	case "members":
-		query = query.Where("primary_department_id IN ?", departmentIDs)
-	case "departments":
-		query = query.Where("id IN ?", departmentIDs)
-	case "files":
-		query = query.Where("uploader_member_id IN (?)", r.db.WithContext(ctx).Table("tenant_members").Select("id").Where("tenant_id = ? AND primary_department_id IN ? AND deleted_at IS NULL", scope.TenantID, departmentIDs))
-	case "audit-logs":
-		query = query.Where("member_id IN (?)", r.db.WithContext(ctx).Table("tenant_members").Select("id").Where("tenant_id = ? AND primary_department_id IN ? AND deleted_at IS NULL", scope.TenantID, departmentIDs))
-	case "login-logs", "api-logs":
-		query = query.Where("user_id IN (?)", r.db.WithContext(ctx).Table("tenant_members").Select("user_id").Where("tenant_id = ? AND primary_department_id IN ? AND deleted_at IS NULL", scope.TenantID, departmentIDs))
-	}
-	return query, nil
 }
 
 func (r *ManagementRepository) resolveDataScope(ctx context.Context, scope managementbiz.Scope) (resolvedDataScope, error) {
@@ -1057,31 +906,6 @@ func (r *ManagementRepository) expandDepartmentDescendants(ctx context.Context, 
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	return result, nil
-}
-
-func incrementPermissionVersion(tx *gorm.DB, scope managementbiz.Scope, resource string, values map[string]any, resourceID uint64) error {
-	switch resource {
-	case "roles", "casbin-rules", "role-scope-departments":
-		if scope.TenantID == 0 {
-			return nil
-		}
-		return tx.Table("tenants").Where("id = ? AND deleted_at IS NULL", scope.TenantID).
-			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error
-	case "tenant-resources":
-		tenantID := numericID(values["tenant_id"])
-		if tenantID == 0 {
-			if err := tx.Table("tenant_resources").Where("id = ?", resourceID).Pluck("tenant_id", &tenantID).Error; err != nil {
-				return errors.New("租户功能授权缺少租户ID")
-			}
-		}
-		return tx.Table("tenants").Where("id = ? AND deleted_at IS NULL", tenantID).
-			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error
-	case "resources":
-		return tx.Table("tenants").Where("deleted_at IS NULL").
-			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error
-	default:
-		return nil
-	}
 }
 
 func sanitizeResourceWrite(definition resourceDefinition, input map[string]any) (map[string]any, error) {
@@ -1200,143 +1024,6 @@ type departmentPathChange struct {
 	newPath  string
 }
 
-func resolveDepartmentPath(tx *gorm.DB, tenantID, parentID, id uint64) (string, error) {
-	if parentID == 0 {
-		return buildDepartmentPath("", id), nil
-	}
-	var parentPath string
-	if err := tx.Table("departments").Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", parentID, tenantID).
-		Pluck("path", &parentPath).Error; err != nil {
-		return "", err
-	}
-	if parentPath == "" {
-		return "", errors.New("所选上级部门不存在或已禁用")
-	}
-	return buildDepartmentPath(parentPath, id), nil
-}
-
-func prepareDepartmentPathUpdate(tx, query *gorm.DB, values map[string]any, tenantID, id uint64) (*departmentPathChange, error) {
-	var current struct {
-		ParentID uint64
-		Path     string
-	}
-	if err := query.Session(&gorm.Session{}).Select("parent_id, path").Take(&current).Error; err != nil {
-		return nil, errors.New("资源不存在或无权访问")
-	}
-	parentID := current.ParentID
-	if value, exists := values["parent_id"]; exists {
-		parentID = numericID(value)
-	}
-	newPath, err := resolveDepartmentPath(tx, tenantID, parentID, id)
-	if err != nil {
-		return nil, err
-	}
-	if parentID != 0 && (newPath == current.Path || strings.HasPrefix(newPath, current.Path+"/")) {
-		return nil, errors.New("上级部门不能选择当前部门或其下级")
-	}
-	values["path"] = newPath
-	return &departmentPathChange{tenantID: tenantID, oldPath: current.Path, newPath: newPath}, nil
-}
-
-func updateDepartmentDescendantPaths(tx *gorm.DB, change departmentPathChange) error {
-	return tx.Table("departments").
-		Where("tenant_id = ? AND path LIKE ?", change.tenantID, change.oldPath+"/%").
-		Update("path", gorm.Expr("CONCAT(?, SUBSTRING(path, ?))", change.newPath, len(change.oldPath)+1)).Error
-}
-
-func validateManagementAssociations(tx *gorm.DB, resource string, values map[string]any, tenantID, currentID uint64, creating bool) error {
-	for field, definition := range managementAssociations[resource] {
-		value, exists := values[field]
-		if !exists {
-			if creating && definition.required {
-				return errors.New(definition.errorMessage)
-			}
-			continue
-		}
-		id := numericID(value)
-		if id == 0 {
-			if definition.required {
-				return errors.New(definition.errorMessage)
-			}
-			continue
-		}
-		if currentID != 0 && id == currentID && (resource == "departments" || resource == "resources") {
-			return errors.New("不能选择当前记录作为上级")
-		}
-		query := tx.Table(definition.table).Where("id = ?", id)
-		if definition.tenantColumn != "" {
-			query = query.Where(definition.tenantColumn+" = ?", tenantID)
-		}
-		if definition.activeOnly {
-			query = query.Where("status = 1")
-		}
-		if definition.softDelete {
-			query = query.Where("deleted_at IS NULL")
-		}
-		var count int64
-		if err := query.Count(&count).Error; err != nil {
-			return err
-		}
-		if count != 1 {
-			return errors.New(definition.errorMessage)
-		}
-	}
-	if resource == "resources" && currentID != 0 && numericID(values["parent_id"]) != 0 {
-		if err := validateResourceParentChain(tx, numericID(values["parent_id"]), currentID); err != nil {
-			return err
-		}
-	}
-	if resource == "casbin-rules" && (creating || values["ptype"] != nil || values["v1"] != nil || values["v2"] != nil) {
-		targets, err := casbinAssociationTargets(values)
-		if err != nil {
-			return err
-		}
-		for _, target := range targets {
-			query := tx.Table(target.table).Where(target.column+" = ?", target.value)
-			if target.tenantColumn != "" {
-				query = query.Where(target.tenantColumn+" = ?", tenantID)
-			}
-			if target.activeOnly {
-				query = query.Where("status = 1")
-			}
-			if target.softDelete {
-				query = query.Where("deleted_at IS NULL")
-			}
-			var count int64
-			if err := query.Count(&count).Error; err != nil {
-				return err
-			}
-			if count != 1 {
-				return errors.New(target.errorMessage)
-			}
-		}
-	}
-	return nil
-}
-
-func validateResourceParentChain(tx *gorm.DB, parentID, currentID uint64) error {
-	chain := make([]uint64, 0, 8)
-	seen := make(map[uint64]struct{})
-	for parentID != 0 {
-		if _, exists := seen[parentID]; exists {
-			return errors.New("资源层级已存在循环")
-		}
-		seen[parentID] = struct{}{}
-		chain = append(chain, parentID)
-		var parent struct {
-			ParentID uint64
-		}
-		if err := tx.Table("resources").Select("parent_id").Where("id = ? AND deleted_at IS NULL", parentID).Take(&parent).Error; err != nil {
-			return errors.New("所选父资源不存在")
-		}
-		parentID = parent.ParentID
-	}
-	if resourceParentChainContains(currentID, chain) {
-		return errors.New("父资源不能选择当前资源或其下级")
-	}
-	return nil
-}
-
 func resourceParentChainContains(currentID uint64, chain []uint64) bool {
 	for _, id := range chain {
 		if id == currentID {
@@ -1344,18 +1031,6 @@ func resourceParentChainContains(currentID uint64, chain []uint64) bool {
 		}
 	}
 	return false
-}
-
-func writeAuditOutbox(tx *gorm.DB, scope managementbiz.Scope, action, resource, resourceID string, after map[string]any) error {
-	payload, err := json.Marshal(map[string]any{"user_id": scope.UserID, "member_id": scope.MemberID, "action": action, "resource_type": resource, "resource_id": resourceID, "after": after})
-	if err != nil {
-		return err
-	}
-	id, err := randomEventID()
-	if err != nil {
-		return err
-	}
-	return tx.Create(&model.AuditOutbox{ID: id, TenantID: scope.TenantID, EventType: "management." + action, AggregateType: resource, AggregateID: resourceID, Payload: datatypes.JSON(payload), Status: 1}).Error
 }
 
 func writeAuditOutboxGen(ctx context.Context, tx *query.Query, scope managementbiz.Scope, action, resource, resourceID string, after map[string]any) error {
