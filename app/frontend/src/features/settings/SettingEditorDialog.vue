@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 
 import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
+import { settingKeyLabel } from './settingLabels'
 
 const props = defineProps<{
   open: boolean
@@ -21,7 +22,10 @@ const form = reactive({
   allowTenantOverride: false,
   isSecret: false
 })
-const title = computed(() => `配置 ${String(props.item?.setting_key ?? '')}`)
+const title = computed(
+  () =>
+    `配置 ${settingKeyLabel(String(props.item?.category ?? ''), String(props.item?.setting_key ?? ''))}`
+)
 
 watch(
   () => [props.open, props.item, props.stored] as const,

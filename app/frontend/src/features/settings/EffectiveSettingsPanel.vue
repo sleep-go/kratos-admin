@@ -5,6 +5,12 @@ import { storeToRefs } from 'pinia'
 import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
 import SettingEditorDialog from './SettingEditorDialog.vue'
+import {
+  settingCategoryLabel,
+  settingKeyLabel,
+  settingSourceLabel,
+  settingValueTypeLabel
+} from './settingLabels'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -60,12 +66,6 @@ function displayValue(item: ResourceRow) {
   return typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')
 }
 
-function sourceLabel(source: unknown) {
-  if (source === 'tenant') return '租户覆盖'
-  if (source === 'platform') return '平台默认'
-  return '代码安全默认'
-}
-
 async function handleSaved() {
   editorOpen.value = false
   await load()
@@ -92,22 +92,25 @@ onMounted(load)
 
     <section v-for="[category, categoryItems] in categories" :key="category" class="setting-group">
       <header>
-        <h2>{{ category }}</h2>
+        <h2>{{ settingCategoryLabel(category) }}</h2>
         <span>{{ categoryItems.length }} 项配置</span>
       </header>
       <div class="setting-grid">
         <article v-for="item in categoryItems" :key="String(item.setting_key)">
           <div class="setting-card__top">
             <div>
-              <small>{{ item.setting_key }}</small><strong>{{ displayValue(item) }}</strong>
+              <small>{{ settingKeyLabel(category, String(item.setting_key)) }}</small
+              ><strong>{{ displayValue(item) }}</strong>
             </div>
             <el-tag :type="item.source === 'tenant' ? 'danger' : 'info'" effect="plain">
-              {{ sourceLabel(item.source) }}
+              {{ settingSourceLabel(String(item.source)) }}
             </el-tag>
           </div>
           <footer>
-            <span>{{ item.value_type
-            }}<template v-if="item.allow_tenant_override"> · 可覆盖</template></span>
+            <span
+              >{{ settingValueTypeLabel(String(item.value_type))
+              }}<template v-if="item.allow_tenant_override"> · 可覆盖</template></span
+            >
             <el-button link type="danger" @click="edit(item)">配置</el-button>
           </footer>
         </article>
