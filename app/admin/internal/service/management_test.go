@@ -67,7 +67,7 @@ func (r *fakeManagementRepository) TestProviderConnection(_ context.Context, sco
 func TestManagementServiceAlwaysUsesAuthenticatedTenant(t *testing.T) {
 	repository := &fakeManagementRepository{}
 	service := NewManagementService(repository)
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 
 	reply, err := service.ListResources(ctx, &v1.ListResourcesRequest{
 		Resource: "departments", Page: 1, PageSize: 20,
@@ -86,7 +86,7 @@ func TestManagementServiceAlwaysUsesAuthenticatedTenant(t *testing.T) {
 
 func TestManagementServiceRejectsPlatformResourceInTenantContext(t *testing.T) {
 	service := NewManagementService(&fakeManagementRepository{})
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 
 	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "tenants"}); err == nil {
 		t.Fatal("tenant context must not access platform tenant governance")
@@ -97,7 +97,7 @@ func TestPlatformAdministratorInTenantContextDoesNotBypassPermission(t *testing.
 	repository := &fakeManagementRepository{}
 	service := NewManagementService(repository, fakePermissionChecker{allowed: false})
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{
-		UserID: 5, TenantID: 8, MemberID: 9, PlatformAdmin: true,
+		UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant, ImpersonatorID: 1,
 	})
 
 	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "login-logs"}); err == nil {
@@ -110,7 +110,7 @@ func TestPlatformAdministratorInTenantContextDoesNotBypassPermission(t *testing.
 
 func TestManagementServiceRejectsMissingCasbinPermission(t *testing.T) {
 	service := NewManagementService(&fakeManagementRepository{}, fakePermissionChecker{allowed: false})
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 
 	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "departments"}); err == nil {
 		t.Fatal("missing list permission must be rejected")
@@ -120,7 +120,7 @@ func TestManagementServiceRejectsMissingCasbinPermission(t *testing.T) {
 func TestGetEffectiveSettingsUsesAuthenticatedTenant(t *testing.T) {
 	repository := &fakeManagementRepository{effectiveRows: []map[string]any{{"key": "site_name", "source": "tenant"}}}
 	service := NewManagementService(repository)
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 
 	reply, err := service.GetEffectiveSettings(ctx, &v1.GetEffectiveSettingsRequest{Category: "platform"})
 	if err != nil {
@@ -134,7 +134,7 @@ func TestGetEffectiveSettingsUsesAuthenticatedTenant(t *testing.T) {
 func TestProviderConnectionTestRequiresUpdatePermission(t *testing.T) {
 	repository := &fakeManagementRepository{}
 	service := NewManagementService(repository, fakePermissionChecker{allowed: false})
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 	if _, err := service.TestProviderConnection(ctx, &v1.TestProviderConnectionRequest{Id: 7}); err == nil {
 		t.Fatal("connection test must require provider update permission")
 	}
@@ -146,7 +146,7 @@ func TestProviderConnectionTestRequiresUpdatePermission(t *testing.T) {
 func TestUpdateRoleAuthorizationIsSingleAuthorizedOperation(t *testing.T) {
 	repository := &fakeManagementRepository{}
 	service := NewManagementService(repository, fakePermissionChecker{allowed: true})
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 
 	_, err := service.UpdateRoleAuthorization(ctx, &v1.UpdateRoleAuthorizationRequest{
 		RoleId: 12, DataScope: 5,
@@ -161,7 +161,7 @@ func TestUpdateRoleAuthorizationIsSingleAuthorizedOperation(t *testing.T) {
 func TestUpdateTenantFeaturesRequiresPlatformAdministrator(t *testing.T) {
 	repository := &fakeManagementRepository{}
 	service := NewManagementService(repository)
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, PlatformAdmin: true})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 0, Realm: bizauth.RealmPlatform})
 
 	_, err := service.UpdateTenantFeatures(ctx, &v1.UpdateTenantFeaturesRequest{TenantId: 10, ResourceIds: []uint64{2, 3}})
 	if err != nil || repository.tenantID != 10 || len(repository.featureIDs) != 2 {
@@ -172,7 +172,7 @@ func TestUpdateTenantFeaturesRequiresPlatformAdministrator(t *testing.T) {
 func TestPlatformTenantSetupUsesExplicitTargetTenant(t *testing.T) {
 	repository := &fakeManagementRepository{}
 	service := NewManagementService(repository)
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, PlatformAdmin: true})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 0, Realm: bizauth.RealmPlatform})
 
 	_, err := service.CreateResource(ctx, &v1.CreateResourceRequest{
 		Resource: "roles", TargetTenantId: 8,
@@ -188,7 +188,7 @@ func TestPlatformTenantSetupUsesExplicitTargetTenant(t *testing.T) {
 func TestTenantContextCannotUsePlatformTenantSetupTarget(t *testing.T) {
 	service := NewManagementService(&fakeManagementRepository{})
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{
-		UserID: 5, TenantID: 7, MemberID: 9, PlatformAdmin: true,
+		UserID: 5, TenantID: 7, MemberID: 9, Realm: bizauth.RealmTenant, ImpersonatorID: 1,
 	})
 
 	if _, err := service.CreateResource(ctx, &v1.CreateResourceRequest{Resource: "roles", TargetTenantId: 8}); err == nil {
@@ -198,7 +198,7 @@ func TestTenantContextCannotUsePlatformTenantSetupTarget(t *testing.T) {
 
 func TestPlatformTenantSetupRejectsPlatformResource(t *testing.T) {
 	service := NewManagementService(&fakeManagementRepository{})
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, PlatformAdmin: true})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 0, Realm: bizauth.RealmPlatform})
 
 	if _, err := service.CreateResource(ctx, &v1.CreateResourceRequest{Resource: "users", TargetTenantId: 8}); err == nil {
 		t.Fatal("平台专属资源不能通过目标租户初始化入口维护")
@@ -208,7 +208,7 @@ func TestPlatformTenantSetupRejectsPlatformResource(t *testing.T) {
 func TestPlatformTenantSetupCanListTargetTenantFeatures(t *testing.T) {
 	repository := &fakeManagementRepository{}
 	service := NewManagementService(repository)
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, PlatformAdmin: true})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 0, Realm: bizauth.RealmPlatform})
 
 	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{
 		Resource: "tenant-resources", TargetTenantId: 8,

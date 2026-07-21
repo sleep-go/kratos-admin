@@ -134,7 +134,7 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 	}
 	repository := &AuthRepository{db: tx, q: query.Use(tx)}
 
-	permissions, err := repository.ListPermissions(context.Background(), tenant.ID, member.ID, false)
+	permissions, err := repository.ListPermissions(context.Background(), bizauth.RealmTenant, tenant.ID, member.ID, 0)
 	if err != nil || len(permissions) != 2 || permissions[0] != "integration-audit-logs:list" || permissions[1] != "integration-menu:list" {
 		t.Fatalf("ListPermissions() = %+v, %v", permissions, err)
 	}
@@ -144,7 +144,7 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 	if err != nil || !allowed {
 		t.Fatalf("Allowed(audit-logs:list) = %v, %v", allowed, err)
 	}
-	navigation, err := repository.ListNavigation(context.Background(), tenant.ID, member.ID, false)
+	navigation, err := repository.ListNavigation(context.Background(), tenant.ID, member.ID, bizauth.RealmTenant)
 	if err != nil || len(navigation) != 1 || navigation[0].Code != "integration-menu" {
 		t.Fatalf("ListNavigation() = %+v, %v", navigation, err)
 	}

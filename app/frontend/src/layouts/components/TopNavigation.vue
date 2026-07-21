@@ -8,17 +8,25 @@ import { SwitchButton } from '@/components/icons/actions'
 import { resolveNavigationIconName } from '@/components/icons/registry'
 import type { NavigationItem } from '@/features/navigation/types'
 
-const props = defineProps<{
-  items: NavigationItem[]
-  tenantName: string
-  userName: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    items: NavigationItem[]
+    tenantName: string
+    userName: string
+    showTenantSwitcher?: boolean
+    accountPath?: string
+  }>(),
+  {
+    showTenantSwitcher: true,
+    accountPath: '/console/account'
+  }
+)
 
 const initials = computed(() => props.userName.trim().slice(0, 1) || '管')
 const route = useRoute()
 
 function isActive(item: NavigationItem) {
-  if (item.to === '/') return route.path === '/'
+  if (item.to === '/console') return route.path === '/console' || route.path === '/console/'
   return item.children?.some((child) => route.path === child.to) ?? route.path === item.to
 }
 
@@ -81,6 +89,7 @@ const emit = defineEmits<{
 
     <div class="account-area">
       <button
+        v-if="showTenantSwitcher"
         class="tenant-switcher"
         data-testid="tenant-switcher"
         type="button"
@@ -90,8 +99,8 @@ const emit = defineEmits<{
         {{ tenantName }}
         <AppIcon name="arrow-down" :size="12" />
       </button>
-      <span class="account-divider" aria-hidden="true"></span>
-      <RouterLink class="account-button" to="/account" aria-label="打开个人中心">
+      <span v-if="showTenantSwitcher" class="account-divider" aria-hidden="true"></span>
+      <RouterLink class="account-button" :to="accountPath" aria-label="打开个人中心">
         <span class="avatar">{{ initials }}</span>
         <span class="account-name">{{ userName }}</span>
       </RouterLink>

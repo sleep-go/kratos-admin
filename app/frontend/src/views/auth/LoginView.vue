@@ -23,12 +23,18 @@ async function refreshCaptcha() {
 
 async function submit() {
   try {
-    const response = await authStore.login({ ...form })
+    const isPlatformLogin = route.path === '/platform/login'
+    const response = isPlatformLogin
+      ? await authStore.platformLogin({ ...form })
+      : await authStore.login({ ...form })
     if (response.mfaRequired) {
       await router.push({ name: 'mfa', query: { challenge: response.mfaChallengeId } })
       return
     }
-    await router.replace(typeof route.query.redirect === 'string' ? route.query.redirect : '/')
+    const defaultRedirect = isPlatformLogin ? '/platform/tenants' : '/console'
+    await router.replace(
+      typeof route.query.redirect === 'string' ? route.query.redirect : defaultRedirect
+    )
   } catch {
     await refreshCaptcha()
   }

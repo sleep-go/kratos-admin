@@ -13,7 +13,7 @@ describe('权限指令', () => {
     store.currentUser = {
       id: '1',
       displayName: '权限用户',
-      platformAdmin: false,
+      realm: 'tenant',
       permissions: ['roles:list', 'departments:*']
     }
     const component = defineComponent({
@@ -42,7 +42,7 @@ describe('权限指令', () => {
     store.currentUser = {
       id: '1',
       displayName: '平台管理员',
-      platformAdmin: true,
+      realm: 'platform',
       permissions: []
     }
     store.currentTenant = { id: '8', name: '演示租户' }

@@ -24,7 +24,7 @@ const storedItems = shallowRef<ResourceRow[]>([])
 const selected = shallowRef<ResourceRow>()
 const targetTenantId = computed(() => String(currentTenant.value?.id ?? '0'))
 const platformContext = computed(
-  () => Boolean(currentUser.value?.platformAdmin) && targetTenantId.value === '0'
+  () => currentUser.value?.realm === 'platform' && targetTenantId.value === '0'
 )
 const categories = computed(() => {
   const result = new Map<string, ResourceRow[]>()

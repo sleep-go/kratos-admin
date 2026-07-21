@@ -247,13 +247,14 @@ func managementScope(ctx context.Context, resource string, targetTenantID uint64
 		return managementbiz.Scope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "该资源仅限平台管理员")
 	}
 	return managementbiz.Scope{
-		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID, PlatformAdmin: platformContext,
+		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID,
+		PlatformAdmin: claims.Realm == bizauth.RealmPlatform,
 	}, nil
 }
 
 func isPlatformResource(resource string) bool {
 	switch resource {
-	case "users", "tenants", "resources", "tenant-resources", "tenant-setup":
+	case "users", "tenants", "resources", "tenant-resources", "tenant-setup", "platform-admins":
 		return true
 	default:
 		return false

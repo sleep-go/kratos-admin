@@ -21,10 +21,15 @@ type AuthRepository struct {
 	q  *query.Query
 }
 
-// ListPermissions 按 Casbin domain 规则加载当前成员在租户授权功能集合内的权限。
-func (r *AuthRepository) ListPermissions(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]string, error) {
-	if platformAdmin && tenantID == 0 {
+// ListPermissions 按认证域和 Casbin domain 规则加载权限。
+// platform 域返回 *:*；tenant 域代维（impersonatorID>0）时等同租户管理员。
+func (r *AuthRepository) ListPermissions(ctx context.Context, realm bizauth.Realm, tenantID, memberID, impersonatorID uint64) ([]string, error) {
+	if realm == bizauth.RealmPlatform && tenantID == 0 {
 		return []string{"*:*"}, nil
+	}
+	// 代维会话等同租户管理员
+	if impersonatorID > 0 {
+		return r.tenantAdminPermissions(ctx, tenantID)
 	}
 	tenantAdmin, err := r.isTenantAdmin(ctx, tenantID, memberID)
 	if err != nil {
@@ -32,17 +37,7 @@ func (r *AuthRepository) ListPermissions(ctx context.Context, tenantID, memberID
 	}
 	permissions := make([]string, 0)
 	if tenantAdmin {
-		tr, resource := r.q.TenantResource, r.q.Resource
-		var codes []string
-		if err := tr.WithContext(ctx).
-			Join(resource, resource.ID.EqCol(tr.ResourceID)).
-			Where(tr.TenantID.Eq(tenantID), resource.ScopeMask.BitAnd(2).Eq(2), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
-			Distinct(resource.Code).Pluck(resource.Code, &codes); err != nil {
-			return nil, fmt.Errorf("查询租户管理员权限失败: %w", err)
-		}
-		for _, code := range codes {
-			permissions = append(permissions, code+":*")
-		}
+		return r.tenantAdminPermissions(ctx, tenantID)
 	} else {
 		g := r.q.CasbinRule.As("g")
 		p := r.q.CasbinRule.As("p")
@@ -121,7 +116,7 @@ func mapAuthUser(row *model.User) *bizauth.User {
 	return &bizauth.User{
 		ID: row.ID, Username: row.Username, DisplayName: row.DisplayName, AvatarURL: avatarURL,
 		Email: email, Phone: phone, MFAEnabled: row.MFAEnabled, MFAChannel: row.MFAChannel,
-		PlatformAdmin: row.IsPlatformAdmin, PasswordHash: row.PasswordHash,
+		PasswordHash: row.PasswordHash,
 		Status: bizauth.UserStatus(row.Status), FailedLoginCount: row.FailedLoginCount, LockedUntil: row.LockedUntil,
 	}
 }
@@ -199,8 +194,9 @@ func nullableStringAssignment(column field.String, value string) field.AssignExp
 // Create 持久化 refresh 会话，数据库仅保存 jti 摘要。
 func (r *AuthRepository) Create(ctx context.Context, session bizauth.Session) error {
 	return r.q.AuthSession.WithContext(ctx).Create(&model.AuthSession{
-		ID: session.ID, UserID: session.UserID, TenantID: session.TenantID,
-		MemberID: session.MemberID, PermissionVersion: session.PermissionVersion, RefreshJTIHash: session.RefreshJTIHash,
+		ID: session.ID, Realm: string(session.Realm), UserID: session.UserID, TenantID: session.TenantID,
+		MemberID: session.MemberID, ImpersonatorID: session.ImpersonatorID,
+		PermissionVersion: session.PermissionVersion, RefreshJTIHash: session.RefreshJTIHash,
 		DeviceName: session.DeviceName, UserAgent: session.UserAgent, IP: session.IP,
 		ExpiresAt: session.ExpiresAt,
 	})
@@ -213,16 +209,19 @@ func (r *AuthRepository) Find(ctx context.Context, sessionID string) (bizauth.Se
 	if err != nil {
 		return bizauth.SessionRecord{}, err
 	}
+	realm := bizauth.Realm(row.Realm)
 	permissionVersion := uint64(0)
-	if row.TenantID == 0 {
-		u := r.q.User
-		user, userErr := u.WithContext(ctx).
-			Where(u.ID.Eq(row.UserID), u.Status.Eq(uint8(bizauth.UserStatusEnabled)), u.IsPlatformAdmin.Is(true)).
+	if realm == bizauth.RealmPlatform {
+		// 平台域会话：校验 platform_admins 账号
+		pa := r.q.PlatformAdmin
+		_, paErr := pa.WithContext(ctx).
+			Where(pa.ID.Eq(row.UserID), pa.Status.Eq(uint8(bizauth.UserStatusEnabled))).
 			First()
-		if userErr != nil || !user.IsPlatformAdmin {
+		if paErr != nil {
 			return bizauth.SessionRecord{}, bizauth.ErrInvalidRefresh
 		}
-	} else {
+	} else if row.TenantID > 0 && row.ImpersonatorID == 0 {
+		// 租户域非代维会话：校验成员身份
 		membership, memberErr := r.FindMembership(ctx, row.UserID, row.TenantID)
 		if memberErr != nil {
 			return bizauth.SessionRecord{}, memberErr
@@ -230,7 +229,8 @@ func (r *AuthRepository) Find(ctx context.Context, sessionID string) (bizauth.Se
 		permissionVersion = membership.PermissionVersion
 	}
 	return bizauth.SessionRecord{
-		ID: row.ID, UserID: row.UserID, TenantID: row.TenantID, MemberID: row.MemberID,
+		ID: row.ID, Realm: realm, UserID: row.UserID, TenantID: row.TenantID, MemberID: row.MemberID,
+		ImpersonatorID: row.ImpersonatorID,
 		RefreshJTIHash: row.RefreshJTIHash, PermissionVersion: permissionVersion,
 		ExpiresAt: row.ExpiresAt, RevokedAt: row.RevokedAt,
 	}, nil
@@ -297,8 +297,8 @@ func (r *AuthRepository) List(ctx context.Context, userID uint64) ([]bizauth.Dev
 	return items, nil
 }
 
-// ListNavigation 仅返回当前可信权限上下文可见的目录与菜单资源。
-func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]bizauth.NavigationItem, error) {
+// ListNavigation 仅返回当前认证域可见的目录与菜单资源。
+func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID uint64, realm bizauth.Realm) ([]bizauth.NavigationItem, error) {
 	type row struct {
 		ID           uint64
 		ParentID     uint64
@@ -312,7 +312,7 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID 
 	resource := r.q.Resource.As("res")
 	navigationQuery := resource.WithContext(ctx).Unscoped().
 		Where(resource.Type.In(1, 2), resource.Visible.Is(true), resource.Status.Eq(1), resource.DeletedAt.IsNull())
-	platformContext := platformAdmin && tenantID == 0
+	platformContext := realm == bizauth.RealmPlatform && tenantID == 0
 	if platformContext {
 		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(1).Eq(1))
 	} else {
@@ -345,6 +345,24 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID 
 		})
 	}
 	return items, nil
+}
+
+// tenantAdminPermissions 返回目标租户中所有已授权资源的通配权限。
+func (r *AuthRepository) tenantAdminPermissions(ctx context.Context, tenantID uint64) ([]string, error) {
+	tr, resource := r.q.TenantResource, r.q.Resource
+	var codes []string
+	if err := tr.WithContext(ctx).
+		Join(resource, resource.ID.EqCol(tr.ResourceID)).
+		Where(tr.TenantID.Eq(tenantID), resource.ScopeMask.BitAnd(2).Eq(2), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+		Distinct(resource.Code).Pluck(resource.Code, &codes); err != nil {
+		return nil, fmt.Errorf("查询租户管理员权限失败: %w", err)
+	}
+	permissions := make([]string, 0, len(codes))
+	for _, code := range codes {
+		permissions = append(permissions, code+":*")
+	}
+	sort.Strings(permissions)
+	return permissions, nil
 }
 
 func (r *AuthRepository) isTenantAdmin(ctx context.Context, tenantID, memberID uint64) (bool, error) {

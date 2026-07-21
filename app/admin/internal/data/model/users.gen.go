@@ -21,7 +21,6 @@ type User struct {
 	PasswordHash      string         `gorm:"column:password_hash;type:varchar(255);not null;comment:Argon2id密码哈希" json:"password_hash"`                                       // Argon2id密码哈希
 	DisplayName       string         `gorm:"column:display_name;type:varchar(128);not null;comment:用户显示名称" json:"display_name"`                                               // 用户显示名称
 	AvatarURL         *string        `gorm:"column:avatar_url;type:text;comment:头像地址" json:"avatar_url"`                                                                      // 头像地址
-	IsPlatformAdmin   bool           `gorm:"column:is_platform_admin;type:tinyint(1);not null;default:0;comment:是否平台管理员：0否，1是" json:"is_platform_admin"`                      // 是否平台管理员：0否，1是
 	Status            uint8          `gorm:"column:status;type:tinyint unsigned;not null;index:idx_users_status,priority:1;default:1;comment:用户状态：1启用，2禁用，3锁定" json:"status"` // 用户状态：1启用，2禁用，3锁定
 	FailedLoginCount  uint32         `gorm:"column:failed_login_count;type:int unsigned;not null;default:0;comment:连续登录失败次数" json:"failed_login_count"`                       // 连续登录失败次数
 	LockedUntil       *time.Time     `gorm:"column:locked_until;type:datetime(3);comment:锁定截止时间" json:"locked_until"`                                                         // 锁定截止时间

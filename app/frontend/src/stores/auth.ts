@@ -6,6 +6,10 @@ import { setAccessToken } from '@/api/http'
 import type { CurrentUser, LoginRequest, TenantSummary } from '@/types/auth'
 import type { AdminV1NavigationItem } from '@/api/generated'
 
+function isPlatformRealm(user: CurrentUser | null | undefined) {
+  return user?.realm === 'platform' && !user?.impersonating
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = shallowRef('')
   const currentUser = ref<CurrentUser | null>(null)
@@ -15,6 +19,23 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = shallowRef(false)
   const sessionRestored = shallowRef(false)
   const isAuthenticated = computed(() => Boolean(accessToken.value && currentUser.value))
+  const isImpersonating = computed(() => Boolean(currentUser.value?.impersonating))
+
+  function applyAuthResponse(response: {
+    accessToken?: string
+    user?: CurrentUser
+    tenants?: TenantSummary[]
+    currentTenant?: TenantSummary
+  }) {
+    if (!response.accessToken || !response.user) {
+      throw new Error('认证响应缺少访问令牌或用户资料')
+    }
+    accessToken.value = response.accessToken
+    currentUser.value = response.user
+    tenants.value = response.tenants ?? []
+    currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
+    setAccessToken(response.accessToken)
+  }
 
   async function login(request: LoginRequest) {
     loading.value = true
@@ -24,14 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
         clearSession()
         return response
       }
-      if (!response.accessToken || !response.user) {
-        throw new Error('登录响应缺少访问令牌或用户资料')
-      }
-      accessToken.value = response.accessToken
-      currentUser.value = response.user
-      tenants.value = response.tenants ?? []
-      currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
-      setAccessToken(response.accessToken)
+      applyAuthResponse(response)
       await loadNavigation()
       sessionRestored.value = true
       return response
@@ -40,23 +54,45 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function restoreSession() {
+  async function platformLogin(request: LoginRequest) {
+    loading.value = true
+    try {
+      const response = await authApi.platformLogin(request)
+      if (response.mfaRequired) {
+        clearSession()
+        return response
+      }
+      applyAuthResponse(response)
+      await loadNavigation()
+      sessionRestored.value = true
+      return response
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function restoreSession(pathname = window.location.pathname) {
     if (sessionRestored.value) {
       return isAuthenticated.value
     }
+    const usePlatformApi = pathname.startsWith('/platform')
     try {
-      const response = await authApi.refresh()
-      if (!response.accessToken || !response.user) {
-        throw new Error('刷新响应缺少访问令牌或用户资料')
-      }
-      accessToken.value = response.accessToken
-      currentUser.value = response.user
-      tenants.value = response.tenants ?? []
-      currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
-      setAccessToken(response.accessToken)
+      const response = usePlatformApi ? await authApi.platformRefresh() : await authApi.refresh()
+      applyAuthResponse(response)
       await loadNavigation()
       return true
     } catch {
+      if (!usePlatformApi) {
+        try {
+          const response = await authApi.platformRefresh()
+          applyAuthResponse(response)
+          await loadNavigation()
+          return true
+        } catch {
+          clearSession()
+          return false
+        }
+      }
       clearSession()
       return false
     } finally {
@@ -65,15 +101,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function renewSession() {
-    const response = await authApi.refresh()
-    if (!response.accessToken || !response.user) {
-      throw new Error('刷新响应缺少访问令牌或用户资料')
-    }
-    accessToken.value = response.accessToken
-    currentUser.value = response.user
-    tenants.value = response.tenants ?? []
-    currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
-    setAccessToken(response.accessToken)
+    const response = isPlatformRealm(currentUser.value)
+      ? await authApi.platformRefresh()
+      : await authApi.refresh()
+    applyAuthResponse(response)
     await loadNavigation()
   }
 
@@ -81,14 +112,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const response = await authApi.verifyMfa({ challengeId, code })
-      if (!response.accessToken || !response.user) {
-        throw new Error('MFA响应缺少访问令牌或用户资料')
-      }
-      accessToken.value = response.accessToken
-      currentUser.value = response.user
-      tenants.value = response.tenants ?? []
-      currentTenant.value = response.currentTenant ?? response.tenants?.[0] ?? null
-      setAccessToken(response.accessToken)
+      applyAuthResponse(response)
       await loadNavigation()
       sessionRestored.value = true
       return response
@@ -101,14 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       const switched = await authApi.switchTenant(tenantId)
-      if (!switched.accessToken || !switched.user) {
-        throw new Error('租户切换响应缺少身份上下文')
-      }
-      accessToken.value = switched.accessToken
-      currentUser.value = switched.user
-      tenants.value = switched.tenants ?? []
-      currentTenant.value = switched.currentTenant ?? null
-      setAccessToken(switched.accessToken)
+      applyAuthResponse(switched)
       await loadNavigation()
     } catch (error) {
       clearSession()
@@ -119,7 +136,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function impersonateTenant(tenantId: string) {
+    loading.value = true
+    try {
+      const response = await authApi.impersonate(tenantId)
+      applyAuthResponse(response)
+      await loadNavigation()
+      sessionRestored.value = true
+      return response
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function logout() {
+    try {
+      if (isPlatformRealm(currentUser.value)) {
+        await authApi.platformLogout()
+      } else {
+        await authApi.logout()
+      }
+    } finally {
+      clearSession()
+    }
+  }
+
+  async function exitImpersonation() {
     try {
       await authApi.logout()
     } finally {
@@ -133,7 +175,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function loadNavigation() {
     try {
-      navigationItems.value = (await authApi.listNavigation()).items ?? []
+      navigationItems.value = isPlatformRealm(currentUser.value)
+        ? ((await authApi.platformListNavigation()).items ?? [])
+        : ((await authApi.listNavigation()).items ?? [])
     } catch {
       navigationItems.value = []
     }
@@ -156,13 +200,17 @@ export const useAuthStore = defineStore('auth', () => {
     navigationItems,
     loading,
     isAuthenticated,
+    isImpersonating,
     sessionRestored,
     login,
+    platformLogin,
     restoreSession,
     renewSession,
     verifyMfa,
     switchTenant,
+    impersonateTenant,
     logout,
+    exitImpersonation,
     applyProfile,
     loadNavigation,
     clearSession

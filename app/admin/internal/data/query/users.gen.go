@@ -35,7 +35,6 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 	_user.PasswordHash = field.NewString(tableName, "password_hash")
 	_user.DisplayName = field.NewString(tableName, "display_name")
 	_user.AvatarURL = field.NewString(tableName, "avatar_url")
-	_user.IsPlatformAdmin = field.NewBool(tableName, "is_platform_admin")
 	_user.Status = field.NewUint8(tableName, "status")
 	_user.FailedLoginCount = field.NewUint32(tableName, "failed_login_count")
 	_user.LockedUntil = field.NewTime(tableName, "locked_until")
@@ -70,7 +69,6 @@ type user struct {
 	PasswordHash      field.String // Argon2id密码哈希
 	DisplayName       field.String // 用户显示名称
 	AvatarURL         field.String // 头像地址
-	IsPlatformAdmin   field.Bool   // 是否平台管理员：0否，1是
 	Status            field.Uint8  // 用户状态：1启用，2禁用，3锁定
 	FailedLoginCount  field.Uint32 // 连续登录失败次数
 	LockedUntil       field.Time   // 锁定截止时间
@@ -106,7 +104,6 @@ func (u *user) updateTableName(table string) *user {
 	u.PasswordHash = field.NewString(table, "password_hash")
 	u.DisplayName = field.NewString(table, "display_name")
 	u.AvatarURL = field.NewString(table, "avatar_url")
-	u.IsPlatformAdmin = field.NewBool(table, "is_platform_admin")
 	u.Status = field.NewUint8(table, "status")
 	u.FailedLoginCount = field.NewUint32(table, "failed_login_count")
 	u.LockedUntil = field.NewTime(table, "locked_until")
@@ -142,7 +139,7 @@ func (u *user) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (u *user) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 20)
+	u.fieldMap = make(map[string]field.Expr, 19)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["username"] = u.Username
 	u.fieldMap["email"] = u.Email
@@ -150,7 +147,6 @@ func (u *user) fillFieldMap() {
 	u.fieldMap["password_hash"] = u.PasswordHash
 	u.fieldMap["display_name"] = u.DisplayName
 	u.fieldMap["avatar_url"] = u.AvatarURL
-	u.fieldMap["is_platform_admin"] = u.IsPlatformAdmin
 	u.fieldMap["status"] = u.Status
 	u.fieldMap["failed_login_count"] = u.FailedLoginCount
 	u.fieldMap["locked_until"] = u.LockedUntil

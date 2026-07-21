@@ -9,9 +9,16 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { resolveNavigation } from '@/features/navigation/registry'
 
-const managementRoutes: Array<[string, string, string]> = [
-  ['platform/users', 'user-management', 'users'],
-  ['platform/tenants', 'tenant-management', 'tenants'],
+const platformManagementRoutes: Array<[string, string, string]> = [
+  ['users', 'platform-user-management', 'users'],
+  ['tenants', 'tenant-management', 'tenants'],
+  ['admins', 'platform-admin-management', 'platform-admins'],
+  ['resources', 'platform-resource-management', 'resources'],
+  ['tenant-features', 'platform-tenant-feature-management', 'tenant-resources'],
+  ['settings/providers', 'platform-provider-management', 'providers']
+]
+
+const consoleManagementRoutes: Array<[string, string, string]> = [
   ['organization/users', 'member-management', 'members'],
   ['organization/departments', 'department-management', 'departments'],
   ['organization/positions', 'position-management', 'positions'],
@@ -26,11 +33,18 @@ const managementRoutes: Array<[string, string, string]> = [
 ]
 
 const routes: RouteRecordRaw[] = [
+  { path: '/', redirect: '/console' },
   {
     path: '/login',
     name: 'login',
     component: () => import('@/views/auth/LoginView.vue'),
-    meta: { guestOnly: true }
+    meta: { guestOnly: true, realm: 'tenant' }
+  },
+  {
+    path: '/platform/login',
+    name: 'platform-login',
+    component: () => import('@/views/auth/LoginView.vue'),
+    meta: { guestOnly: true, realm: 'platform' }
   },
   {
     path: '/mfa',
@@ -45,9 +59,35 @@ const routes: RouteRecordRaw[] = [
     meta: { guestOnly: true }
   },
   {
-    path: '/',
-    component: () => import('@/layouts/AppShell.vue'),
-    meta: { requiresAuth: true },
+    path: '/platform',
+    component: () => import('@/layouts/PlatformShell.vue'),
+    meta: { requiresAuth: true, realm: 'platform' },
+    children: [
+      { path: '', redirect: '/platform/tenants' },
+      {
+        path: 'account',
+        name: 'platform-user-center',
+        component: () => import('@/views/account/UserCenterView.vue')
+      },
+      {
+        path: 'tenants/:tenantId/setup',
+        name: 'tenant-setup',
+        component: () => import('@/views/platform/TenantSetupView.vue'),
+        props: (route) => ({ tenantId: String(route.params.tenantId) }),
+        meta: { platformOnly: true }
+      },
+      ...platformManagementRoutes.map(([path, name, resourceKey]) => ({
+        path,
+        name,
+        component: () => import('@/views/management/ResourceListView.vue'),
+        props: { resourceKey }
+      }))
+    ]
+  },
+  {
+    path: '/console',
+    component: () => import('@/layouts/ConsoleShell.vue'),
+    meta: { requiresAuth: true, realm: 'tenant' },
     children: [
       {
         path: '',
@@ -60,26 +100,9 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/files/FileManagementView.vue')
       },
       {
-        path: 'settings/providers',
-        name: 'provider-management',
-        component: () => import('@/views/settings/ProviderManagementView.vue')
-      },
-      {
         path: 'permission/roles',
         name: 'role-management',
         component: () => import('@/views/permission/RolePermissionView.vue')
-      },
-      {
-        path: 'permission/tenant-features',
-        name: 'tenant-resource-management',
-        component: () => import('@/views/permission/TenantFeatureView.vue')
-      },
-      {
-        path: 'platform/tenants/:tenantId/setup',
-        name: 'tenant-setup',
-        component: () => import('@/views/platform/TenantSetupView.vue'),
-        props: (route) => ({ tenantId: String(route.params.tenantId) }),
-        meta: { platformOnly: true }
       },
       {
         path: 'settings',
@@ -91,7 +114,7 @@ const routes: RouteRecordRaw[] = [
         name: 'user-center',
         component: () => import('@/views/account/UserCenterView.vue')
       },
-      ...managementRoutes.map(([path, name, resourceKey]) => ({
+      ...consoleManagementRoutes.map(([path, name, resourceKey]) => ({
         path,
         name,
         component: () => import('@/views/management/ResourceListView.vue'),
@@ -99,8 +122,20 @@ const routes: RouteRecordRaw[] = [
       }))
     ]
   },
-  { path: '/:pathMatch(.*)*', redirect: '/' }
+  { path: '/:pathMatch(.*)*', redirect: '/console' }
 ]
+
+function isPlatformContext(authStore: ReturnType<typeof useAuthStore>) {
+  return (
+    authStore.currentUser?.realm === 'platform' &&
+    !authStore.currentUser?.impersonating &&
+    Number(authStore.currentTenant?.id ?? 0) === 0
+  )
+}
+
+function defaultHome(authStore: ReturnType<typeof useAuthStore>) {
+  return isPlatformContext(authStore) ? '/platform/tenants' : '/console'
+}
 
 export function createAppRouter(mode: 'web' | 'memory' = 'web') {
   const history: RouterHistory = mode === 'memory' ? createMemoryHistory() : createWebHistory()
@@ -109,29 +144,50 @@ export function createAppRouter(mode: 'web' | 'memory' = 'web') {
   router.beforeEach(async (to) => {
     const authStore = useAuthStore()
     if (!authStore.isAuthenticated && !authStore.sessionRestored) {
-      await authStore.restoreSession()
+      await authStore.restoreSession(to.path)
     }
+
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-      return { name: 'login', query: { redirect: to.fullPath } }
+      const loginName = to.meta.realm === 'platform' ? 'platform-login' : 'login'
+      return { name: loginName, query: { redirect: to.fullPath } }
     }
+
     if (to.meta.guestOnly && authStore.isAuthenticated) {
-      return { name: 'dashboard' }
+      return defaultHome(authStore)
     }
+
+    if (to.meta.realm === 'platform' && authStore.isAuthenticated && !isPlatformContext(authStore)) {
+      return authStore.currentUser?.impersonating ? '/console' : { name: 'login' }
+    }
+
+    if (
+      to.meta.realm === 'tenant' &&
+      authStore.isAuthenticated &&
+      isPlatformContext(authStore) &&
+      !to.meta.guestOnly
+    ) {
+      return '/platform/tenants'
+    }
+
     if (to.meta.platformOnly) {
-      const platformContext =
-        Boolean(authStore.currentUser?.platformAdmin) &&
-        Number(authStore.currentTenant?.id ?? 0) === 0
       const canManageTenants = resolveNavigation(authStore.navigationItems).some(
         (item) => item.to === '/platform/tenants'
       )
-      if (!platformContext || !canManageTenants) return { name: 'dashboard' }
+      if (!isPlatformContext(authStore) || !canManageTenants) {
+        return defaultHome(authStore)
+      }
       return
     }
-    if (authStore.isAuthenticated && !to.meta.guestOnly && !['/', '/account'].includes(to.path)) {
-      const allowed = resolveNavigation(authStore.navigationItems).some(
-        (item) => item.to === to.path
-      )
-      if (!allowed) return { name: 'dashboard' }
+
+    const resolved = resolveNavigation(authStore.navigationItems)
+    if (
+      authStore.isAuthenticated &&
+      !to.meta.guestOnly &&
+      resolved.length > 0 &&
+      !['/console', '/console/account', '/platform/account'].includes(to.path)
+    ) {
+      const allowed = resolved.some((item) => item.to === to.path)
+      if (!allowed) return defaultHome(authStore)
     }
   })
 

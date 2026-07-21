@@ -172,19 +172,21 @@ func (x *TenantSummary) GetName() string {
 }
 
 type CurrentUser struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	AvatarUrl     string                 `protobuf:"bytes,3,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
-	PlatformAdmin bool                   `protobuf:"varint,4,opt,name=platform_admin,json=platformAdmin,proto3" json:"platform_admin,omitempty"`
-	Permissions   []string               `protobuf:"bytes,5,rep,name=permissions,proto3" json:"permissions,omitempty"`
-	Username      string                 `protobuf:"bytes,6,opt,name=username,proto3" json:"username,omitempty"`
-	Email         string                 `protobuf:"bytes,7,opt,name=email,proto3" json:"email,omitempty"`
-	Phone         string                 `protobuf:"bytes,8,opt,name=phone,proto3" json:"phone,omitempty"`
-	MfaEnabled    bool                   `protobuf:"varint,9,opt,name=mfa_enabled,json=mfaEnabled,proto3" json:"mfa_enabled,omitempty"`
-	MfaChannel    string                 `protobuf:"bytes,10,opt,name=mfa_channel,json=mfaChannel,proto3" json:"mfa_channel,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	DisplayName    string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	AvatarUrl      string                 `protobuf:"bytes,3,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	Realm          string                 `protobuf:"bytes,4,opt,name=realm,proto3" json:"realm,omitempty"`
+	Permissions    []string               `protobuf:"bytes,5,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	Username       string                 `protobuf:"bytes,6,opt,name=username,proto3" json:"username,omitempty"`
+	Email          string                 `protobuf:"bytes,7,opt,name=email,proto3" json:"email,omitempty"`
+	Phone          string                 `protobuf:"bytes,8,opt,name=phone,proto3" json:"phone,omitempty"`
+	MfaEnabled     bool                   `protobuf:"varint,9,opt,name=mfa_enabled,json=mfaEnabled,proto3" json:"mfa_enabled,omitempty"`
+	MfaChannel     string                 `protobuf:"bytes,10,opt,name=mfa_channel,json=mfaChannel,proto3" json:"mfa_channel,omitempty"`
+	ImpersonatorId uint64                 `protobuf:"varint,11,opt,name=impersonator_id,json=impersonatorId,proto3" json:"impersonator_id,omitempty"`
+	Impersonating  bool                   `protobuf:"varint,12,opt,name=impersonating,proto3" json:"impersonating,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CurrentUser) Reset() {
@@ -238,11 +240,11 @@ func (x *CurrentUser) GetAvatarUrl() string {
 	return ""
 }
 
-func (x *CurrentUser) GetPlatformAdmin() bool {
+func (x *CurrentUser) GetRealm() string {
 	if x != nil {
-		return x.PlatformAdmin
+		return x.Realm
 	}
-	return false
+	return ""
 }
 
 func (x *CurrentUser) GetPermissions() []string {
@@ -285,6 +287,20 @@ func (x *CurrentUser) GetMfaChannel() string {
 		return x.MfaChannel
 	}
 	return ""
+}
+
+func (x *CurrentUser) GetImpersonatorId() uint64 {
+	if x != nil {
+		return x.ImpersonatorId
+	}
+	return 0
+}
+
+func (x *CurrentUser) GetImpersonating() bool {
+	if x != nil {
+		return x.Impersonating
+	}
+	return false
 }
 
 type LoginRequest struct {
@@ -1653,13 +1669,13 @@ const file_admin_v1_auth_proto_rawDesc = "" +
 	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"3\n" +
 	"\rTenantSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xb2\x02\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xf0\x02\n" +
 	"\vCurrentUser\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
-	"avatar_url\x18\x03 \x01(\tR\tavatarUrl\x12%\n" +
-	"\x0eplatform_admin\x18\x04 \x01(\bR\rplatformAdmin\x12 \n" +
+	"avatar_url\x18\x03 \x01(\tR\tavatarUrl\x12\x14\n" +
+	"\x05realm\x18\x04 \x01(\tR\x05realm\x12 \n" +
 	"\vpermissions\x18\x05 \x03(\tR\vpermissions\x12\x1a\n" +
 	"\busername\x18\x06 \x01(\tR\busername\x12\x14\n" +
 	"\x05email\x18\a \x01(\tR\x05email\x12\x14\n" +
@@ -1668,7 +1684,9 @@ const file_admin_v1_auth_proto_rawDesc = "" +
 	"mfaEnabled\x12\x1f\n" +
 	"\vmfa_channel\x18\n" +
 	" \x01(\tR\n" +
-	"mfaChannel\"\xad\x01\n" +
+	"mfaChannel\x12'\n" +
+	"\x0fimpersonator_id\x18\v \x01(\x04R\x0eimpersonatorId\x12$\n" +
+	"\rimpersonating\x18\f \x01(\bR\rimpersonating\"\xad\x01\n" +
 	"\fLoginRequest\x12\x1e\n" +
 	"\n" +
 	"identifier\x18\x01 \x01(\tR\n" +

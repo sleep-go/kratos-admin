@@ -46,7 +46,8 @@ type SessionHandler interface {
 	List(ctx context.Context, userID uint64, currentSessionID string) ([]bizauth.DeviceSession, error)
 	Revoke(ctx context.Context, sessionID string, userID uint64) error
 	UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) (bizauth.UserProfile, error)
-	Navigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]bizauth.NavigationItem, error)
+	Navigation(ctx context.Context, tenantID, memberID uint64, realm bizauth.Realm) ([]bizauth.NavigationItem, error)
+	ProfileByRealm(ctx context.Context, userID, tenantID uint64, realm bizauth.Realm) (bizauth.SessionProfile, error)
 }
 
 // AuthService 实现登录、令牌与会话治理 API。
@@ -383,7 +384,7 @@ func (s *AuthService) ListNavigation(ctx context.Context, _ *v1.ListNavigationRe
 	if !ok || s.sessionHandler == nil {
 		return nil, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
-	items, err := s.sessionHandler.Navigation(ctx, claims.TenantID, claims.MemberID, claims.PlatformAdmin)
+	items, err := s.sessionHandler.Navigation(ctx, claims.TenantID, claims.MemberID, claims.Realm)
 	if err != nil {
 		return nil, kratoserrors.InternalServer("NAVIGATION_LIST_FAILED", "加载授权菜单失败")
 	}
@@ -399,7 +400,7 @@ func (s *AuthService) ListNavigation(ctx context.Context, _ *v1.ListNavigationRe
 
 func refreshCookie(token string, expiresAt time.Time, secure bool) string {
 	return (&http.Cookie{
-		Name: "kratos_admin_refresh", Value: token, Path: "/api/v1/auth",
+		Name: "kratos_admin_refresh", Value: token, Path: "/api/v1",
 		Expires: expiresAt, MaxAge: int(time.Until(expiresAt).Seconds()),
 		HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
 	}).String()
@@ -407,7 +408,7 @@ func refreshCookie(token string, expiresAt time.Time, secure bool) string {
 
 func clearRefreshCookie(secure bool) string {
 	return (&http.Cookie{
-		Name: "kratos_admin_refresh", Path: "/api/v1/auth", MaxAge: -1,
+		Name: "kratos_admin_refresh", Path: "/api/v1", MaxAge: -1,
 		Expires: time.Unix(1, 0), HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
 	}).String()
 }
@@ -435,7 +436,8 @@ func mapCurrentUser(user bizauth.UserProfile) *v1.CurrentUser {
 	return &v1.CurrentUser{
 		Id: user.ID, Username: user.Username, DisplayName: user.DisplayName, AvatarUrl: user.AvatarURL,
 		Email: user.Email, Phone: user.Phone, MfaEnabled: user.MFAEnabled, MfaChannel: user.MFAChannel,
-		PlatformAdmin: user.PlatformAdmin, Permissions: user.Permissions,
+		Realm: string(user.Realm), Permissions: user.Permissions,
+		ImpersonatorId: user.ImpersonatorID, Impersonating: user.Impersonating,
 	}
 }
 

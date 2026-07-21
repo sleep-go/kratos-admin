@@ -32,6 +32,7 @@ var (
 	LoginLog            *loginLog
 	MemberDepartment    *memberDepartment
 	Position            *position
+	PlatformAdmin      *platformAdmin
 	ProviderConfig      *providerConfig
 	Resource            *resource
 	Role                *role
@@ -61,6 +62,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	LoginLog = &Q.LoginLog
 	MemberDepartment = &Q.MemberDepartment
 	Position = &Q.Position
+	PlatformAdmin = &Q.PlatformAdmin
 	ProviderConfig = &Q.ProviderConfig
 	Resource = &Q.Resource
 	Role = &Q.Role
@@ -91,6 +93,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		LoginLog:            newLoginLog(db, opts...),
 		MemberDepartment:    newMemberDepartment(db, opts...),
 		Position:            newPosition(db, opts...),
+		PlatformAdmin:      newPlatformAdmin(db, opts...),
 		ProviderConfig:      newProviderConfig(db, opts...),
 		Resource:            newResource(db, opts...),
 		Role:                newRole(db, opts...),
@@ -122,6 +125,7 @@ type Query struct {
 	LoginLog            loginLog
 	MemberDepartment    memberDepartment
 	Position            position
+	PlatformAdmin       platformAdmin
 	ProviderConfig      providerConfig
 	Resource            resource
 	Role                role
@@ -156,6 +160,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		LoginLog:            q.LoginLog.clone(db),
 		MemberDepartment:    q.MemberDepartment.clone(db),
 		Position:            q.Position.clone(db),
+		PlatformAdmin:       q.PlatformAdmin.clone(db),
 		ProviderConfig:      q.ProviderConfig.clone(db),
 		Resource:            q.Resource.clone(db),
 		Role:                q.Role.clone(db),
@@ -195,6 +200,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		LoginLog:            q.LoginLog.replaceDB(db),
 		MemberDepartment:    q.MemberDepartment.replaceDB(db),
 		Position:            q.Position.replaceDB(db),
+		PlatformAdmin:       q.PlatformAdmin.replaceDB(db),
 		ProviderConfig:      q.ProviderConfig.replaceDB(db),
 		Resource:            q.Resource.replaceDB(db),
 		Role:                q.Role.replaceDB(db),

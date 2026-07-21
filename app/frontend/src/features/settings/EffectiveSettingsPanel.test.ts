@@ -37,7 +37,7 @@ describe('EffectiveSettingsPanel', () => {
             initialState: {
               auth: {
                 currentTenant: { id: '0', name: '平台管理' },
-                currentUser: { id: '1', displayName: '管理员', platformAdmin: true }
+                currentUser: { id: '1', displayName: '管理员', realm: 'platform' }
               }
             }
           })

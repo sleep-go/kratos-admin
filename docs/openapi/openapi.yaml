@@ -761,6 +761,174 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/platform/auth/impersonate:
+        post:
+            tags:
+                - PlatformAuthService
+            operationId: PlatformAuthService_Impersonate
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.PlatformAuthServiceImpersonateRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.PlatformAuthServiceImpersonateResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/platform/auth/login:
+        post:
+            tags:
+                - PlatformAuthService
+            operationId: PlatformAuthService_Login
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.PlatformAuthServiceLoginRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.PlatformAuthServiceLoginResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/platform/auth/logout:
+        post:
+            tags:
+                - PlatformAuthService
+            operationId: PlatformAuthService_Logout
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.PlatformAuthServiceLogoutResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/platform/auth/navigation:
+        get:
+            tags:
+                - PlatformAuthService
+            operationId: PlatformAuthService_ListNavigation
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.PlatformAuthServiceListNavigationResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/platform/auth/profile:
+        get:
+            tags:
+                - PlatformAuthService
+            operationId: PlatformAuthService_Profile
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.PlatformAuthServiceProfileResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/platform/auth/refresh:
+        post:
+            tags:
+                - PlatformAuthService
+            operationId: PlatformAuthService_Refresh
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/admin.v1.PlatformAuthServiceRefreshRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.PlatformAuthServiceRefreshResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/platform/auth/sessions:
+        get:
+            tags:
+                - PlatformAuthService
+            operationId: PlatformAuthService_ListSessions
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.PlatformAuthServiceListSessionsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
+    /api/v1/platform/auth/sessions/{sessionId}:
+        delete:
+            tags:
+                - PlatformAuthService
+            operationId: PlatformAuthService_RevokeSession
+            parameters:
+                - name: sessionId
+                  in: path
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/admin.v1.PlatformAuthServiceRevokeSessionResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/google.rpc.Status'
     /api/v1/settings/effective:
         get:
             tags:
@@ -885,8 +1053,8 @@ components:
                     type: string
                 avatarUrl:
                     type: string
-                platformAdmin:
-                    type: boolean
+                realm:
+                    type: string
                 permissions:
                     type: array
                     items:
@@ -901,6 +1069,10 @@ components:
                     type: boolean
                 mfaChannel:
                     type: string
+                impersonatorId:
+                    type: string
+                impersonating:
+                    type: boolean
         admin.v1.DeleteFileResponse:
             type: object
             properties: {}
@@ -1070,6 +1242,115 @@ components:
                 sortOrder:
                     type: integer
                     format: uint32
+        admin.v1.PlatformAuthServiceImpersonateRequest:
+            type: object
+            properties:
+                tenantId:
+                    type: string
+        admin.v1.PlatformAuthServiceImpersonateResponse:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                expiresAt:
+                    type: string
+                    format: date-time
+                currentTenant:
+                    $ref: '#/components/schemas/admin.v1.TenantSummary'
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
+                tenants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.TenantSummary'
+        admin.v1.PlatformAuthServiceListNavigationResponse:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.NavigationItem'
+        admin.v1.PlatformAuthServiceListSessionsResponse:
+            type: object
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.Session'
+        admin.v1.PlatformAuthServiceLoginRequest:
+            type: object
+            properties:
+                identifier:
+                    type: string
+                password:
+                    type: string
+                captchaId:
+                    type: string
+                captchaCode:
+                    type: string
+                deviceName:
+                    type: string
+        admin.v1.PlatformAuthServiceLoginResponse:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                expiresAt:
+                    type: string
+                    format: date-time
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
+                tenants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.TenantSummary'
+                currentTenant:
+                    $ref: '#/components/schemas/admin.v1.TenantSummary'
+                mfaChallengeId:
+                    type: string
+                mfaRequired:
+                    type: boolean
+        admin.v1.PlatformAuthServiceLogoutResponse:
+            type: object
+            properties: {}
+        admin.v1.PlatformAuthServiceProfileResponse:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                expiresAt:
+                    type: string
+                    format: date-time
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
+                tenants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.TenantSummary'
+                currentTenant:
+                    $ref: '#/components/schemas/admin.v1.TenantSummary'
+        admin.v1.PlatformAuthServiceRefreshRequest:
+            type: object
+            properties: {}
+        admin.v1.PlatformAuthServiceRefreshResponse:
+            type: object
+            properties:
+                accessToken:
+                    type: string
+                expiresAt:
+                    type: string
+                    format: date-time
+                user:
+                    $ref: '#/components/schemas/admin.v1.CurrentUser'
+                tenants:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/admin.v1.TenantSummary'
+                currentTenant:
+                    $ref: '#/components/schemas/admin.v1.TenantSummary'
+        admin.v1.PlatformAuthServiceRevokeSessionResponse:
+            type: object
+            properties: {}
         admin.v1.RefreshRequest:
             type: object
             properties: {}
@@ -1302,3 +1583,5 @@ tags:
       description: LogService 提供受权限保护的异步日志导出与下载能力。
     - name: ManagementService
       description: ManagementService 提供白名单后台资源的统一分页与维护接口。
+    - name: PlatformAuthService
+      description: PlatformAuthService 提供平台管理员登录、代维与会话治理接口。

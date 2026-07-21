@@ -1,5 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { beforeEach, vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import ResourceListView from './ResourceListView.vue'
 
@@ -36,9 +38,14 @@ vi.mock('@/api/logs', () => ({
 }))
 
 function mountView(resourceKey = 'users', targetTenantId?: string) {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/', component: { template: '<div />' } }]
+  })
   return mount(ResourceListView, {
     props: { resourceKey, targetTenantId },
     global: {
+      plugins: [createPinia(), router],
       directives: { permission: () => undefined, loading: () => undefined },
       stubs: {
         ResourceFormField: {

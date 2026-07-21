@@ -23,12 +23,23 @@ const (
 	TokenTypeRefresh TokenType = "refresh"
 )
 
+// Realm 标识认证域：平台管理员或租户用户。
+type Realm string
+
+const (
+	// RealmPlatform 表示平台管理员认证域。
+	RealmPlatform Realm = "platform"
+	// RealmTenant 表示租户用户认证域。
+	RealmTenant Realm = "tenant"
+)
+
 // TokenSubject 描述签发令牌所需的认证上下文。
 type TokenSubject struct {
 	UserID            uint64
 	TenantID          uint64
 	MemberID          uint64
-	PlatformAdmin     bool
+	Realm             Realm
+	ImpersonatorID    uint64
 	SessionID         string
 	PermissionVersion uint64
 }
@@ -38,7 +49,8 @@ type TokenClaims struct {
 	UserID            uint64    `json:"uid"`
 	TenantID          uint64    `json:"tid"`
 	MemberID          uint64    `json:"mid"`
-	PlatformAdmin     bool      `json:"pa"`
+	Realm             Realm     `json:"realm"`
+	ImpersonatorID    uint64    `json:"imp,omitempty"`
 	SessionID         string    `json:"sid"`
 	PermissionVersion uint64    `json:"pv"`
 	TokenType         TokenType `json:"typ"`
@@ -143,7 +155,8 @@ func (m *TokenManager) sign(subject TokenSubject, tokenType TokenType, ttl time.
 		UserID:            subject.UserID,
 		TenantID:          subject.TenantID,
 		MemberID:          subject.MemberID,
-		PlatformAdmin:     subject.PlatformAdmin,
+		Realm:             subject.Realm,
+		ImpersonatorID:    subject.ImpersonatorID,
 		SessionID:         subject.SessionID,
 		PermissionVersion: subject.PermissionVersion,
 		TokenType:         tokenType,

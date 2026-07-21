@@ -14,6 +14,29 @@ CREATE TABLE tenants (
     KEY idx_tenants_status (status, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='租户表';
 
+CREATE TABLE platform_admins (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '平台管理员主键',
+    username VARCHAR(64) NOT NULL COMMENT '平台管理员唯一用户名',
+    email VARCHAR(191) NULL COMMENT '平台管理员邮箱',
+    phone VARCHAR(32) NULL COMMENT '平台管理员手机号',
+    password_hash VARCHAR(255) NOT NULL COMMENT 'Argon2id密码哈希',
+    display_name VARCHAR(128) NOT NULL COMMENT '显示名称',
+    avatar_url TEXT NULL COMMENT '头像地址',
+    mfa_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否启用登录MFA：0否，1是',
+    mfa_channel VARCHAR(16) NOT NULL DEFAULT 'email' COMMENT 'MFA渠道：email邮件，sms短信',
+    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '账号状态：1启用，2禁用，3锁定',
+    failed_login_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '连续登录失败次数',
+    locked_until DATETIME(3) NULL COMMENT '锁定截止时间',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    deleted_at DATETIME(3) NULL COMMENT '逻辑删除时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_platform_admins_username (username),
+    UNIQUE KEY uk_platform_admins_email (email),
+    UNIQUE KEY uk_platform_admins_phone (phone),
+    KEY idx_platform_admins_status (status, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='平台管理员表';
+
 CREATE TABLE users (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户主键',
     username VARCHAR(64) NOT NULL COMMENT '全局唯一用户名',
@@ -22,12 +45,13 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL COMMENT 'Argon2id密码哈希',
     display_name VARCHAR(128) NOT NULL COMMENT '用户显示名称',
     avatar_url TEXT NULL COMMENT '头像地址',
-    is_platform_admin TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否平台管理员：0否，1是',
     status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '用户状态：1启用，2禁用，3锁定',
     failed_login_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '连续登录失败次数',
     locked_until DATETIME(3) NULL COMMENT '锁定截止时间',
     email_verified_at DATETIME(3) NULL COMMENT '邮箱验证时间',
     phone_verified_at DATETIME(3) NULL COMMENT '手机号验证时间',
+    mfa_enabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否启用登录MFA：0否，1是',
+    mfa_channel VARCHAR(16) NOT NULL DEFAULT 'email' COMMENT 'MFA渠道：email邮件，sms短信',
     password_changed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '密码最后修改时间',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
@@ -122,6 +146,7 @@ CREATE TABLE resources (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '权限资源主键',
     parent_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '父资源ID，0表示根资源',
     type TINYINT UNSIGNED NOT NULL COMMENT '资源类型：1目录，2菜单，3按钮，4API',
+    scope_mask TINYINT UNSIGNED NOT NULL DEFAULT 3 COMMENT '资源适用范围位标记：1仅平台，2仅租户，3平台与租户共用',
     code VARCHAR(128) NOT NULL COMMENT '全局唯一资源编码',
     name VARCHAR(128) NOT NULL COMMENT '资源名称',
     route_path VARCHAR(255) NOT NULL DEFAULT '' COMMENT '前端路由路径',
@@ -176,9 +201,11 @@ CREATE TABLE role_scope_departments (
 
 CREATE TABLE auth_sessions (
     id CHAR(36) NOT NULL COMMENT '会话UUID',
-    user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
-    tenant_id BIGINT UNSIGNED NOT NULL COMMENT '当前租户ID，0表示平台域',
-    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前租户成员ID，平台域为0',
+    realm VARCHAR(16) NOT NULL DEFAULT 'tenant' COMMENT '认证域：platform平台，tenant租户',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '主体ID：平台域为platform_admin.id，租户域为user.id',
+    tenant_id BIGINT UNSIGNED NOT NULL COMMENT '当前租户ID，平台域为0',
+    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '当前租户成员ID，平台域或代维会话为0',
+    impersonator_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '代维平台管理员ID，非代维为0',
     permission_version BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '会话最近一次签发时的权限版本号',
     refresh_jti_hash CHAR(64) NOT NULL COMMENT 'Refresh JWT jti的SHA256摘要',
     device_name VARCHAR(128) NOT NULL DEFAULT '' COMMENT '设备名称',
@@ -190,7 +217,7 @@ CREATE TABLE auth_sessions (
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_auth_sessions_refresh_hash (refresh_jti_hash),
-    KEY idx_auth_sessions_user (user_id, revoked_at, expires_at)
+    KEY idx_auth_sessions_user (realm, user_id, revoked_at, expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='认证会话表';
 
 CREATE TABLE verification_codes (
@@ -203,6 +230,7 @@ CREATE TABLE verification_codes (
     attempt_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '已验证失败次数',
     expires_at DATETIME(3) NOT NULL COMMENT '过期时间',
     consumed_at DATETIME(3) NULL COMMENT '消费时间',
+    context_data JSON NULL COMMENT 'MFA设备上下文等非敏感挑战数据',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     PRIMARY KEY (id),
     KEY idx_verification_codes_lookup (target, scene, created_at)
@@ -231,13 +259,15 @@ CREATE TABLE audit_outbox (
     aggregate_type VARCHAR(64) NOT NULL COMMENT '业务聚合类型',
     aggregate_id VARCHAR(64) NOT NULL COMMENT '业务聚合ID',
     payload JSON NOT NULL COMMENT '审计事件载荷',
-    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '处理状态：1待处理，2已发布，3失败',
+    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '处理状态：1待处理，2已完成，3等待重试，4最终失败',
     retry_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '重试次数',
     next_retry_at DATETIME(3) NULL COMMENT '下次重试时间',
+    dispatched_at DATETIME(3) NULL COMMENT '最近一次RabbitMQ确认投递时间',
+    last_error VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '最后一次处理失败原因',
     published_at DATETIME(3) NULL COMMENT '成功发布时间',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     PRIMARY KEY (id),
-    KEY idx_audit_outbox_dispatch (status, next_retry_at, created_at)
+    KEY idx_audit_outbox_dispatch (status, next_retry_at, dispatched_at, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='事务审计Outbox表';
 
 CREATE TABLE audit_logs (
@@ -246,6 +276,7 @@ CREATE TABLE audit_logs (
     tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属租户ID，0表示平台域',
     user_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作用户ID，系统任务为0',
     member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作成员ID，平台域或系统任务为0',
+    impersonator_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '代维平台管理员ID，非代维为0',
     action VARCHAR(64) NOT NULL COMMENT '业务动作',
     resource_type VARCHAR(64) NOT NULL COMMENT '资源类型',
     resource_id VARCHAR(64) NOT NULL COMMENT '资源ID',
@@ -356,13 +387,18 @@ CREATE TABLE files (
     size_bytes BIGINT UNSIGNED NOT NULL COMMENT '文件大小字节数',
     sha256 CHAR(64) NOT NULL DEFAULT '' COMMENT '文件SHA256摘要',
     etag VARCHAR(191) NOT NULL DEFAULT '' COMMENT '对象存储返回的ETag',
-    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '文件状态：1待确认，2可用，3已删除，4清理失败',
+    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '文件状态：1待确认，2可用，3已删除，4清理失败，5等待后台清理',
+    cleanup_dispatched_at DATETIME(3) NULL COMMENT '文件清理任务最近一次RabbitMQ确认投递时间',
+    cleanup_retry_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '文件清理失败重试次数',
+    cleanup_next_retry_at DATETIME(3) NULL COMMENT '文件清理下次重试时间',
+    cleanup_failure_reason VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '文件清理最后失败原因',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
     deleted_at DATETIME(3) NULL COMMENT '逻辑删除时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_files_provider_object (provider_name, object_key),
-    KEY idx_files_tenant (tenant_id, status, created_at)
+    KEY idx_files_tenant (tenant_id, status, created_at),
+    KEY idx_files_cleanup (status, cleanup_next_retry_at, cleanup_dispatched_at, updated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='租户文件元数据表';
 
 CREATE TABLE file_references (
@@ -376,6 +412,33 @@ CREATE TABLE file_references (
     UNIQUE KEY uk_file_references_relation (tenant_id, file_id, business_type, business_id),
     KEY idx_file_references_business (tenant_id, business_type, business_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件业务引用表';
+
+CREATE TABLE log_exports (
+    id CHAR(36) NOT NULL COMMENT '日志导出任务UUID',
+    tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属租户ID，0表示平台跨租户导出',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '发起导出的用户ID',
+    member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '发起导出的租户成员ID，平台域为0',
+    log_type VARCHAR(16) NOT NULL COMMENT '日志类型：login登录日志，audit操作审计，api接口访问日志',
+    keyword VARCHAR(191) NOT NULL DEFAULT '' COMMENT '导出查询关键词',
+    filters JSON NULL COMMENT '导出查询白名单筛选条件',
+    payload_version SMALLINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '异步任务载荷版本',
+    idempotency_key VARCHAR(191) NOT NULL COMMENT '异步任务幂等键',
+    status TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT '导出状态：1待处理，2处理中，3已完成，4失败',
+    row_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '实际导出行数，最多100000条',
+    file_id CHAR(36) NOT NULL DEFAULT '' COMMENT '完成后生成的受保护文件UUID',
+    retry_count INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '已执行重试次数',
+    next_retry_at DATETIME(3) NULL COMMENT '下次允许执行时间',
+    dispatched_at DATETIME(3) NULL COMMENT '最近一次RabbitMQ确认投递时间',
+    failure_reason VARCHAR(1024) NOT NULL DEFAULT '' COMMENT '最后失败原因',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
+    started_at DATETIME(3) NULL COMMENT '开始处理时间',
+    finished_at DATETIME(3) NULL COMMENT '处理完成或最终失败时间',
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_log_exports_idempotency (idempotency_key),
+    KEY idx_log_exports_pending (status, next_retry_at, dispatched_at, created_at),
+    KEY idx_log_exports_query (tenant_id, user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='异步日志导出任务表';
 
 CREATE TABLE failed_tasks (
     id CHAR(36) NOT NULL COMMENT '失败任务UUID',
@@ -395,8 +458,41 @@ CREATE TABLE failed_tasks (
     KEY idx_failed_tasks_status (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='异步失败任务记录表';
 
+INSERT INTO resources (parent_id, type, scope_mask, code, name, route_path, component_key, icon, sort_order, visible, status)
+VALUES
+    (0, 1, 1, 'menu.platform', '平台管理', '', '', 'OfficeBuilding', 10, 1, 1),
+    (0, 1, 2, 'menu.organization', '组织管理', '', '', 'UserFilled', 20, 1, 1),
+    (0, 1, 2, 'menu.permission', '权限中心', '', '', 'Lock', 30, 1, 1),
+    (0, 1, 3, 'menu.logs', '日志中心', '', '', 'Document', 40, 1, 1),
+    (0, 1, 2, 'menu.storage', '文件管理', '', '', 'Folder', 50, 1, 1),
+    (0, 1, 3, 'menu.settings', '系统设置', '', '', 'Setting', 60, 1, 1);
+
+INSERT INTO resources (parent_id, type, scope_mask, code, name, route_path, component_key, icon, sort_order, visible, status)
+VALUES
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'users', '全局用户', '/platform/users', 'users', 'User', 11, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'tenants', '租户管理', '/platform/tenants', 'tenants', 'OfficeBuilding', 12, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 3, 1, 'tenant-setup', '租户初始化', '', 'tenant-setup', 'Tools', 13, 0, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'platform-admins', '平台管理员', '/platform/admins', 'platform-admins', 'UserFilled', 14, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'resources', '菜单与权限资源', '/platform/resources', 'resources', 'Menu', 15, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform') AS parent), 2, 1, 'tenant-resources', '租户功能授权', '/platform/tenant-features', 'tenant-resources', 'Connection', 16, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.organization') AS parent), 2, 2, 'members', '成员管理', '/console/organization/users', 'members', 'UserFilled', 21, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.organization') AS parent), 2, 2, 'departments', '部门管理', '/console/organization/departments', 'departments', 'Share', 22, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.organization') AS parent), 2, 2, 'positions', '岗位管理', '/console/organization/positions', 'positions', 'Postcard', 23, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.permission') AS parent), 2, 2, 'roles', '角色与数据权限', '/console/permission/roles', 'roles', 'Lock', 31, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.permission') AS parent), 2, 2, 'casbin-rules', '按钮与 API 授权', '/console/permission/policies', 'casbin-rules', 'Key', 32, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.logs') AS parent), 2, 3, 'login-logs', '登录日志', '/console/logs/login', 'login-logs', 'List', 41, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.logs') AS parent), 2, 3, 'audit-logs', '操作审计', '/console/logs/audit', 'audit-logs', 'DocumentChecked', 42, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.logs') AS parent), 2, 3, 'api-logs', 'API 日志', '/console/logs/api', 'api-logs', 'Monitor', 43, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.logs') AS parent), 2, 3, 'log-exports', '日志导出', '/console/logs/exports', 'log-exports', 'Download', 44, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.storage') AS parent), 2, 2, 'files', '文件管理', '/console/files', 'files', 'Folder', 51, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.settings') AS parent), 2, 3, 'settings', '系统设置', '/console/settings', 'settings', 'Setting', 61, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.settings') AS parent), 2, 3, 'providers', '渠道配置', '/platform/settings/providers', 'providers', 'Connection', 62, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.settings') AS parent), 2, 2, 'dictionary-types', '参数字典', '/console/settings/dictionaries', 'dictionary-types', 'Collection', 63, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.settings') AS parent), 2, 2, 'dictionary-items', '字典项', '/console/settings/dictionary-items', 'dictionary-items', 'Tickets', 64, 1, 1);
+
 -- +goose Down
 DROP TABLE IF EXISTS failed_tasks;
+DROP TABLE IF EXISTS log_exports;
 DROP TABLE IF EXISTS file_references;
 DROP TABLE IF EXISTS files;
 DROP TABLE IF EXISTS provider_configs;
@@ -419,4 +515,5 @@ DROP TABLE IF EXISTS tenant_members;
 DROP TABLE IF EXISTS positions;
 DROP TABLE IF EXISTS departments;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS platform_admins;
 DROP TABLE IF EXISTS tenants;

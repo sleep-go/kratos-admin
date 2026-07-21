@@ -29,6 +29,11 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
   return response.data
 }
 
+export async function platformLogin(request: LoginRequest): Promise<LoginResponse> {
+  const response = await http.post<LoginResponse>('/platform/auth/login', request)
+  return response.data
+}
+
 export async function verifyMfa(request: VerifyMfaRequest): Promise<VerifyMfaResponse> {
   const response = await http.post<VerifyMfaResponse>('/auth/mfa/verify', request)
   return response.data
@@ -49,8 +54,17 @@ export async function logout(): Promise<void> {
   await http.post('/auth/logout')
 }
 
+export async function platformLogout(): Promise<void> {
+  await http.post('/platform/auth/logout')
+}
+
 export async function refresh(): Promise<RefreshResponse> {
   const response = await http.post<RefreshResponse>('/auth/refresh', {})
+  return response.data
+}
+
+export async function platformRefresh(): Promise<RefreshResponse> {
+  const response = await http.post<RefreshResponse>('/platform/auth/refresh', {})
   return response.data
 }
 
@@ -59,8 +73,18 @@ export async function switchTenant(tenantId: string): Promise<SwitchTenantRespon
   return response.data
 }
 
+export async function impersonate(tenantId: string): Promise<LoginResponse> {
+  const response = await http.post<LoginResponse>('/platform/auth/impersonate', { tenantId })
+  return response.data
+}
+
 export async function listSessions(): Promise<AdminV1ListSessionsResponse> {
   const response = await http.get<AdminV1ListSessionsResponse>('/auth/sessions')
+  return response.data
+}
+
+export async function platformListSessions(): Promise<AdminV1ListSessionsResponse> {
+  const response = await http.get<AdminV1ListSessionsResponse>('/platform/auth/sessions')
   return response.data
 }
 
@@ -69,8 +93,17 @@ export async function listNavigation(): Promise<AdminV1ListNavigationResponse> {
   return response.data
 }
 
+export async function platformListNavigation(): Promise<AdminV1ListNavigationResponse> {
+  const response = await http.get<AdminV1ListNavigationResponse>('/platform/auth/navigation')
+  return response.data
+}
+
 export async function revokeSession(sessionId: string): Promise<void> {
   await http.delete('/auth/sessions/' + encodeURIComponent(sessionId))
+}
+
+export async function platformRevokeSession(sessionId: string): Promise<void> {
+  await http.delete('/platform/auth/sessions/' + encodeURIComponent(sessionId))
 }
 
 export async function updateProfile(

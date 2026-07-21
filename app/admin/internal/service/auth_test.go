@@ -31,7 +31,7 @@ type fakeSessionHandler struct {
 	navigation []bizauth.NavigationItem
 }
 
-func (h *fakeSessionHandler) Navigation(context.Context, uint64, uint64, bool) ([]bizauth.NavigationItem, error) {
+func (h *fakeSessionHandler) Navigation(context.Context, uint64, uint64, bizauth.Realm) ([]bizauth.NavigationItem, error) {
 	return h.navigation, nil
 }
 
@@ -57,14 +57,21 @@ func (h *fakeSessionHandler) Refresh(context.Context, string) (bizauth.RefreshRe
 	return bizauth.RefreshResult{
 		Tokens: bizauth.TokenPair{AccessToken: "renewed"},
 		Profile: bizauth.SessionProfile{
-			User:          bizauth.UserProfile{ID: 8, DisplayName: "恢复用户", PlatformAdmin: true},
+			User:          bizauth.UserProfile{ID: 8, DisplayName: "恢复用户", Realm: bizauth.RealmPlatform},
 			CurrentTenant: bizauth.TenantOption{Name: "平台管理"},
 		},
 	}, nil
 }
 func (h *fakeSessionHandler) Profile(context.Context, uint64, uint64) (bizauth.SessionProfile, error) {
 	return bizauth.SessionProfile{
-		User:          bizauth.UserProfile{ID: 8, DisplayName: "恢复用户", PlatformAdmin: true},
+		User:          bizauth.UserProfile{ID: 8, DisplayName: "恢复用户", Realm: bizauth.RealmPlatform},
+		CurrentTenant: bizauth.TenantOption{ID: 0, Name: "平台管理"},
+		Tenants:       []bizauth.TenantOption{{ID: 11, Name: "租户甲"}},
+	}, nil
+}
+func (h *fakeSessionHandler) ProfileByRealm(_ context.Context, _, _ uint64, realm bizauth.Realm) (bizauth.SessionProfile, error) {
+	return bizauth.SessionProfile{
+		User:          bizauth.UserProfile{ID: 8, DisplayName: "恢复用户", Realm: realm},
 		CurrentTenant: bizauth.TenantOption{ID: 0, Name: "平台管理"},
 		Tenants:       []bizauth.TenantOption{{ID: 11, Name: "租户甲"}},
 	}, nil
@@ -111,7 +118,7 @@ func TestAuthServiceLoginMapsUserAndTenant(t *testing.T) {
 	expiresAt := time.Date(2026, 7, 20, 12, 15, 0, 0, time.UTC)
 	handler := &fakeLoginHandler{result: bizauth.LoginResult{
 		Tokens:        bizauth.TokenPair{AccessToken: "access", RefreshToken: "refresh", AccessExpiresAt: expiresAt, RefreshExpiresAt: expiresAt.Add(7 * 24 * time.Hour)},
-		User:          bizauth.UserProfile{ID: 1, DisplayName: "超级管理员", PlatformAdmin: true, Permissions: []string{"files:*"}},
+		User:          bizauth.UserProfile{ID: 1, DisplayName: "超级管理员", Realm: bizauth.RealmPlatform, Permissions: []string{"files:*"}},
 		CurrentTenant: bizauth.TenantOption{ID: 0, Name: "平台管理"},
 		Tenants:       []bizauth.TenantOption{{ID: 8, Name: "示例租户"}},
 	}}
@@ -121,7 +128,7 @@ func TestAuthServiceLoginMapsUserAndTenant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Login() error = %v", err)
 	}
-	if reply.AccessToken != "access" || reply.User.GetDisplayName() != "超级管理员" || !reply.User.GetPlatformAdmin() {
+	if reply.AccessToken != "access" || reply.User.GetDisplayName() != "超级管理员" || reply.User.GetRealm() != string(bizauth.RealmPlatform) {
 		t.Fatalf("reply = %+v", reply)
 	}
 	if len(reply.User.GetPermissions()) != 1 || reply.User.GetPermissions()[0] != "files:*" {
@@ -167,7 +174,7 @@ func TestAuthServiceLoginReturnsMFAChallengeWithoutTokens(t *testing.T) {
 
 func TestRefreshCookieIsHttpOnlyAndScoped(t *testing.T) {
 	cookie := refreshCookie("refresh-token", time.Now().Add(time.Hour), true)
-	for _, part := range []string{"kratos_admin_refresh=refresh-token", "Path=/api/v1/auth", "HttpOnly", "Secure", "SameSite=Lax"} {
+	for _, part := range []string{"kratos_admin_refresh=refresh-token", "Path=/api/v1", "HttpOnly", "Secure", "SameSite=Lax"} {
 		if !strings.Contains(cookie, part) {
 			t.Fatalf("cookie %q must contain %q", cookie, part)
 		}
@@ -206,7 +213,7 @@ func TestUpdateProfileUsesAuthenticatedUser(t *testing.T) {
 func TestListNavigationUsesAuthenticatedTenantAndMember(t *testing.T) {
 	handler := &fakeSessionHandler{navigation: []bizauth.NavigationItem{{ID: 9, Code: "files", Name: "文件管理", ComponentKey: "files"}}}
 	service := NewAuthService(&fakeLoginHandler{}, false, handler)
-	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 8, TenantID: 10, MemberID: 20})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 8, TenantID: 10, MemberID: 20, Realm: bizauth.RealmTenant})
 
 	reply, err := service.ListNavigation(ctx, &v1.ListNavigationRequest{})
 	if err != nil || len(reply.Items) != 1 || reply.Items[0].GetComponentKey() != "files" {

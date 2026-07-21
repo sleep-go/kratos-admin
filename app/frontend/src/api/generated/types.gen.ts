@@ -69,6 +69,7 @@ export type AdminV1CurrentUser = {
     id?: string;
     displayName?: string;
     avatarUrl?: string;
+    realm?: string;
     platformAdmin?: boolean;
     permissions?: Array<string>;
     username?: string;
@@ -76,6 +77,8 @@ export type AdminV1CurrentUser = {
     phone?: string;
     mfaEnabled?: boolean;
     mfaChannel?: string;
+    impersonatorId?: number;
+    impersonating?: boolean;
 };
 
 export type AdminV1DeleteFileResponse = {

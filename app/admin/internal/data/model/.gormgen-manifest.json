@@ -14,6 +14,7 @@
     "log_exports.gen.go",
     "login_logs.gen.go",
     "member_departments.gen.go",
+    "platform_admins.gen.go",
     "positions.gen.go",
     "provider_configs.gen.go",
     "resources.gen.go",

@@ -39,10 +39,6 @@ func TestGeneratedModelCoreTypes(t *testing.T) {
 	if !ok || id.Type.Kind() != reflect.Uint64 {
 		t.Fatal("User.ID 必须为 uint64")
 	}
-	platformAdmin, ok := userType.FieldByName("IsPlatformAdmin")
-	if !ok || platformAdmin.Type.Kind() != reflect.Bool {
-		t.Fatal("User.IsPlatformAdmin 必须为 bool")
-	}
 	status, ok := userType.FieldByName("Status")
 	if !ok || status.Type.Kind() != reflect.Uint8 {
 		t.Fatal("User.Status 必须为 uint8")

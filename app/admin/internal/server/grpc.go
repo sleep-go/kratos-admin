@@ -25,6 +25,9 @@ func NewGRPCServer(cfg conf.Config, services *service.Services) *kgrpc.Server {
 	if services.Auth != nil {
 		v1.RegisterAuthServiceServer(server, services.Auth)
 	}
+	if services.PlatformAuth != nil {
+		v1.RegisterPlatformAuthServiceServer(server, services.PlatformAuth)
+	}
 	if services.Management != nil {
 		v1.RegisterManagementServiceServer(server, services.Management)
 	}

@@ -18,10 +18,7 @@ type fakeUserRepository struct {
 	permissions   []string
 }
 
-func (r *fakeUserRepository) ListPermissions(_ context.Context, _, _ uint64, platformAdmin bool) ([]string, error) {
-	if platformAdmin {
-		return []string{"*:*"}, nil
-	}
+func (r *fakeUserRepository) ListPermissions(_ context.Context, _ Realm, _, _, _ uint64) ([]string, error) {
 	return r.permissions, nil
 }
 
@@ -138,17 +135,41 @@ func TestPlatformAdminCanLoginWithoutTenantMembership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
-	users := &fakeUserRepository{user: &User{
-		ID: 1, PasswordHash: passwordHash, Status: UserStatusEnabled, PlatformAdmin: true,
+	admins := &fakePlatformAdminRepository{admin: &PlatformAdmin{
+		ID: 1, PasswordHash: passwordHash, Status: UserStatusEnabled,
 	}}
 	sessions := &fakeSessionRepository{}
-	usecase := NewLoginUsecase(users, sessions, hasher, NewTokenManager(privateKey, 15*time.Minute, 7*24*time.Hour, func() time.Time { return now }), func() time.Time { return now })
+	usecase := NewPlatformLoginUsecase(admins, sessions, hasher, NewTokenManager(privateKey, 15*time.Minute, 7*24*time.Hour, func() time.Time { return now }), func() time.Time { return now })
 
 	result, err := usecase.Login(context.Background(), LoginInput{Identifier: "root", Password: "StrongPassword!2026"})
 	if err != nil {
 		t.Fatalf("Login() error = %v", err)
 	}
-	if result.CurrentTenant.ID != 0 || sessions.session.TenantID != 0 || sessions.session.MemberID != 0 {
+	if result.CurrentTenant.ID != 0 || sessions.session.TenantID != 0 || sessions.session.MemberID != 0 || sessions.session.Realm != RealmPlatform {
 		t.Fatalf("platform session = %+v, current tenant = %+v", sessions.session, result.CurrentTenant)
 	}
+}
+
+type fakePlatformAdminRepository struct {
+	admin *PlatformAdmin
+}
+
+func (r *fakePlatformAdminRepository) FindByIdentifier(_ context.Context, _ string) (*PlatformAdmin, error) {
+	if r.admin == nil {
+		return nil, ErrInvalidCredentials
+	}
+	copy := *r.admin
+	return &copy, nil
+}
+
+func (r *fakePlatformAdminRepository) FindByID(_ context.Context, _ uint64) (*PlatformAdmin, error) {
+	return r.FindByIdentifier(context.Background(), "")
+}
+
+func (r *fakePlatformAdminRepository) UpdateLoginFailure(_ context.Context, _ uint64, _ uint32, _ *time.Time) error {
+	return nil
+}
+
+func (r *fakePlatformAdminRepository) ResetLoginFailures(_ context.Context, _ uint64) error {
+	return nil
 }

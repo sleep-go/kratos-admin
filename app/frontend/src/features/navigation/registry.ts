@@ -9,25 +9,26 @@ export interface ResolvedNavigationItem {
 }
 
 const componentRouteRegistry: Readonly<Record<string, string>> = {
-  dashboard: '/',
+  dashboard: '/console',
   users: '/platform/users',
   tenants: '/platform/tenants',
-  members: '/organization/users',
-  departments: '/organization/departments',
-  positions: '/organization/positions',
-  roles: '/permission/roles',
-  resources: '/permission/resources',
-  'tenant-resources': '/permission/tenant-features',
-  'casbin-rules': '/permission/policies',
-  'login-logs': '/logs/login',
-  'audit-logs': '/logs/audit',
-  'api-logs': '/logs/api',
-  'log-exports': '/logs/exports',
-  files: '/files',
-  settings: '/settings',
-  providers: '/settings/providers',
-  'dictionary-types': '/settings/dictionaries',
-  'dictionary-items': '/settings/dictionary-items'
+  'platform-admins': '/platform/admins',
+  members: '/console/organization/users',
+  departments: '/console/organization/departments',
+  positions: '/console/organization/positions',
+  roles: '/console/permission/roles',
+  resources: '/platform/resources',
+  'tenant-resources': '/platform/tenant-features',
+  'casbin-rules': '/console/permission/policies',
+  'login-logs': '/console/logs/login',
+  'audit-logs': '/console/logs/audit',
+  'api-logs': '/console/logs/api',
+  'log-exports': '/console/logs/exports',
+  files: '/console/files',
+  settings: '/console/settings',
+  providers: '/platform/settings/providers',
+  'dictionary-types': '/console/settings/dictionaries',
+  'dictionary-items': '/console/settings/dictionary-items'
 }
 
 export function resolveNavigation(items: AdminV1NavigationItem[]): ResolvedNavigationItem[] {
@@ -48,17 +49,28 @@ export function resolveNavigation(items: AdminV1NavigationItem[]): ResolvedNavig
     .sort((left, right) => left.sortOrder - right.sortOrder)
 }
 
-export function resolveTopNavigation(items: ResolvedNavigationItem[]): NavigationItem[] {
+export function resolveTopNavigation(
+  items: ResolvedNavigationItem[],
+  context: 'platform' | 'console' = 'console'
+): NavigationItem[] {
+  if (context === 'platform') {
+    const platformItems = items
+      .filter((item) => item.to.startsWith('/platform/'))
+      .map((item) => ({ label: item.label, to: item.to }))
+    return platformItems.length > 0
+      ? [{ label: '平台治理', to: '/platform/tenants', children: platformItems }]
+      : []
+  }
+
   const groups = [
-    { label: '平台管理', to: '/platform/tenants', prefixes: ['/platform/'] },
-    { label: '组织管理', to: '/organization/users', prefixes: ['/organization/'] },
-    { label: '权限中心', to: '/permission/roles', prefixes: ['/permission/'] },
-    { label: '日志中心', to: '/logs/audit', prefixes: ['/logs/'] },
-    { label: '文件管理', to: '/files', prefixes: ['/files'] },
-    { label: '系统设置', to: '/settings', prefixes: ['/settings'] }
+    { label: '组织管理', to: '/console/organization/users', prefixes: ['/console/organization/'] },
+    { label: '权限中心', to: '/console/permission/roles', prefixes: ['/console/permission/'] },
+    { label: '日志中心', to: '/console/logs/audit', prefixes: ['/console/logs/'] },
+    { label: '文件管理', to: '/console/files', prefixes: ['/console/files'] },
+    { label: '系统设置', to: '/console/settings', prefixes: ['/console/settings'] }
   ]
   return [
-    { label: '工作台', to: '/' },
+    { label: '工作台', to: '/console' },
     ...groups.flatMap((group) => {
       const children = items
         .filter((item) => group.prefixes.some((prefix) => item.to.startsWith(prefix)))

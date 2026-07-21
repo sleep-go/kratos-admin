@@ -40,7 +40,7 @@ const (
 	MembershipStatusDisabled MembershipStatus = 2
 )
 
-// User 表示认证流程所需的全局用户信息。
+// User 表示认证流程所需的全局租户用户信息。
 type User struct {
 	ID               uint64
 	Username         string
@@ -50,7 +50,6 @@ type User struct {
 	Phone            string
 	MFAEnabled       bool
 	MFAChannel       string
-	PlatformAdmin    bool
 	PasswordHash     string
 	Status           UserStatus
 	FailedLoginCount uint32
@@ -69,9 +68,11 @@ type Membership struct {
 // Session 表示服务端持久化的 refresh 会话。
 type Session struct {
 	ID                string
+	Realm             Realm
 	UserID            uint64
 	TenantID          uint64
 	MemberID          uint64
+	ImpersonatorID    uint64
 	PermissionVersion uint64
 	RefreshJTIHash    string
 	DeviceName        string
@@ -85,7 +86,7 @@ type UserRepository interface {
 	FindByIdentifier(ctx context.Context, identifier string) (*User, error)
 	FindByID(ctx context.Context, userID uint64) (*User, error)
 	ListMemberships(ctx context.Context, userID uint64) ([]Membership, error)
-	ListPermissions(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]string, error)
+	ListPermissions(ctx context.Context, realm Realm, tenantID, memberID, impersonatorID uint64) ([]string, error)
 	UpdateLoginFailure(ctx context.Context, userID uint64, count uint32, lockedUntil *time.Time) error
 	ResetLoginFailures(ctx context.Context, userID uint64) error
 }
@@ -131,7 +132,9 @@ type UserProfile struct {
 	Phone         string
 	MFAEnabled    bool
 	MFAChannel    string
-	PlatformAdmin bool
+	Realm         Realm
+	ImpersonatorID uint64
+	Impersonating bool
 	Permissions   []string
 }
 
@@ -206,12 +209,11 @@ func (u *LoginUsecase) CompleteMFA(ctx context.Context, user User, input LoginIn
 }
 
 func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input LoginInput) (LoginResult, error) {
-
 	memberships, err := u.users.ListMemberships(ctx, user.ID)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("查询租户成员身份失败: %w", err)
 	}
-	selected, options, err := selectMembership(memberships, input.TenantID, user.PlatformAdmin)
+	selected, options, err := selectMembership(memberships, input.TenantID)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -223,7 +225,7 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 		UserID:            user.ID,
 		TenantID:          selected.TenantID,
 		MemberID:          selected.ID,
-		PlatformAdmin:     user.PlatformAdmin,
+		Realm:             RealmTenant,
 		SessionID:         sessionID,
 		PermissionVersion: selected.PermissionVersion,
 	})
@@ -232,6 +234,7 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 	}
 	if err := u.sessions.Create(ctx, Session{
 		ID:                sessionID,
+		Realm:             RealmTenant,
 		UserID:            user.ID,
 		TenantID:          selected.TenantID,
 		MemberID:          selected.ID,
@@ -244,7 +247,7 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 	}); err != nil {
 		return LoginResult{}, fmt.Errorf("创建认证会话失败: %w", err)
 	}
-	permissions, err := u.users.ListPermissions(ctx, selected.TenantID, selected.ID, user.PlatformAdmin && selected.TenantID == 0)
+	permissions, err := u.users.ListPermissions(ctx, RealmTenant, selected.TenantID, selected.ID, 0)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("加载用户权限失败: %w", err)
 	}
@@ -253,18 +256,18 @@ func (u *LoginUsecase) completeLogin(ctx context.Context, user User, input Login
 	}
 	return LoginResult{
 		Tokens:        tokens,
-		User:          user.Profile(permissions),
+		User:          user.toProfile(RealmTenant, permissions),
 		CurrentTenant: TenantOption{ID: selected.TenantID, Name: selected.TenantName},
 		Tenants:       options,
 	}, nil
 }
 
-// Profile 返回只包含可安全下发给当前账号的资料。
-func (u User) Profile(permissions []string) UserProfile {
+// toProfile 返回只包含可安全下发给当前账号的资料。
+func (u User) toProfile(realm Realm, permissions []string) UserProfile {
 	return UserProfile{
 		ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarURL: u.AvatarURL,
 		Email: u.Email, Phone: u.Phone, MFAEnabled: u.MFAEnabled, MFAChannel: u.MFAChannel,
-		PlatformAdmin: u.PlatformAdmin, Permissions: permissions,
+		Realm: realm, Permissions: permissions,
 	}
 }
 
@@ -281,12 +284,10 @@ func (u *LoginUsecase) recordFailure(ctx context.Context, user *User, now time.T
 	return nil
 }
 
-func selectMembership(memberships []Membership, requestedTenantID uint64, platformAdmin bool) (Membership, []TenantOption, error) {
+// selectMembership 从可用成员列表中选择目标租户，不再支持 tenant_id=0 平台选项。
+func selectMembership(memberships []Membership, requestedTenantID uint64) (Membership, []TenantOption, error) {
 	options := make([]TenantOption, 0, len(memberships))
 	var selected Membership
-	if platformAdmin && requestedTenantID == 0 {
-		selected = Membership{TenantName: "平台管理", Status: MembershipStatusEnabled}
-	}
 	for _, membership := range memberships {
 		if membership.Status != MembershipStatusEnabled {
 			continue
@@ -296,7 +297,7 @@ func selectMembership(memberships []Membership, requestedTenantID uint64, platfo
 			selected = membership
 		}
 	}
-	if selected.ID == 0 && !(platformAdmin && requestedTenantID == 0) {
+	if selected.ID == 0 {
 		return Membership{}, nil, ErrNoTenantMembership
 	}
 	return selected, options, nil

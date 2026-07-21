@@ -33,6 +33,7 @@ func newAuditLog(db *gorm.DB, opts ...gen.DOOption) auditLog {
 	_auditLog.TenantID = field.NewUint64(tableName, "tenant_id")
 	_auditLog.UserID = field.NewUint64(tableName, "user_id")
 	_auditLog.MemberID = field.NewUint64(tableName, "member_id")
+	_auditLog.ImpersonatorID = field.NewUint64(tableName, "impersonator_id")
 	_auditLog.Action = field.NewString(tableName, "action")
 	_auditLog.ResourceType = field.NewString(tableName, "resource_type")
 	_auditLog.ResourceID = field.NewString(tableName, "resource_id")
@@ -53,22 +54,23 @@ func newAuditLog(db *gorm.DB, opts ...gen.DOOption) auditLog {
 type auditLog struct {
 	auditLogDo auditLogDo
 
-	ALL          field.Asterisk
-	ID           field.Uint64 // 操作审计日志主键
-	EventID      field.String // 来源Outbox事件UUID
-	TenantID     field.Uint64 // 所属租户ID，0表示平台域
-	UserID       field.Uint64 // 操作用户ID，系统任务为0
-	MemberID     field.Uint64 // 操作成员ID，平台域或系统任务为0
-	Action       field.String // 业务动作
-	ResourceType field.String // 资源类型
-	ResourceID   field.String // 资源ID
-	Summary      field.String // 中文操作摘要
-	BeforeData   field.Field  // 变更前脱敏数据
-	AfterData    field.Field  // 变更后脱敏数据
-	IP           field.String // 客户端IP
-	UserAgent    field.String // 客户端User-Agent
-	RequestID    field.String // 请求追踪ID
-	CreatedAt    field.Time   // 发生时间
+	ALL            field.Asterisk
+	ID             field.Uint64 // 操作审计日志主键
+	EventID        field.String // 来源Outbox事件UUID
+	TenantID       field.Uint64 // 所属租户ID，0表示平台域
+	UserID         field.Uint64 // 操作用户ID，系统任务为0
+	MemberID       field.Uint64 // 操作成员ID，平台域或系统任务为0
+	ImpersonatorID field.Uint64 // 代维平台管理员ID，非代维为0
+	Action         field.String // 业务动作
+	ResourceType   field.String // 资源类型
+	ResourceID     field.String // 资源ID
+	Summary        field.String // 中文操作摘要
+	BeforeData     field.Field  // 变更前脱敏数据
+	AfterData      field.Field  // 变更后脱敏数据
+	IP             field.String // 客户端IP
+	UserAgent      field.String // 客户端User-Agent
+	RequestID      field.String // 请求追踪ID
+	CreatedAt      field.Time   // 发生时间
 
 	fieldMap map[string]field.Expr
 }
@@ -90,6 +92,7 @@ func (a *auditLog) updateTableName(table string) *auditLog {
 	a.TenantID = field.NewUint64(table, "tenant_id")
 	a.UserID = field.NewUint64(table, "user_id")
 	a.MemberID = field.NewUint64(table, "member_id")
+	a.ImpersonatorID = field.NewUint64(table, "impersonator_id")
 	a.Action = field.NewString(table, "action")
 	a.ResourceType = field.NewString(table, "resource_type")
 	a.ResourceID = field.NewString(table, "resource_id")
@@ -124,12 +127,13 @@ func (a *auditLog) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *auditLog) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 15)
+	a.fieldMap = make(map[string]field.Expr, 16)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["event_id"] = a.EventID
 	a.fieldMap["tenant_id"] = a.TenantID
 	a.fieldMap["user_id"] = a.UserID
 	a.fieldMap["member_id"] = a.MemberID
+	a.fieldMap["impersonator_id"] = a.ImpersonatorID
 	a.fieldMap["action"] = a.Action
 	a.fieldMap["resource_type"] = a.ResourceType
 	a.fieldMap["resource_id"] = a.ResourceID

@@ -32,6 +32,9 @@ func NewHTTPServer(cfg conf.Config, services *service.Services, providers *provi
 	if services.Auth != nil {
 		v1.RegisterAuthServiceHTTPServer(server, services.Auth)
 	}
+	if services.PlatformAuth != nil {
+		v1.RegisterPlatformAuthServiceHTTPServer(server, services.PlatformAuth)
+	}
 	if services.Management != nil {
 		v1.RegisterManagementServiceHTTPServer(server, services.Management)
 	}

@@ -29,9 +29,11 @@ func newAuthSession(db *gorm.DB, opts ...gen.DOOption) authSession {
 	tableName := _authSession.authSessionDo.TableName()
 	_authSession.ALL = field.NewAsterisk(tableName)
 	_authSession.ID = field.NewString(tableName, "id")
+	_authSession.Realm = field.NewString(tableName, "realm")
 	_authSession.UserID = field.NewUint64(tableName, "user_id")
 	_authSession.TenantID = field.NewUint64(tableName, "tenant_id")
 	_authSession.MemberID = field.NewUint64(tableName, "member_id")
+	_authSession.ImpersonatorID = field.NewUint64(tableName, "impersonator_id")
 	_authSession.PermissionVersion = field.NewUint64(tableName, "permission_version")
 	_authSession.RefreshJTIHash = field.NewString(tableName, "refresh_jti_hash")
 	_authSession.DeviceName = field.NewString(tableName, "device_name")
@@ -53,9 +55,11 @@ type authSession struct {
 
 	ALL               field.Asterisk
 	ID                field.String // 会话UUID
-	UserID            field.Uint64 // 用户ID
-	TenantID          field.Uint64 // 当前租户ID，0表示平台域
-	MemberID          field.Uint64 // 当前租户成员ID，平台域为0
+	Realm             field.String // 认证域：platform平台，tenant租户
+	UserID            field.Uint64 // 主体ID：平台域为platform_admin.id，租户域为user.id
+	TenantID          field.Uint64 // 当前租户ID，平台域为0
+	MemberID          field.Uint64 // 当前租户成员ID，平台域或代维会话为0
+	ImpersonatorID    field.Uint64 // 代维平台管理员ID，非代维为0
 	PermissionVersion field.Uint64 // 会话最近一次签发时的权限版本号
 	RefreshJTIHash    field.String // Refresh JWT jti的SHA256摘要
 	DeviceName        field.String // 设备名称
@@ -82,9 +86,11 @@ func (a authSession) As(alias string) *authSession {
 func (a *authSession) updateTableName(table string) *authSession {
 	a.ALL = field.NewAsterisk(table)
 	a.ID = field.NewString(table, "id")
+	a.Realm = field.NewString(table, "realm")
 	a.UserID = field.NewUint64(table, "user_id")
 	a.TenantID = field.NewUint64(table, "tenant_id")
 	a.MemberID = field.NewUint64(table, "member_id")
+	a.ImpersonatorID = field.NewUint64(table, "impersonator_id")
 	a.PermissionVersion = field.NewUint64(table, "permission_version")
 	a.RefreshJTIHash = field.NewString(table, "refresh_jti_hash")
 	a.DeviceName = field.NewString(table, "device_name")
@@ -120,11 +126,13 @@ func (a *authSession) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *authSession) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 13)
+	a.fieldMap = make(map[string]field.Expr, 15)
 	a.fieldMap["id"] = a.ID
+	a.fieldMap["realm"] = a.Realm
 	a.fieldMap["user_id"] = a.UserID
 	a.fieldMap["tenant_id"] = a.TenantID
 	a.fieldMap["member_id"] = a.MemberID
+	a.fieldMap["impersonator_id"] = a.ImpersonatorID
 	a.fieldMap["permission_version"] = a.PermissionVersion
 	a.fieldMap["refresh_jti_hash"] = a.RefreshJTIHash
 	a.fieldMap["device_name"] = a.DeviceName

@@ -18,7 +18,7 @@ export function hasPermission(
 function applyPermission(element: HTMLElement, binding: DirectiveBinding<string>) {
   const authStore = useAuthStore()
   const platformContext =
-    Boolean(authStore.currentUser?.platformAdmin) && Number(authStore.currentTenant?.id ?? 0) === 0
+    authStore.currentUser?.realm === 'platform' && Number(authStore.currentTenant?.id ?? 0) === 0
   element.hidden = !hasPermission(
     authStore.currentUser?.permissions,
     binding.value,

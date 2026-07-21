@@ -1,5 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import * as logApi from '@/api/logs'
 import * as managementApi from '@/api/management'
@@ -19,9 +21,14 @@ vi.mock('@/api/logs', () => ({
 }))
 
 function mountView() {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/', component: { template: '<div />' } }]
+  })
   return mount(ResourceListView, {
     props: { resourceKey: 'login-logs' },
     global: {
+      plugins: [createPinia(), router],
       directives: { permission: () => undefined, loading: () => undefined },
       stubs: {
         ElButton: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
@@ -68,7 +75,8 @@ describe('日志结构化筛选', () => {
 
     expect(managementApi.listResources).toHaveBeenLastCalledWith(
       'login-logs',
-      expect.objectContaining({ filters: { result: '2' } })
+      expect.objectContaining({ filters: { result: '2' } }),
+      undefined
     )
 
     await wrapper.get('[data-testid="export-button"]').trigger('click')
@@ -89,7 +97,8 @@ describe('日志结构化筛选', () => {
 
     expect(managementApi.listResources).toHaveBeenLastCalledWith(
       'login-logs',
-      expect.objectContaining({ keyword: '', filters: {} })
+      expect.objectContaining({ keyword: '', filters: {} }),
+      undefined
     )
   })
 })

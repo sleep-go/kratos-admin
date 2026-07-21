@@ -19,13 +19,16 @@ describe('AppShell', () => {
             initialState: {
               auth: {
                 currentTenant: { id: '10', name: '示例租户' },
+                tenants: [
+                  { id: '10', name: '示例租户' },
+                  { id: '11', name: '备用租户' }
+                ],
                 navigationItems: [
-                  { name: '租户管理', routePath: '/platform/tenants', componentKey: 'tenants' },
-                  { name: '成员管理', routePath: '/organization/users', componentKey: 'members' },
-                  { name: '角色管理', routePath: '/permission/roles', componentKey: 'roles' },
-                  { name: '审计日志', routePath: '/logs/audit', componentKey: 'audit-logs' },
-                  { name: '文件管理', routePath: '/files', componentKey: 'files' },
-                  { name: '系统设置', routePath: '/settings', componentKey: 'settings' }
+                  { name: '成员管理', routePath: '/console/organization/users', componentKey: 'members' },
+                  { name: '角色管理', routePath: '/console/permission/roles', componentKey: 'roles' },
+                  { name: '审计日志', routePath: '/console/logs/audit', componentKey: 'audit-logs' },
+                  { name: '文件管理', routePath: '/console/files', componentKey: 'files' },
+                  { name: '系统设置', routePath: '/console/settings', componentKey: 'settings' }
                 ]
               }
             }
@@ -59,7 +62,14 @@ describe('AppShell', () => {
           createTestingPinia({
             createSpy: vi.fn,
             initialState: {
-              auth: { currentTenant: { id: '10', name: '示例租户' }, navigationItems: [] }
+              auth: {
+                currentTenant: { id: '10', name: '示例租户' },
+                tenants: [
+                  { id: '10', name: '示例租户' },
+                  { id: '11', name: '备用租户' }
+                ],
+                navigationItems: []
+              }
             }
           }),
           router
@@ -87,7 +97,14 @@ describe('AppShell', () => {
           createTestingPinia({
             createSpy: vi.fn,
             initialState: {
-              auth: { currentTenant: { id: '10', name: '示例租户' }, navigationItems: [] }
+              auth: {
+                currentTenant: { id: '10', name: '示例租户' },
+                tenants: [
+                  { id: '10', name: '示例租户' },
+                  { id: '11', name: '备用租户' }
+                ],
+                navigationItems: []
+              }
             }
           }),
           router
@@ -120,10 +137,10 @@ describe('AppShell', () => {
               auth: {
                 currentTenant: { id: '0', name: '平台管理' },
                 navigationItems: [
-                  { name: '登录日志', routePath: '/logs/login', componentKey: 'login-logs' },
-                  { name: '操作审计', routePath: '/logs/audit', componentKey: 'audit-logs' },
-                  { name: 'API 日志', routePath: '/logs/api', componentKey: 'api-logs' },
-                  { name: '导出记录', routePath: '/logs/exports', componentKey: 'log-exports' }
+                  { name: '登录日志', routePath: '/console/logs/login', componentKey: 'login-logs' },
+                  { name: '操作审计', routePath: '/console/logs/audit', componentKey: 'audit-logs' },
+                  { name: 'API 日志', routePath: '/console/logs/api', componentKey: 'api-logs' },
+                  { name: '导出记录', routePath: '/console/logs/exports', componentKey: 'log-exports' }
                 ]
               }
             }

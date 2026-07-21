@@ -85,13 +85,15 @@ message CurrentUser {
   uint64 id = 1;
   string display_name = 2;
   string avatar_url = 3;
-  bool platform_admin = 4;
+  string realm = 4;
   repeated string permissions = 5;
   string username = 6;
   string email = 7;
   string phone = 8;
   bool mfa_enabled = 9;
   string mfa_channel = 10;
+  uint64 impersonator_id = 11;
+  bool impersonating = 12;
 }
 
 message LoginRequest {

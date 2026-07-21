@@ -16,11 +16,17 @@ import (
 
 func provideServices(cfg conf.Config, resources *data.Data, providers *provider.AdminSet) (*service.Services, error) {
 	repository := data.NewAuthRepository(resources)
+	platformAdminRepo := data.NewPlatformAdminRepository(resources)
 	tokenManager := bizauth.NewTokenManager(providers.PrivateKey, cfg.Auth.AccessTTL, cfg.Auth.RefreshTTL, nil)
 	hasher := bizauth.NewPasswordHasher(bizauth.DefaultPasswordParams())
 	loginUsecase := bizauth.NewLoginUsecase(repository, repository, hasher, tokenManager, nil)
 	sessionUsecase := bizauth.NewSessionUsecase(repository, tokenManager, nil)
-	authService := service.NewAuthService(loginUsecase, cfg.Environment == "production", sessionUsecase)
+	sessionUsecase.ConfigurePlatformAdmins(platformAdminRepo)
+	platformLoginUsecase := bizauth.NewPlatformLoginUsecase(platformAdminRepo, repository, hasher, tokenManager, nil)
+	impersonateUsecase := bizauth.NewImpersonateUsecase(platformAdminRepo, repository, repository, tokenManager, 0, nil)
+	secureCookie := cfg.Environment == "production"
+	authService := service.NewAuthService(loginUsecase, secureCookie, sessionUsecase)
+	platformAuthService := service.NewPlatformAuthService(platformLoginUsecase, sessionUsecase, impersonateUsecase, secureCookie)
 	authService.ConfigureAccessSecurity(tokenManager, sessionUsecase)
 	authService.ConfigureAccessLog(repository)
 	authService.ConfigureLoginLog(repository)
@@ -48,6 +54,7 @@ func provideServices(cfg conf.Config, resources *data.Data, providers *provider.
 	return service.NewServices(
 		service.NewHealthService(Name),
 		authService,
+		platformAuthService,
 		service.NewManagementService(managementRepository, managementRepository),
 		service.NewFileService(fileUsecase, managementRepository),
 		service.NewLogService(logUsecase, managementRepository),

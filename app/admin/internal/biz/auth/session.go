@@ -21,9 +21,11 @@ var (
 // SessionRecord 描述令牌轮换所需的持久化会话状态。
 type SessionRecord struct {
 	ID                string
+	Realm             Realm
 	UserID            uint64
 	TenantID          uint64
 	MemberID          uint64
+	ImpersonatorID    uint64
 	RefreshJTIHash    string
 	PermissionVersion uint64
 	ExpiresAt         time.Time
@@ -44,7 +46,7 @@ type DeviceSession struct {
 
 // IsPlatformContext 判断令牌是否处于可信平台治理上下文。
 func IsPlatformContext(claims *TokenClaims) bool {
-	return claims != nil && claims.PlatformAdmin && claims.TenantID == 0
+	return claims != nil && claims.Realm == RealmPlatform && claims.TenantID == 0
 }
 
 // NavigationItem 描述服务端授权后可下发的菜单资源。
@@ -64,13 +66,13 @@ type SessionManagerRepository interface {
 	Find(ctx context.Context, sessionID string) (SessionRecord, error)
 	FindUser(ctx context.Context, userID uint64) (User, error)
 	ListMemberships(ctx context.Context, userID uint64) ([]Membership, error)
-	ListPermissions(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]string, error)
+	ListPermissions(ctx context.Context, realm Realm, tenantID, memberID, impersonatorID uint64) ([]string, error)
 	Rotate(ctx context.Context, sessionID, expectedHash, nextHash string, expiresAt time.Time, tenantID, memberID, permissionVersion uint64) (bool, error)
 	Revoke(ctx context.Context, sessionID string, userID uint64) error
 	FindMembership(ctx context.Context, userID, tenantID uint64) (Membership, error)
 	List(ctx context.Context, userID uint64) ([]DeviceSession, error)
 	UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) error
-	ListNavigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]NavigationItem, error)
+	ListNavigation(ctx context.Context, tenantID, memberID uint64, realm Realm) ([]NavigationItem, error)
 }
 
 // SessionProfile 描述 refresh 后恢复前端会话所需的安全用户与租户上下文。
@@ -94,9 +96,10 @@ type SwitchTenantResult struct {
 
 // SessionUsecase 负责一次性 refresh 轮换、会话撤销和租户切换。
 type SessionUsecase struct {
-	repository SessionManagerRepository
-	tokens     *TokenManager
-	now        func() time.Time
+	repository     SessionManagerRepository
+	platformAdmins PlatformAdminRepository
+	tokens         *TokenManager
+	now            func() time.Time
 }
 
 // NewSessionUsecase 创建会话用例。
@@ -107,32 +110,62 @@ func NewSessionUsecase(repository SessionManagerRepository, tokens *TokenManager
 	return &SessionUsecase{repository: repository, tokens: tokens, now: now}
 }
 
+// ConfigurePlatformAdmins 配置平台管理员仓储，用于平台域会话校验。
+func (u *SessionUsecase) ConfigurePlatformAdmins(repo PlatformAdminRepository) {
+	u.platformAdmins = repo
+}
+
 // Refresh 校验 refresh token 并执行原子 jti 轮换。
 func (u *SessionUsecase) Refresh(ctx context.Context, refreshToken string) (RefreshResult, error) {
 	claims, session, err := u.validate(ctx, refreshToken)
 	if err != nil {
 		return RefreshResult{}, err
 	}
-	user, err := u.repository.FindUser(ctx, claims.UserID)
-	if err != nil || user.Status != UserStatusEnabled {
-		return RefreshResult{}, ErrAccountDisabled
+	// 平台域使用 PlatformAdminRepository 校验，租户域使用 UserRepository
+	if session.Realm == RealmPlatform {
+		if u.platformAdmins == nil {
+			return RefreshResult{}, ErrAccountDisabled
+		}
+		admin, adminErr := u.platformAdmins.FindByID(ctx, claims.UserID)
+		if adminErr != nil || admin.Status != UserStatusEnabled {
+			return RefreshResult{}, ErrAccountDisabled
+		}
+	} else {
+		user, userErr := u.repository.FindUser(ctx, claims.UserID)
+		if userErr != nil || user.Status != UserStatusEnabled {
+			return RefreshResult{}, ErrAccountDisabled
+		}
 	}
 	pair, err := u.rotate(ctx, claims, session, TokenSubject{
 		UserID: claims.UserID, TenantID: session.TenantID, MemberID: session.MemberID,
-		PlatformAdmin: user.PlatformAdmin, SessionID: session.ID, PermissionVersion: session.PermissionVersion,
+		Realm: session.Realm, ImpersonatorID: session.ImpersonatorID,
+		SessionID: session.ID, PermissionVersion: session.PermissionVersion,
 	})
 	if err != nil {
 		return RefreshResult{}, err
 	}
-	profile, err := u.Profile(ctx, claims.UserID, session.TenantID)
+	profile, err := u.buildProfile(ctx, session.Realm, claims.UserID, session.TenantID)
 	if err != nil {
 		return RefreshResult{}, err
 	}
 	return RefreshResult{Tokens: pair, Profile: profile}, nil
 }
 
-// Profile 重新加载用户及可用租户，避免前端持久化访问令牌或信任陈旧身份信息。
+// Profile 重新加载用户及可用租户（租户域），避免前端持久化访问令牌或信任陈旧身份信息。
 func (u *SessionUsecase) Profile(ctx context.Context, userID, tenantID uint64) (SessionProfile, error) {
+	return u.ProfileByRealm(ctx, userID, tenantID, RealmTenant)
+}
+
+// ProfileByRealm 按认证域重新加载会话资料。
+func (u *SessionUsecase) ProfileByRealm(ctx context.Context, userID, tenantID uint64, realm Realm) (SessionProfile, error) {
+	return u.buildProfile(ctx, realm, userID, tenantID)
+}
+
+// buildProfile 按认证域加载会话资料。
+func (u *SessionUsecase) buildProfile(ctx context.Context, realm Realm, userID, tenantID uint64) (SessionProfile, error) {
+	if realm == RealmPlatform {
+		return u.platformProfile(ctx, userID)
+	}
 	user, err := u.repository.FindUser(ctx, userID)
 	if err != nil || user.Status != UserStatusEnabled {
 		return SessionProfile{}, ErrAccountDisabled
@@ -142,11 +175,8 @@ func (u *SessionUsecase) Profile(ctx context.Context, userID, tenantID uint64) (
 		return SessionProfile{}, err
 	}
 	profile := SessionProfile{
-		User:    user.Profile(nil),
+		User:    user.toProfile(RealmTenant, nil),
 		Tenants: make([]TenantOption, 0, len(memberships)),
-	}
-	if tenantID == 0 && user.PlatformAdmin {
-		profile.CurrentTenant = TenantOption{Name: "平台管理"}
 	}
 	for _, membership := range memberships {
 		if membership.Status != MembershipStatusEnabled {
@@ -168,12 +198,31 @@ func (u *SessionUsecase) Profile(ctx context.Context, userID, tenantID uint64) (
 			break
 		}
 	}
-	permissions, err := u.repository.ListPermissions(ctx, tenantID, memberID, user.PlatformAdmin && tenantID == 0)
+	permissions, err := u.repository.ListPermissions(ctx, RealmTenant, tenantID, memberID, 0)
 	if err != nil {
 		return SessionProfile{}, err
 	}
 	profile.User.Permissions = permissions
 	return profile, nil
+}
+
+// platformProfile 加载平台管理员会话资料。
+func (u *SessionUsecase) platformProfile(ctx context.Context, adminID uint64) (SessionProfile, error) {
+	if u.platformAdmins == nil {
+		return SessionProfile{}, ErrAccountDisabled
+	}
+	admin, err := u.platformAdmins.FindByID(ctx, adminID)
+	if err != nil || admin.Status != UserStatusEnabled {
+		return SessionProfile{}, ErrAccountDisabled
+	}
+	permissions, err := u.repository.ListPermissions(ctx, RealmPlatform, 0, 0, 0)
+	if err != nil {
+		return SessionProfile{}, err
+	}
+	return SessionProfile{
+		User:          admin.toProfile(permissions),
+		CurrentTenant: TenantOption{Name: "平台管理"},
+	}, nil
 }
 
 // UpdateProfile 更新当前账号可自行维护的非敏感资料。
@@ -188,35 +237,33 @@ func (u *SessionUsecase) UpdateProfile(ctx context.Context, userID uint64, displ
 	if err := u.repository.UpdateProfile(ctx, userID, displayName, avatarURL, email, phone); err != nil {
 		return UserProfile{}, err
 	}
+	// 以当前认证域与租户上下文重新构建会话资料，避免丢失 permissions。
+	if claims, ok := ClaimsFromContext(ctx); ok {
+		profile, err := u.buildProfile(ctx, claims.Realm, claims.UserID, claims.TenantID)
+		if err != nil {
+			return UserProfile{}, err
+		}
+		return profile.User, nil
+	}
+
+	// 如果上下文缺失（理论上不应发生），降级返回基础资料。
 	user, err := u.repository.FindUser(ctx, userID)
 	if err != nil {
 		return UserProfile{}, err
 	}
-	return user.Profile(nil), nil
+	return user.toProfile(RealmTenant, nil), nil
 }
 
 // SwitchTenant 重新校验目标租户成员身份，并绑定新租户轮换整对令牌。
+// 租户域会话禁止切换到 tenant_id=0（仅平台域可直接登录平台）。
 func (u *SessionUsecase) SwitchTenant(ctx context.Context, refreshToken string, tenantID uint64) (SwitchTenantResult, error) {
 	claims, session, err := u.validate(ctx, refreshToken)
 	if err != nil {
 		return SwitchTenantResult{}, err
 	}
+	// 租户域禁止切换到 tenant_id=0
 	if tenantID == 0 {
-		user, userErr := u.repository.FindUser(ctx, claims.UserID)
-		if userErr != nil || user.Status != UserStatusEnabled || !user.PlatformAdmin {
-			return SwitchTenantResult{}, ErrNoTenantMembership
-		}
-		profile, profileErr := u.Profile(ctx, claims.UserID, tenantID)
-		if profileErr != nil {
-			return SwitchTenantResult{}, profileErr
-		}
-		pair, rotateErr := u.rotate(ctx, claims, session, TokenSubject{
-			UserID: claims.UserID, PlatformAdmin: true, SessionID: session.ID,
-		})
-		if rotateErr != nil {
-			return SwitchTenantResult{}, rotateErr
-		}
-		return SwitchTenantResult{Tokens: pair, Profile: profile}, nil
+		return SwitchTenantResult{}, ErrNoTenantMembership
 	}
 	membership, err := u.repository.FindMembership(ctx, claims.UserID, tenantID)
 	if err != nil || membership.Status != MembershipStatusEnabled {
@@ -226,13 +273,13 @@ func (u *SessionUsecase) SwitchTenant(ctx context.Context, refreshToken string, 
 	if err != nil || user.Status != UserStatusEnabled {
 		return SwitchTenantResult{}, ErrAccountDisabled
 	}
-	profile, err := u.Profile(ctx, claims.UserID, tenantID)
+	profile, err := u.buildProfile(ctx, RealmTenant, claims.UserID, tenantID)
 	if err != nil {
 		return SwitchTenantResult{}, err
 	}
 	pair, err := u.rotate(ctx, claims, session, TokenSubject{
 		UserID: claims.UserID, TenantID: membership.TenantID, MemberID: membership.ID,
-		PlatformAdmin: user.PlatformAdmin, SessionID: session.ID, PermissionVersion: membership.PermissionVersion,
+		Realm: RealmTenant, SessionID: session.ID, PermissionVersion: membership.PermissionVersion,
 	})
 	if err != nil {
 		return SwitchTenantResult{}, err
@@ -257,10 +304,9 @@ func (u *SessionUsecase) List(ctx context.Context, userID uint64, currentSession
 	return items, nil
 }
 
-// Navigation 按令牌中的可信租户、成员身份返回可见菜单。
-func (u *SessionUsecase) Navigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]NavigationItem, error) {
-	// 平台管理员进入具体租户后也必须遵守该租户的功能授权与成员角色，只有平台上下文可查看平台治理菜单。
-	return u.repository.ListNavigation(ctx, tenantID, memberID, platformAdmin && tenantID == 0)
+// Navigation 按令牌中的认证域和租户、成员身份返回可见菜单。
+func (u *SessionUsecase) Navigation(ctx context.Context, tenantID, memberID uint64, realm Realm) ([]NavigationItem, error) {
+	return u.repository.ListNavigation(ctx, tenantID, memberID, realm)
 }
 
 // Logout 根据签名有效的 refresh token 撤销对应服务端会话。
@@ -287,9 +333,23 @@ func (u *SessionUsecase) ValidateAccess(ctx context.Context, claims *TokenClaims
 	if session.PermissionVersion != claims.PermissionVersion {
 		return ErrPermissionVersionChanged
 	}
-	user, err := u.repository.FindUser(ctx, claims.UserID)
-	if err != nil || user.Status != UserStatusEnabled || user.PlatformAdmin != claims.PlatformAdmin {
+	if session.Realm != claims.Realm {
 		return ErrSessionRevoked
+	}
+	// 按域校验账号状态
+	if claims.Realm == RealmPlatform {
+		if u.platformAdmins == nil {
+			return ErrSessionRevoked
+		}
+		admin, adminErr := u.platformAdmins.FindByID(ctx, claims.UserID)
+		if adminErr != nil || admin.Status != UserStatusEnabled {
+			return ErrSessionRevoked
+		}
+	} else {
+		user, userErr := u.repository.FindUser(ctx, claims.UserID)
+		if userErr != nil || user.Status != UserStatusEnabled {
+			return ErrSessionRevoked
+		}
 	}
 	return nil
 }

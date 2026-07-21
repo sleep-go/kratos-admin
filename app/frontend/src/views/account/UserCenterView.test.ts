@@ -26,7 +26,7 @@ describe('个人中心', () => {
                   username: 'admin',
                   displayName: '超级管理员',
                   email: 'admin@example.com',
-                  platformAdmin: true
+                  realm: 'platform'
                 },
                 currentTenant: { id: '10', name: '演示租户' }
               }

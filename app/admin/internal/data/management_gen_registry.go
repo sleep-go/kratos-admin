@@ -10,7 +10,8 @@ func (a managementResourceAdapter) SupportsField(name string) bool {
 }
 
 var managementGenAdapters = map[string]managementResourceAdapter{
-	"users":                  {Fields: fieldSet("id", "username", "email", "phone", "display_name", "is_platform_admin", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at")},
+	"users":                  {Fields: fieldSet("id", "username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at")},
+	"platform-admins":        {Fields: fieldSet("id", "username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at")},
 	"tenants":                {Fields: fieldSet("id", "code", "name", "status", "permission_version", "created_at", "updated_at")},
 	"members":                {Fields: fieldSet("id", "tenant_id", "user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin", "joined_at")},
 	"departments":            {Fields: fieldSet("id", "tenant_id", "parent_id", "name", "code", "path", "sort_order", "status", "created_at", "updated_at")},

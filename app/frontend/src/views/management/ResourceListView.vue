@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 
 import * as managementApi from '@/api/management'
 import * as logApi from '@/api/logs'
@@ -22,8 +23,11 @@ import {
 import { buildLookupOptions, resolveFieldLookup } from '@/features/management/resourceFormOptions'
 import type { ResourceRow } from '@/api/management'
 import type { AdminV1LogExport } from '@/api/generated'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{ resourceKey: string; targetTenantId?: string }>()
+const router = useRouter()
+const authStore = useAuthStore()
 const definition = computed(() => resourceDefinitions[props.resourceKey])
 const tableFields = computed(() => definition.value.fields.filter((field) => field.table))
 const formFields = computed(() =>
@@ -56,6 +60,12 @@ const optionsLoading = shallowRef(false)
 const exportTask = ref<AdminV1LogExport>()
 const exporting = ref(false)
 let active = true
+
+async function enterTenant(tenantId: string) {
+  await authStore.impersonateTenant(tenantId)
+  ElMessage.success('已进入租户代维视角')
+  await router.push('/console')
+}
 
 function scopeOptions(resource: string) {
   if (!props.targetTenantId || ['users', 'tenants', 'resources'].includes(resource))
@@ -438,7 +448,7 @@ onBeforeUnmount(() => {
             displayValue(scope.row[field.key], field, scope.row)
           }}</template>
         </el-table-column>
-        <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" width="210">
+        <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" width="280">
           <template #default="scope">
             <router-link
               v-if="definition.resource === 'tenants'"
@@ -446,6 +456,14 @@ onBeforeUnmount(() => {
             >
               <el-button link>初始化</el-button>
             </router-link>
+            <el-button
+              v-if="definition.resource === 'tenants'"
+              link
+              data-testid="impersonate-tenant"
+              @click="enterTenant(String(scope.row.id))"
+            >
+              进入租户
+            </el-button>
             <el-button
               v-permission="`${definition.resource}:update`"
               link
@@ -506,6 +524,13 @@ onBeforeUnmount(() => {
             >
               <el-button link>初始化</el-button>
             </router-link>
+            <el-button
+              v-if="definition.resource === 'tenants'"
+              link
+              @click="enterTenant(String(row.id))"
+            >
+              进入租户
+            </el-button>
             <el-button
               v-permission="`${definition.resource}:update`"
               link

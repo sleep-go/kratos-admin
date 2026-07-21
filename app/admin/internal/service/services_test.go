@@ -10,7 +10,7 @@ func TestNewServicesBuildsAllAdminServices(t *testing.T) {
 	management := &ManagementService{}
 	file := &FileService{}
 	logService := &LogService{}
-	services := NewServices(health, auth, management, file, logService)
+	services := NewServices(health, auth, nil, management, file, logService)
 	if services.Health == nil || services.Auth == nil || services.Management == nil || services.File == nil || services.Log == nil {
 		t.Fatalf("Services = %+v", services)
 	}
