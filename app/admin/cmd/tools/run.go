@@ -15,7 +15,9 @@ import (
 )
 
 type genOptions struct {
-	OutPath string
+	ConfPath     string
+	ModelOutPath string
+	QueryOutPath string
 }
 
 func runMigrate(ctx context.Context, confPath string) error {
@@ -65,7 +67,7 @@ func runInitAdmin(ctx context.Context, confPath string) error {
 
 func runGORMGen(_ context.Context, options genOptions) error {
 	generator := gen.NewGenerator(gen.Config{
-		OutPath:      options.OutPath,
+		OutPath:      options.QueryOutPath,
 		ModelPkgPath: "github.com/sleep-go/kratos-admin/app/admin/internal/data/model",
 		Mode:         gen.WithDefaultQuery | gen.WithQueryInterface,
 	})
