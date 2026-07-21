@@ -51,8 +51,8 @@ wire: ## 生成 Admin Server 的 Wire 依赖注入代码
 	GOCACHE=$(GOCACHE) go tool wire ./app/admin/cmd/server
 
 .PHONY: gorm-gen
-gorm-gen: ## 生成 GORM Gen 类型安全查询代码
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/tools gorm-gen
+gorm-gen: ## 从 Goose 临时数据库反向生成 GORM Model 与 Query
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/tools gorm-gen --conf ./configs/config.yaml
 
 .PHONY: migrate
 migrate: ## 使用 Goose 执行数据库迁移
