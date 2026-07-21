@@ -5,6 +5,19 @@ export interface ResourceField {
   required?: boolean
   table?: boolean
   default?: string | number | boolean
+  valueLabels?: Record<string, string>
+}
+
+export interface ResourceOption {
+  label: string
+  value: string
+}
+
+export interface ResourceFilter {
+  key: string
+  label: string
+  type: 'text' | 'select'
+  options?: ResourceOption[]
 }
 
 export interface ResourceDefinition {
@@ -14,6 +27,7 @@ export interface ResourceDefinition {
   fields: ResourceField[]
   readOnly?: boolean
   exportLogType?: 'login' | 'audit' | 'api'
+  filters?: ResourceFilter[]
 }
 
 const commonStatus: ResourceField = { key: 'status', label: '状态', type: 'status', table: true }
@@ -149,9 +163,28 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     description: '查看登录成功、失败、锁定与 MFA 事件。',
     readOnly: true,
     exportLogType: 'login',
+    filters: [
+      {
+        key: 'result',
+        label: '登录结果',
+        type: 'select',
+        options: [
+          { label: '成功', value: '1' },
+          { label: '失败', value: '2' },
+          { label: '账号锁定', value: '3' },
+          { label: '需要 MFA', value: '4' }
+        ]
+      },
+      { key: 'user_id', label: '用户 ID', type: 'text' }
+    ],
     fields: [
       { key: 'identifier', label: '登录标识', table: true },
-      { key: 'result', label: '结果', table: true },
+      {
+        key: 'result',
+        label: '结果',
+        table: true,
+        valueLabels: { '1': '成功', '2': '失败', '3': '账号锁定', '4': '需要 MFA' }
+      },
       { key: 'reason', label: '原因', table: true },
       { key: 'ip', label: 'IP', table: true },
       { key: 'request_id', label: '请求 ID', table: true },
@@ -164,6 +197,12 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     description: '查询由事务 Outbox 可靠生成的业务审计。',
     readOnly: true,
     exportLogType: 'audit',
+    filters: [
+      { key: 'action', label: '操作类型', type: 'text' },
+      { key: 'resource_type', label: '资源类型', type: 'text' },
+      { key: 'user_id', label: '用户 ID', type: 'text' },
+      { key: 'member_id', label: '成员 ID', type: 'text' }
+    ],
     fields: [
       { key: 'summary', label: '操作摘要', table: true },
       { key: 'action', label: '动作', table: true },
@@ -180,6 +219,24 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     description: '按路由、状态码和请求 ID 排查接口异常。',
     readOnly: true,
     exportLogType: 'api',
+    filters: [
+      {
+        key: 'method',
+        label: 'HTTP 方法',
+        type: 'select',
+        options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((value) => ({ label: value, value }))
+      },
+      {
+        key: 'status_code',
+        label: '状态码',
+        type: 'select',
+        options: ['200', '400', '401', '403', '404', '409', '500'].map((value) => ({
+          label: value,
+          value
+        }))
+      },
+      { key: 'user_id', label: '用户 ID', type: 'text' }
+    ],
     fields: [
       { key: 'method', label: '方法', table: true },
       { key: 'route', label: '路由', table: true },
@@ -195,9 +252,42 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     title: '日志导出记录',
     description: '查询异步导出状态并下载已完成的受保护文件。',
     readOnly: true,
+    filters: [
+      {
+        key: 'log_type',
+        label: '日志类型',
+        type: 'select',
+        options: [
+          { label: '登录日志', value: 'login' },
+          { label: '操作审计', value: 'audit' },
+          { label: 'API 日志', value: 'api' }
+        ]
+      },
+      {
+        key: 'status',
+        label: '任务状态',
+        type: 'select',
+        options: [
+          { label: '等待处理', value: '1' },
+          { label: '处理中', value: '2' },
+          { label: '已完成', value: '3' },
+          { label: '失败', value: '4' }
+        ]
+      }
+    ],
     fields: [
-      { key: 'log_type', label: '日志类型', table: true },
-      { key: 'status', label: '任务状态', table: true },
+      {
+        key: 'log_type',
+        label: '日志类型',
+        table: true,
+        valueLabels: { login: '登录日志', audit: '操作审计', api: 'API 日志' }
+      },
+      {
+        key: 'status',
+        label: '任务状态',
+        table: true,
+        valueLabels: { '1': '等待处理', '2': '处理中', '3': '已完成', '4': '失败' }
+      },
       { key: 'row_count', label: '导出条数', table: true },
       { key: 'file_id', label: '文件 ID', table: true },
       { key: 'retry_count', label: '重试次数', table: true },

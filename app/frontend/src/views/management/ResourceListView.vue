@@ -7,6 +7,7 @@ import * as logApi from '@/api/logs'
 import { resourceDefinitions } from '@/features/management/resourceDefinitions'
 import type { ResourceRow } from '@/api/management'
 import type { AdminV1LogExport } from '@/api/generated'
+import type { ResourceField } from '@/features/management/resourceDefinitions'
 
 const props = defineProps<{ resourceKey: string }>()
 const definition = computed(() => resourceDefinitions[props.resourceKey])
@@ -17,6 +18,7 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(20)
 const keyword = ref('')
+const filters = reactive<Record<string, string>>({})
 const dialogOpen = ref(false)
 const editingID = ref('')
 const form = reactive<ResourceRow>({})
@@ -30,7 +32,8 @@ async function load() {
     const response = await managementApi.listResources(definition.value.resource, {
       page: page.value,
       page_size: pageSize.value,
-      keyword: keyword.value
+      keyword: keyword.value,
+      filters: activeFilters()
     })
     items.value = response.items ?? []
     total.value = Number(response.total ?? 0)
@@ -41,6 +44,21 @@ async function load() {
 
 function resetQuery() {
   keyword.value = ''
+  clearFilters()
+  page.value = 1
+  void load()
+}
+
+function activeFilters() {
+  return Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ''))
+}
+
+function clearFilters() {
+  for (const key of Object.keys(filters)) delete filters[key]
+}
+
+function query() {
+  page.value = 1
   void load()
 }
 
@@ -105,7 +123,8 @@ async function startExport() {
   try {
     exportTask.value = await logApi.createLogExport({
       logType: definition.value.exportLogType,
-      keyword: keyword.value
+      keyword: keyword.value,
+      filters: activeFilters()
     })
     ElMessage.success('导出任务已创建，后台处理中')
     for (
@@ -118,7 +137,8 @@ async function startExport() {
       exportTask.value = await logApi.getLogExport(exportTask.value.id)
     }
     if (exportTask.value?.status === 3) ElMessage.success('日志导出完成')
-    if (exportTask.value?.status === 4) ElMessage.error(exportTask.value.failureReason || '日志导出失败')
+    if (exportTask.value?.status === 4)
+      ElMessage.error(exportTask.value.failureReason || '日志导出失败')
   } finally {
     exporting.value = false
   }
@@ -148,9 +168,11 @@ async function downloadExportRow(row: ResourceRow) {
   link.remove()
 }
 
-function displayValue(value: unknown, type?: string) {
-  if (type === 'status') return Number(value) === 1 ? '启用' : '禁用'
-  if (type === 'boolean') return value === true || value === 1 || value === '1' ? '是' : '否'
+function displayValue(value: unknown, field: ResourceField) {
+  const label = field.valueLabels?.[String(value)]
+  if (label) return label
+  if (field.type === 'status') return Number(value) === 1 ? '启用' : '禁用'
+  if (field.type === 'boolean') return value === true || value === 1 || value === '1' ? '是' : '否'
   return value ?? '—'
 }
 
@@ -158,6 +180,8 @@ watch(
   () => props.resourceKey,
   () => {
     page.value = 1
+    keyword.value = ''
+    clearFilters()
     void load()
   }
 )
@@ -179,6 +203,7 @@ onBeforeUnmount(() => {
         <el-button
           v-if="definition.exportLogType"
           v-permission="`${definition.resource}:export`"
+          data-testid="export-button"
           :loading="exporting"
           @click="startExport"
         >
@@ -210,9 +235,33 @@ onBeforeUnmount(() => {
       </el-button>
     </div>
     <div class="query-panel">
-      <el-input v-model="keyword" clearable placeholder="输入关键词搜索" @keyup.enter="load" />
-      <el-button @click="load">查询</el-button>
-      <el-button @click="resetQuery">重置</el-button>
+      <el-input v-model="keyword" clearable placeholder="输入关键词搜索" @keyup.enter="query" />
+      <template v-for="filter in definition.filters ?? []" :key="filter.key">
+        <el-select
+          v-if="filter.type === 'select'"
+          v-model="filters[filter.key]"
+          clearable
+          :placeholder="filter.label"
+          :data-testid="`filter-${filter.key}`"
+        >
+          <el-option
+            v-for="option in filter.options ?? []"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <el-input
+          v-else
+          v-model="filters[filter.key]"
+          clearable
+          :placeholder="filter.label"
+          :data-testid="`filter-${filter.key}`"
+          @keyup.enter="query"
+        />
+      </template>
+      <el-button data-testid="query-button" @click="query">查询</el-button>
+      <el-button data-testid="reset-button" @click="resetQuery">重置</el-button>
     </div>
     <div class="table-panel">
       <el-table v-loading="loading" :data="items" stripe>
@@ -224,7 +273,7 @@ onBeforeUnmount(() => {
           :label="field.label"
           min-width="125"
         >
-          <template #default="scope">{{ displayValue(scope.row[field.key], field.type) }}</template>
+          <template #default="scope">{{ displayValue(scope.row[field.key], field) }}</template>
         </el-table-column>
         <el-table-column v-if="!definition.readOnly" label="操作" fixed="right" width="138">
           <template #default="scope">
@@ -233,8 +282,8 @@ onBeforeUnmount(() => {
               link
               @click="openEdit(scope.row)"
             >
-              编辑
-            </el-button><el-button
+              编辑 </el-button
+            ><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
@@ -265,20 +314,22 @@ onBeforeUnmount(() => {
       <div v-if="!loading && items.length === 0" class="mobile-empty">暂无数据</div>
       <div class="mobile-cards">
         <article v-for="row in items" :key="String(row.id)">
-          <strong>#{{ row.id }} ·
+          <strong
+            >#{{ row.id }} ·
             {{
               row.name ?? row.display_name ?? row.summary ?? row.original_name ?? definition.title
-            }}</strong>
+            }}</strong
+          >
           <dl>
             <template v-for="field in tableFields.slice(0, 5)" :key="field.key">
               <dt>{{ field.label }}</dt>
-              <dd>{{ displayValue(row[field.key], field.type) }}</dd>
+              <dd>{{ displayValue(row[field.key], field) }}</dd>
             </template>
           </dl>
           <div v-if="!definition.readOnly">
             <el-button v-permission="`${definition.resource}:update`" link @click="openEdit(row)">
-              编辑
-            </el-button><el-button
+              编辑 </el-button
+            ><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
@@ -347,7 +398,8 @@ onBeforeUnmount(() => {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogOpen = false">取消</el-button><el-button type="danger" @click="save">保存</el-button>
+        <el-button @click="dialogOpen = false">取消</el-button
+        ><el-button type="danger" @click="save">保存</el-button>
       </template>
     </el-dialog>
   </section>
