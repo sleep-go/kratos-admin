@@ -924,27 +924,6 @@ func sanitizeResourceWrite(definition resourceDefinition, input map[string]any) 
 	return values, nil
 }
 
-func resourceOrder(definition resourceDefinition, requested string) string {
-	field, direction, _ := strings.Cut(requested, ":")
-	allowed := false
-	for _, column := range definition.columns {
-		if column == field {
-			allowed = true
-			break
-		}
-	}
-	if !allowed {
-		if definition.defaultOrder != "" {
-			return definition.defaultOrder
-		}
-		return "id DESC"
-	}
-	if strings.EqualFold(direction, "asc") {
-		return field + " ASC"
-	}
-	return field + " DESC"
-}
-
 func numericID(value any) uint64 {
 	switch id := value.(type) {
 	case uint64:
@@ -1105,9 +1084,10 @@ func (r *ManagementRepository) EffectiveSettings(ctx context.Context, scope mana
 		if _, exists := keys[key]; !exists {
 			keys[key] = defaultSetting{Category: item.Category, Key: item.SettingKey, ValueType: item.ValueType}
 		}
-		if item.TenantID == 0 {
+		switch item.TenantID {
+		case 0:
 			platform[key] = item
-		} else if item.TenantID == scope.TenantID {
+		case scope.TenantID:
 			tenant[key] = item
 		}
 	}

@@ -85,7 +85,7 @@ func (r *LogMaintenanceRepository) Cleanup(ctx context.Context, now time.Time) (
 	if err != nil {
 		return LogCleanupResult{}, fmt.Errorf("获取日志维护专用连接失败: %w", err)
 	}
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 	return runLockedMaintenance(ctx, sqlLockConnection{connection: connection}, func(ctx context.Context) (LogCleanupResult, error) {
 		return r.cleanupUnlocked(ctx, now)
 	})

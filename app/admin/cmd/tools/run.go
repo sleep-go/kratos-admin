@@ -36,7 +36,7 @@ func runInitAdmin(ctx context.Context, confPath string) error {
 	if err != nil {
 		return fmt.Errorf("获取初始化数据库连接池失败: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	initializer := setup.NewAdminInitializer(
 		data.NewAdminRepository(db),

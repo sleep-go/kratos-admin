@@ -26,7 +26,7 @@ func TestApplyMigrationsUsesProvidedDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := ApplyMigrations(context.Background(), db); err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestMigrationLockSerializesConcurrentMySQLMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	var applied int
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT version_id) FROM goose_db_version WHERE is_applied = 1 AND version_id BETWEEN 1 AND 6").Scan(&applied); err != nil {
 		t.Fatal(err)

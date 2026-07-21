@@ -38,7 +38,7 @@ func Migrate(ctx context.Context, dsn string) error {
 	if err != nil {
 		return fmt.Errorf("打开迁移数据库失败: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := db.PingContext(ctx); err != nil {
 		return fmt.Errorf("检查迁移数据库连接失败: %w", err)
 	}
@@ -46,7 +46,7 @@ func Migrate(ctx context.Context, dsn string) error {
 	if err != nil {
 		return fmt.Errorf("获取迁移专用连接失败: %w", err)
 	}
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 	return runLockedMigration(ctx, sqlLockConnection{connection: connection}, func(ctx context.Context) error {
 		return ApplyMigrations(ctx, db)
 	})

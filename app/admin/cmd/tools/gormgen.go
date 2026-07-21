@@ -164,7 +164,7 @@ func generateGORMArtifacts(ctx context.Context, dsn string, options genOptions) 
 	if err != nil {
 		return fmt.Errorf("获取代码生成数据库连接池失败: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 	if err := sqlDB.PingContext(ctx); err != nil {
 		return fmt.Errorf("检查代码生成 MySQL 连接失败: %w", err)
 	}
@@ -198,7 +198,7 @@ func generateGORMArtifactsFromDatabase(db *gorm.DB, tables []string, options gen
 	if err != nil {
 		return fmt.Errorf("创建代码生成暂存目录失败: %w", err)
 	}
-	defer os.RemoveAll(stagingRoot)
+	defer func() { _ = os.RemoveAll(stagingRoot) }()
 	stagingModel := filepath.Join(stagingRoot, "model")
 	stagingQuery := filepath.Join(stagingRoot, "query")
 
@@ -421,7 +421,7 @@ func writeFileAtomically(path string, content []byte, mode os.FileMode) error {
 		return err
 	}
 	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
+	defer func() { _ = os.Remove(temporaryPath) }()
 	if err := temporary.Chmod(mode); err != nil {
 		_ = temporary.Close()
 		return err
