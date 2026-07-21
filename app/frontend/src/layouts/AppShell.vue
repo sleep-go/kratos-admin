@@ -73,8 +73,7 @@ async function selectTenant(tenantID: string) {
           :class="{ active: String(currentTenant?.id) === String(tenant.id) }"
           @click="selectTenant(String(tenant.id))"
         >
-          <strong>{{ tenant.name }}</strong
-          ><span>租户 ID {{ tenant.id }}</span>
+          <strong>{{ tenant.name }}</strong><span>租户 ID {{ tenant.id }}</span>
         </button>
       </section>
     </div>

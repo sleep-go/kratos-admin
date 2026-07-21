@@ -99,18 +99,15 @@ onMounted(load)
         <article v-for="item in categoryItems" :key="String(item.setting_key)">
           <div class="setting-card__top">
             <div>
-              <small>{{ settingKeyLabel(category, String(item.setting_key)) }}</small
-              ><strong>{{ displayValue(item) }}</strong>
+              <small>{{ settingKeyLabel(category, String(item.setting_key)) }}</small><strong>{{ displayValue(item) }}</strong>
             </div>
             <el-tag :type="item.source === 'tenant' ? 'danger' : 'info'" effect="plain">
               {{ settingSourceLabel(String(item.source)) }}
             </el-tag>
           </div>
           <footer>
-            <span
-              >{{ settingValueTypeLabel(String(item.value_type))
-              }}<template v-if="item.allow_tenant_override"> · 可覆盖</template></span
-            >
+            <span>{{ settingValueTypeLabel(String(item.value_type))
+            }}<template v-if="item.allow_tenant_override"> · 可覆盖</template></span>
             <el-button link type="danger" @click="edit(item)">配置</el-button>
           </footer>
         </article>
