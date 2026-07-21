@@ -144,18 +144,18 @@ func TestSettingsAndProviderConfigsAreEncryptedAndResolvedInMySQL(t *testing.T) 
 		t.Fatal(err)
 	}
 	if _, err := repository.Create(context.Background(), platformScope, "settings", map[string]any{
-		"category": "platform", "setting_key": "site_name", "value_type": "string",
+		"category": "integration_config", "setting_key": "site_name", "value_type": "string",
 		"setting_value": "平台标题", "allow_tenant_override": true, "is_secret": false,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	tenantScope := managementbiz.Scope{TenantID: tenant.ID, UserID: 1, MemberID: 1}
 	if _, err := repository.Create(context.Background(), tenantScope, "settings", map[string]any{
-		"category": "platform", "setting_key": "site_name", "value_type": "string", "setting_value": "租户标题",
+		"category": "integration_config", "setting_key": "site_name", "value_type": "string", "setting_value": "租户标题",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	rows, err := repository.EffectiveSettings(context.Background(), tenantScope, "platform")
+	rows, err := repository.EffectiveSettings(context.Background(), tenantScope, "integration_config")
 	if err != nil {
 		t.Fatal(err)
 	}
