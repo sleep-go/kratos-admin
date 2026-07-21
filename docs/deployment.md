@@ -15,13 +15,13 @@ Compose 启动链路为 MySQL/Redis/RabbitMQ/Mailpit → Admin → init-admin �
 终端一启动 Admin：
 
 ```bash
-go run ./app/admin/cmd/kratos-admin server --conf ./configs/config.yaml
+go run ./app/admin/cmd/server -conf ./configs/config.yaml
 ```
 
 健康检查通过后，终端二初始化管理员：
 
 ```bash
-go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/config.yaml
+go run ./app/admin/cmd/tools init-admin --conf ./configs/config.yaml
 ```
 
 终端三启动前端：
@@ -44,7 +44,7 @@ make compose-deps-up
 
 ## 生产与 Kubernetes
 
-- 生产只部署一个 Admin Deployment，不再部署独立 Worker Deployment 或 migrate Job；通过 `--conf` 指定生产完整 YAML。
+- 生产只部署一个 Admin Deployment，不再部署独立 Worker Deployment 或 migrate Job；通过 `-conf` 指定生产完整 YAML。
 - 每个 Admin Pod 都执行相同的启动迁移检查，MySQL 命名锁确保同一时刻只有一个实例应用迁移；其他实例等待后再次检查。
 - 发布中的迁移必须向前兼容滚动期间同时运行的新旧版本。破坏性变更应拆成“先扩展、再切换、最后清理”的多个版本。
 - RabbitMQ 建议在目标 vhost 上统一默认队列类型为 quorum，并监控三条业务队列、统一死信队列、未确认消息和连接重试日志。

@@ -3,7 +3,7 @@ GOPATH := $(shell go env GOPATH)
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 GOCACHE ?= /tmp/go-build
 GO_APP_PACKAGES := ./app/admin/...
-GO_PACKAGES := $(GO_APP_PACKAGES) ./internal/...
+GO_PACKAGES := $(GO_APP_PACKAGES)
 
 ifeq ($(GOHOSTOS),windows)
 	GIT_BASH := $(subst \,/,$(subst cmd\git.exe,bin\bash.exe,$(shell where git)))
@@ -20,7 +20,7 @@ init: ## 安装 Proto 与 Wire 工具
 	go install github.com/google/wire/cmd/wire@v0.7.0
 
 .PHONY: config
-config: ## 生成 internal/conf 配置代码
+config: ## 生成 app/admin/internal/conf 配置代码
 	buf generate --template buf.gen.config.yaml
 
 .PHONY: api
@@ -29,9 +29,10 @@ api: ## 检查并生成业务 API、gRPC、HTTP 与 OpenAPI 代码
 	buf generate
 
 .PHONY: build
-build: ## 构建统一的 kratos-admin 命令行到 bin
+build: ## 构建 Admin 服务和运维工具到 bin
 	mkdir -p bin
-	GOCACHE=$(GOCACHE) go build -trimpath -o bin/kratos-admin ./app/admin/cmd/kratos-admin
+	GOCACHE=$(GOCACHE) go build -trimpath -ldflags "-X main.Version=$(VERSION)" -o bin/kratos-admin ./app/admin/cmd/server
+	GOCACHE=$(GOCACHE) go build -trimpath -o bin/kratos-admin-tools ./app/admin/cmd/tools
 
 .PHONY: generate
 generate: ## 执行 Go Generate、GORM Gen 并校验模块依赖
@@ -46,24 +47,24 @@ all: ## 生成 API、配置及依赖注入代码
 	$(MAKE) generate
 
 .PHONY: wire
-wire: ## 生成 Admin 的 Wire 依赖注入代码
-	GOCACHE=$(GOCACHE) go tool wire ./app/admin
+wire: ## 生成 Admin Server 的 Wire 依赖注入代码
+	GOCACHE=$(GOCACHE) go tool wire ./app/admin/cmd/server
 
 .PHONY: gorm-gen
 gorm-gen: ## 生成 GORM Gen 类型安全查询代码
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin gorm-gen
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/tools gorm-gen
 
 .PHONY: migrate
 migrate: ## 使用 Goose 执行数据库迁移
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin migrate --conf ./configs/config.yaml
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/tools migrate --conf ./configs/config.yaml
 
 .PHONY: init-admin
 init-admin: ## 幂等初始化平台超级管理员
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/config.yaml
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/tools init-admin --conf ./configs/config.yaml
 
 .PHONY: run-admin
 run-admin: ## 启动 Admin HTTP/gRPC 服务
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin server --conf ./configs/config.yaml
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/server -conf ./configs/config.yaml
 
 .PHONY: test
 test: ## 运行后端测试

@@ -9,8 +9,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
-	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
+	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
+	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
 )
 
 // GetEffectiveSettings 返回按代码默认、平台默认和租户覆盖解析后的有效设置。

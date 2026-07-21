@@ -3,9 +3,9 @@
 ## 目录与依赖
 
 - 后端应用仅位于 `app/admin`，Vue 前端位于 `app/frontend`；仓库不存在 `app/worker`。
-- `kratos-admin` 提供 `server`、`migrate`、`init-admin`、`gorm-gen` 四个业务子命令。
+- `app/admin/cmd/server` 是不依赖 Cobra 的标准 Kratos 服务入口；`app/admin/cmd/tools` 提供 `migrate`、`init-admin`、`gorm-gen` 三个运维子命令。
 - Admin 的 Kratos 生命周期同时注册 HTTP、gRPC 和 RabbitMQ task Server。
-- `internal/data` 不导入应用 Service/Server，`internal/biz` 不导入 Data 或应用内部包。
+- `app/admin/internal/data` 不导入 Service/Server，`app/admin/internal/biz` 不导入 Data/Service/Server，Service 不导入 Data/Server。
 - 现行 Go 代码不依赖 Asynq，Redis 不承担异步任务队列。
 
 ## 后端与生成代码
@@ -16,8 +16,8 @@ make gorm-gen
 make test
 make vet
 make build
-GOCACHE=/tmp/go-build go test ./app/admin/... ./internal/... -count=1
-GOCACHE=/tmp/go-build go vet ./app/admin/... ./internal/...
+GOCACHE=/tmp/go-build go test ./app/admin/... -count=1
+GOCACHE=/tmp/go-build go vet ./app/admin/...
 ```
 
 依次执行 `make config`、`make wire`、`make gorm-gen`、`make api` 和 `cd app/frontend && pnpm api:generate`，随后确认生成目录没有非预期 Git 差异。
@@ -44,7 +44,7 @@ GOCACHE=/tmp/go-build go vet ./app/admin/... ./internal/...
 ```bash
 KRATOS_ADMIN_TEST_MYSQL_DSN='kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local' \
 KRATOS_ADMIN_TEST_RABBITMQ_URL='amqp://kratos:kratos@127.0.0.1:5672/kratos_admin' \
-GOCACHE=/tmp/go-build go test ./internal/data ./app/admin/internal/task \
+GOCACHE=/tmp/go-build go test ./app/admin/internal/data ./app/admin/internal/server/task \
   -run 'Migration|RabbitMQ|Recovery' -count=1 -timeout=60s
 ```
 

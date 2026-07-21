@@ -14,8 +14,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	auditbiz "github.com/sleep-go/kratos-admin/internal/biz/audit"
-	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
+	auditbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/audit"
+	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
 )
 
 // LoginHandler 定义认证服务调用的登录用例。

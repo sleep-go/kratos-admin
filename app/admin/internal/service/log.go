@@ -8,10 +8,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
-	"github.com/sleep-go/kratos-admin/internal/biz/logexport"
-	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
-	"github.com/sleep-go/kratos-admin/internal/provider/storage"
+	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/logexport"
+	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/storage"
 )
 
 // LogExportHandler 定义日志导出创建、查询和下载能力。

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
-	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
+	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
+	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
 )
 
 type fakeManagementRepository struct {

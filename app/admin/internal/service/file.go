@@ -8,10 +8,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
-	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
-	filebiz "github.com/sleep-go/kratos-admin/internal/biz/file"
-	managementbiz "github.com/sleep-go/kratos-admin/internal/biz/management"
-	"github.com/sleep-go/kratos-admin/internal/provider/storage"
+	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
+	filebiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/file"
+	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/storage"
 )
 
 // FileHandler 定义文件上传、确认、下载和删除用例。

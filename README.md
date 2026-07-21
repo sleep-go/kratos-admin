@@ -25,16 +25,18 @@
 ```text
 app/
 ├── admin/
-│   ├── cmd/kratos-admin/       # 统一 Cobra 命令入口
-│   └── internal/{server,service,task}
+│   ├── cmd/
+│   │   ├── server/             # 官方 Kratos 服务入口与 Wire
+│   │   └── tools/              # Cobra 迁移、初始化与代码生成工具
+│   └── internal/
+│       ├── biz/                # 领域用例与仓储契约
+│       ├── conf/               # Bootstrap 配置 Proto 与加载器
+│       ├── data/               # MySQL、Redis、GORM 与外部 Provider
+│       ├── server/             # HTTP、gRPC 与 RabbitMQ Task Server
+│       └── service/            # Protobuf transport 服务实现
 └── frontend/                   # Vue 3 前端应用
 api/admin/v1/                   # 业务 API Proto
 configs/                        # 宿主机与 Compose 的完整 Kratos YAML
-internal/
-├── biz/                        # 领域用例与仓储契约
-├── conf/                       # Bootstrap 配置 Proto 与加载器
-├── data/                       # MySQL、Redis、Casbin、GORM Gen
-└── provider/                   # 邮件、短信、存储、密钥 Provider
 migrations/                     # Goose SQL 迁移
 deploy/Dockerfile.backend       # 后端多阶段镜像
 docker-compose.yml              # 完整本地编排
@@ -107,27 +109,27 @@ pnpm dev
 
 前端开发地址为 <http://127.0.0.1:5173>，Vite 会将 `/api` 代理到 `http://127.0.0.1:8000`。
 
-## 统一命令行
+## 后端服务与运维工具
 
 ```bash
 make build
-./bin/kratos-admin --help
+./bin/kratos-admin -conf ./configs/config.yaml
+./bin/kratos-admin-tools --help
 ```
 
-可用子命令：
+`kratos-admin` 是标准 Kratos 服务可执行程序，使用官方 `-conf` 参数；`kratos-admin-tools` 是独立 Cobra 运维工具，提供：
 
 ```text
-kratos-admin server      启动 Admin HTTP/gRPC
-kratos-admin migrate     使用 Goose 执行数据库迁移
-kratos-admin init-admin  幂等初始化平台超级管理员
-kratos-admin gorm-gen    生成 GORM Gen 查询代码
+kratos-admin-tools migrate     使用 Goose 执行数据库迁移
+kratos-admin-tools init-admin  幂等初始化平台超级管理员
+kratos-admin-tools gorm-gen    生成 GORM Gen 查询代码
 ```
 
-`server`、`migrate` 和 `init-admin` 默认读取 `configs/config.yaml`；可通过 `-c/--conf` 指定另一份完整 YAML。
+服务默认读取 `configs/config.yaml`，可用 `-conf` 指定配置；`migrate` 和 `init-admin` 可用 `-c/--conf` 指定另一份完整 YAML。
 
 ## 配置约定
 
-- `internal/conf/conf.proto` 是运行配置结构的真相源。
+- `app/admin/internal/conf/conf.proto` 是运行配置结构的真相源。
 - `configs/config.yaml` 和 `configs/config.docker.yaml` 使用同一个配置契约，仅区分宿主机与容器网络及路径。
 - 应用不读取 `.env` 或系统环境变量；生产发布应替换完整 YAML 并限制文件权限。
 - 仓库仅保存本地开发密钥，真实密码、JWT 私钥和 Provider 凭据不得提交 Git。
@@ -139,7 +141,7 @@ kratos-admin gorm-gen    生成 GORM Gen 查询代码
 ```bash
 make help             # 查看全部目标
 make all              # 生成 API、配置、Wire 和 GORM Gen
-make build            # 构建 bin/kratos-admin
+make build            # 构建 bin/kratos-admin 与 bin/kratos-admin-tools
 make test             # 后端竞态测试
 make vet              # Go 静态检查
 make frontend-test    # 前端组件测试
