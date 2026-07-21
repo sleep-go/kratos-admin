@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/config"
-	configenv "github.com/go-kratos/kratos/v2/config/env"
 	configfile "github.com/go-kratos/kratos/v2/config/file"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 const (
-	defaultMySQLDSN = "kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local"
-	defaultRedis    = "127.0.0.1:6379"
-	defaultRabbitMQ = "amqp://kratos:kratos@127.0.0.1:5672/kratos_admin"
+	defaultMySQLDSN      = "kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local"
+	defaultRedis         = "127.0.0.1:6379"
+	defaultRabbitMQ      = "amqp://kratos:kratos@127.0.0.1:5672/kratos_admin"
+	defaultMigrationsDir = "migrations"
 )
 
 // Config 描述 Admin API 与后台任务共享的完整运行配置。
@@ -26,6 +26,21 @@ type Config struct {
 	Auth        Auth
 	Storage     Storage
 	Messaging   Messaging
+	Setup       Setup
+}
+
+// Setup 描述部署初始化所需的配置。
+type Setup struct {
+	Admin AdminSetup
+}
+
+// AdminSetup 描述首个平台超级管理员的初始化资料。
+type AdminSetup struct {
+	Username        string
+	DisplayName     string
+	Email           string
+	Phone           string
+	InitialPassword string
 }
 
 // Messaging 描述验证码邮件与短信 Provider 配置。
@@ -58,6 +73,7 @@ type Data struct {
 	RabbitMQURL         string
 	RabbitMQPrefetch    int
 	RabbitMQConcurrency int
+	MigrationsDir       string
 }
 
 // Auth 描述令牌生命周期及敏感数据保护配置。
@@ -81,12 +97,9 @@ type Storage struct {
 	OSSSecurityToken   string
 }
 
-// Load 从 Kratos YAML 配置文件加载配置，并使用环境变量解析占位符。
+// Load 仅从指定 Kratos YAML 文件加载完整运行配置。
 func Load(path string) (Config, error) {
-	source := config.New(config.WithSource(
-		configfile.NewSource(path),
-		configenv.NewSource(),
-	))
+	source := config.New(config.WithSource(configfile.NewSource(path)))
 	defer func() { _ = source.Close() }()
 
 	if err := source.Load(); err != nil {
@@ -100,7 +113,7 @@ func Load(path string) (Config, error) {
 
 	cfg := fromBootstrap(bootstrap)
 	if cfg.Environment == "production" && (cfg.Auth.SecretKey == "" || cfg.Auth.JWTPrivateKey == "") {
-		return Config{}, errors.New("生产环境必须配置 KRATOS_ADMIN_SECRET_KEY 和 KRATOS_ADMIN_JWT_PRIVATE_KEY")
+		return Config{}, errors.New("生产环境必须配置 auth.secret_key 和 auth.jwt_private_key")
 	}
 
 	return cfg, nil
@@ -114,6 +127,7 @@ func fromBootstrap(bootstrap *Bootstrap) Config {
 	auth := bootstrap.GetAuth()
 	storage := bootstrap.GetStorage()
 	messaging := bootstrap.GetMessaging()
+	adminSetup := bootstrap.GetSetup().GetAdmin()
 
 	cfg := Config{
 		Environment: environment,
@@ -123,6 +137,7 @@ func fromBootstrap(bootstrap *Bootstrap) Config {
 		},
 		Data: Data{
 			MySQLDSN:            stringOrDefault(data.GetDatabase().GetSource(), defaultMySQLDSN),
+			MigrationsDir:       stringOrDefault(data.GetDatabase().GetMigrationsDir(), defaultMigrationsDir),
 			RedisAddr:           stringOrDefault(data.GetRedis().GetAddr(), defaultRedis),
 			RedisDB:             int(data.GetRedis().GetDb()),
 			RabbitMQURL:         stringOrDefault(rabbitMQ.GetUrl(), defaultRabbitMQ),
@@ -160,6 +175,13 @@ func fromBootstrap(bootstrap *Bootstrap) Config {
 			AliyunSMSSignName:        messaging.GetAliyunSmsSignName(),
 			AliyunSMSTemplateCode:    messaging.GetAliyunSmsTemplateCode(),
 		},
+		Setup: Setup{Admin: AdminSetup{
+			Username:        stringOrDefault(adminSetup.GetUsername(), "admin"),
+			DisplayName:     stringOrDefault(adminSetup.GetDisplayName(), "超级管理员"),
+			Email:           adminSetup.GetEmail(),
+			Phone:           adminSetup.GetPhone(),
+			InitialPassword: adminSetup.GetInitialPassword(),
+		}},
 	}
 
 	return cfg

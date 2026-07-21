@@ -13,6 +13,7 @@ message Bootstrap {
   AuthConfig auth = 4;
   StorageConfig storage = 5;
   MessagingConfig messaging = 6;
+  SetupConfig setup = 7;
 }
 
 message ServerConfig {
@@ -34,6 +35,7 @@ message DataConfig {
   message Database {
     string driver = 1;
     string source = 2;
+    string migrations_dir = 3;
   }
   message Redis {
     string network = 1;
@@ -84,4 +86,15 @@ message MessagingConfig {
   string aliyun_sms_access_key_secret = 10;
   string aliyun_sms_sign_name = 11;
   string aliyun_sms_template_code = 12;
+}
+
+message SetupConfig {
+  message Admin {
+    string username = 1;
+    string display_name = 2;
+    string email = 3;
+    string phone = 4;
+    string initial_password = 5;
+  }
+  Admin admin = 1;
 }

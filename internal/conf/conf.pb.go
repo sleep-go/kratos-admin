@@ -30,6 +30,7 @@ type Bootstrap struct {
 	Auth          *AuthConfig            `protobuf:"bytes,4,opt,name=auth,proto3" json:"auth,omitempty"`
 	Storage       *StorageConfig         `protobuf:"bytes,5,opt,name=storage,proto3" json:"storage,omitempty"`
 	Messaging     *MessagingConfig       `protobuf:"bytes,6,opt,name=messaging,proto3" json:"messaging,omitempty"`
+	Setup         *SetupConfig           `protobuf:"bytes,7,opt,name=setup,proto3" json:"setup,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -102,6 +103,13 @@ func (x *Bootstrap) GetStorage() *StorageConfig {
 func (x *Bootstrap) GetMessaging() *MessagingConfig {
 	if x != nil {
 		return x.Messaging
+	}
+	return nil
+}
+
+func (x *Bootstrap) GetSetup() *SetupConfig {
+	if x != nil {
+		return x.Setup
 	}
 	return nil
 }
@@ -526,6 +534,50 @@ func (x *MessagingConfig) GetAliyunSmsTemplateCode() string {
 	return ""
 }
 
+type SetupConfig struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Admin         *SetupConfig_Admin     `protobuf:"bytes,1,opt,name=admin,proto3" json:"admin,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupConfig) Reset() {
+	*x = SetupConfig{}
+	mi := &file_conf_conf_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupConfig) ProtoMessage() {}
+
+func (x *SetupConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_conf_conf_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupConfig.ProtoReflect.Descriptor instead.
+func (*SetupConfig) Descriptor() ([]byte, []int) {
+	return file_conf_conf_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SetupConfig) GetAdmin() *SetupConfig_Admin {
+	if x != nil {
+		return x.Admin
+	}
+	return nil
+}
+
 type ServerConfig_HTTP struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Network       string                 `protobuf:"bytes,1,opt,name=network,proto3" json:"network,omitempty"`
@@ -537,7 +589,7 @@ type ServerConfig_HTTP struct {
 
 func (x *ServerConfig_HTTP) Reset() {
 	*x = ServerConfig_HTTP{}
-	mi := &file_conf_conf_proto_msgTypes[6]
+	mi := &file_conf_conf_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -549,7 +601,7 @@ func (x *ServerConfig_HTTP) String() string {
 func (*ServerConfig_HTTP) ProtoMessage() {}
 
 func (x *ServerConfig_HTTP) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[6]
+	mi := &file_conf_conf_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -597,7 +649,7 @@ type ServerConfig_GRPC struct {
 
 func (x *ServerConfig_GRPC) Reset() {
 	*x = ServerConfig_GRPC{}
-	mi := &file_conf_conf_proto_msgTypes[7]
+	mi := &file_conf_conf_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -609,7 +661,7 @@ func (x *ServerConfig_GRPC) String() string {
 func (*ServerConfig_GRPC) ProtoMessage() {}
 
 func (x *ServerConfig_GRPC) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[7]
+	mi := &file_conf_conf_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -650,13 +702,14 @@ type DataConfig_Database struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Driver        string                 `protobuf:"bytes,1,opt,name=driver,proto3" json:"driver,omitempty"`
 	Source        string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
+	MigrationsDir string                 `protobuf:"bytes,3,opt,name=migrations_dir,json=migrationsDir,proto3" json:"migrations_dir,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DataConfig_Database) Reset() {
 	*x = DataConfig_Database{}
-	mi := &file_conf_conf_proto_msgTypes[8]
+	mi := &file_conf_conf_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -668,7 +721,7 @@ func (x *DataConfig_Database) String() string {
 func (*DataConfig_Database) ProtoMessage() {}
 
 func (x *DataConfig_Database) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[8]
+	mi := &file_conf_conf_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -698,6 +751,13 @@ func (x *DataConfig_Database) GetSource() string {
 	return ""
 }
 
+func (x *DataConfig_Database) GetMigrationsDir() string {
+	if x != nil {
+		return x.MigrationsDir
+	}
+	return ""
+}
+
 type DataConfig_Redis struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Network       string                 `protobuf:"bytes,1,opt,name=network,proto3" json:"network,omitempty"`
@@ -711,7 +771,7 @@ type DataConfig_Redis struct {
 
 func (x *DataConfig_Redis) Reset() {
 	*x = DataConfig_Redis{}
-	mi := &file_conf_conf_proto_msgTypes[9]
+	mi := &file_conf_conf_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -723,7 +783,7 @@ func (x *DataConfig_Redis) String() string {
 func (*DataConfig_Redis) ProtoMessage() {}
 
 func (x *DataConfig_Redis) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[9]
+	mi := &file_conf_conf_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -785,7 +845,7 @@ type DataConfig_RabbitMQ struct {
 
 func (x *DataConfig_RabbitMQ) Reset() {
 	*x = DataConfig_RabbitMQ{}
-	mi := &file_conf_conf_proto_msgTypes[10]
+	mi := &file_conf_conf_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -797,7 +857,7 @@ func (x *DataConfig_RabbitMQ) String() string {
 func (*DataConfig_RabbitMQ) ProtoMessage() {}
 
 func (x *DataConfig_RabbitMQ) ProtoReflect() protoreflect.Message {
-	mi := &file_conf_conf_proto_msgTypes[10]
+	mi := &file_conf_conf_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -834,18 +894,95 @@ func (x *DataConfig_RabbitMQ) GetConcurrency() int32 {
 	return 0
 }
 
+type SetupConfig_Admin struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Username        string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	DisplayName     string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Email           string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	Phone           string                 `protobuf:"bytes,4,opt,name=phone,proto3" json:"phone,omitempty"`
+	InitialPassword string                 `protobuf:"bytes,5,opt,name=initial_password,json=initialPassword,proto3" json:"initial_password,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SetupConfig_Admin) Reset() {
+	*x = SetupConfig_Admin{}
+	mi := &file_conf_conf_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupConfig_Admin) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupConfig_Admin) ProtoMessage() {}
+
+func (x *SetupConfig_Admin) ProtoReflect() protoreflect.Message {
+	mi := &file_conf_conf_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupConfig_Admin.ProtoReflect.Descriptor instead.
+func (*SetupConfig_Admin) Descriptor() ([]byte, []int) {
+	return file_conf_conf_proto_rawDescGZIP(), []int{6, 0}
+}
+
+func (x *SetupConfig_Admin) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *SetupConfig_Admin) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *SetupConfig_Admin) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *SetupConfig_Admin) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+func (x *SetupConfig_Admin) GetInitialPassword() string {
+	if x != nil {
+		return x.InitialPassword
+	}
+	return ""
+}
+
 var File_conf_conf_proto protoreflect.FileDescriptor
 
 const file_conf_conf_proto_rawDesc = "" +
 	"\n" +
-	"\x0fconf/conf.proto\x12\x11kratos.admin.conf\x1a\x1egoogle/protobuf/duration.proto\"\xca\x02\n" +
+	"\x0fconf/conf.proto\x12\x11kratos.admin.conf\x1a\x1egoogle/protobuf/duration.proto\"\x80\x03\n" +
 	"\tBootstrap\x12 \n" +
 	"\venvironment\x18\x01 \x01(\tR\venvironment\x127\n" +
 	"\x06server\x18\x02 \x01(\v2\x1f.kratos.admin.conf.ServerConfigR\x06server\x121\n" +
 	"\x04data\x18\x03 \x01(\v2\x1d.kratos.admin.conf.DataConfigR\x04data\x121\n" +
 	"\x04auth\x18\x04 \x01(\v2\x1d.kratos.admin.conf.AuthConfigR\x04auth\x12:\n" +
 	"\astorage\x18\x05 \x01(\v2 .kratos.admin.conf.StorageConfigR\astorage\x12@\n" +
-	"\tmessaging\x18\x06 \x01(\v2\".kratos.admin.conf.MessagingConfigR\tmessaging\"\xd8\x02\n" +
+	"\tmessaging\x18\x06 \x01(\v2\".kratos.admin.conf.MessagingConfigR\tmessaging\x124\n" +
+	"\x05setup\x18\a \x01(\v2\x1e.kratos.admin.conf.SetupConfigR\x05setup\"\xd8\x02\n" +
 	"\fServerConfig\x128\n" +
 	"\x04http\x18\x01 \x01(\v2$.kratos.admin.conf.ServerConfig.HTTPR\x04http\x128\n" +
 	"\x04grpc\x18\x02 \x01(\v2$.kratos.admin.conf.ServerConfig.GRPCR\x04grpc\x1ai\n" +
@@ -856,15 +993,16 @@ const file_conf_conf_proto_rawDesc = "" +
 	"\x04GRPC\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x123\n" +
-	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\xad\x04\n" +
+	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\xd4\x04\n" +
 	"\n" +
 	"DataConfig\x12B\n" +
 	"\bdatabase\x18\x01 \x01(\v2&.kratos.admin.conf.DataConfig.DatabaseR\bdatabase\x129\n" +
 	"\x05redis\x18\x02 \x01(\v2#.kratos.admin.conf.DataConfig.RedisR\x05redis\x12B\n" +
-	"\brabbitmq\x18\x03 \x01(\v2&.kratos.admin.conf.DataConfig.RabbitMQR\brabbitmq\x1a:\n" +
+	"\brabbitmq\x18\x03 \x01(\v2&.kratos.admin.conf.DataConfig.RabbitMQR\brabbitmq\x1aa\n" +
 	"\bDatabase\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x12\x16\n" +
-	"\x06source\x18\x02 \x01(\tR\x06source\x1a\xc3\x01\n" +
+	"\x06source\x18\x02 \x01(\tR\x06source\x12%\n" +
+	"\x0emigrations_dir\x18\x03 \x01(\tR\rmigrationsDir\x1a\xc3\x01\n" +
 	"\x05Redis\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x12\x0e\n" +
@@ -911,7 +1049,15 @@ const file_conf_conf_proto_rawDesc = "" +
 	"\x1caliyun_sms_access_key_secret\x18\n" +
 	" \x01(\tR\x18aliyunSmsAccessKeySecret\x12/\n" +
 	"\x14aliyun_sms_sign_name\x18\v \x01(\tR\x11aliyunSmsSignName\x127\n" +
-	"\x18aliyun_sms_template_code\x18\f \x01(\tR\x15aliyunSmsTemplateCodeB5Z3github.com/sleep-go/kratos-admin/internal/conf;confb\x06proto3"
+	"\x18aliyun_sms_template_code\x18\f \x01(\tR\x15aliyunSmsTemplateCode\"\xe9\x01\n" +
+	"\vSetupConfig\x12:\n" +
+	"\x05admin\x18\x01 \x01(\v2$.kratos.admin.conf.SetupConfig.AdminR\x05admin\x1a\x9d\x01\n" +
+	"\x05Admin\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x14\n" +
+	"\x05phone\x18\x04 \x01(\tR\x05phone\x12)\n" +
+	"\x10initial_password\x18\x05 \x01(\tR\x0finitialPasswordB5Z3github.com/sleep-go/kratos-admin/internal/conf;confb\x06proto3"
 
 var (
 	file_conf_conf_proto_rawDescOnce sync.Once
@@ -925,7 +1071,7 @@ func file_conf_conf_proto_rawDescGZIP() []byte {
 	return file_conf_conf_proto_rawDescData
 }
 
-var file_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_conf_conf_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_conf_conf_proto_goTypes = []any{
 	(*Bootstrap)(nil),           // 0: kratos.admin.conf.Bootstrap
 	(*ServerConfig)(nil),        // 1: kratos.admin.conf.ServerConfig
@@ -933,12 +1079,14 @@ var file_conf_conf_proto_goTypes = []any{
 	(*AuthConfig)(nil),          // 3: kratos.admin.conf.AuthConfig
 	(*StorageConfig)(nil),       // 4: kratos.admin.conf.StorageConfig
 	(*MessagingConfig)(nil),     // 5: kratos.admin.conf.MessagingConfig
-	(*ServerConfig_HTTP)(nil),   // 6: kratos.admin.conf.ServerConfig.HTTP
-	(*ServerConfig_GRPC)(nil),   // 7: kratos.admin.conf.ServerConfig.GRPC
-	(*DataConfig_Database)(nil), // 8: kratos.admin.conf.DataConfig.Database
-	(*DataConfig_Redis)(nil),    // 9: kratos.admin.conf.DataConfig.Redis
-	(*DataConfig_RabbitMQ)(nil), // 10: kratos.admin.conf.DataConfig.RabbitMQ
-	(*durationpb.Duration)(nil), // 11: google.protobuf.Duration
+	(*SetupConfig)(nil),         // 6: kratos.admin.conf.SetupConfig
+	(*ServerConfig_HTTP)(nil),   // 7: kratos.admin.conf.ServerConfig.HTTP
+	(*ServerConfig_GRPC)(nil),   // 8: kratos.admin.conf.ServerConfig.GRPC
+	(*DataConfig_Database)(nil), // 9: kratos.admin.conf.DataConfig.Database
+	(*DataConfig_Redis)(nil),    // 10: kratos.admin.conf.DataConfig.Redis
+	(*DataConfig_RabbitMQ)(nil), // 11: kratos.admin.conf.DataConfig.RabbitMQ
+	(*SetupConfig_Admin)(nil),   // 12: kratos.admin.conf.SetupConfig.Admin
+	(*durationpb.Duration)(nil), // 13: google.protobuf.Duration
 }
 var file_conf_conf_proto_depIdxs = []int32{
 	1,  // 0: kratos.admin.conf.Bootstrap.server:type_name -> kratos.admin.conf.ServerConfig
@@ -946,22 +1094,24 @@ var file_conf_conf_proto_depIdxs = []int32{
 	3,  // 2: kratos.admin.conf.Bootstrap.auth:type_name -> kratos.admin.conf.AuthConfig
 	4,  // 3: kratos.admin.conf.Bootstrap.storage:type_name -> kratos.admin.conf.StorageConfig
 	5,  // 4: kratos.admin.conf.Bootstrap.messaging:type_name -> kratos.admin.conf.MessagingConfig
-	6,  // 5: kratos.admin.conf.ServerConfig.http:type_name -> kratos.admin.conf.ServerConfig.HTTP
-	7,  // 6: kratos.admin.conf.ServerConfig.grpc:type_name -> kratos.admin.conf.ServerConfig.GRPC
-	8,  // 7: kratos.admin.conf.DataConfig.database:type_name -> kratos.admin.conf.DataConfig.Database
-	9,  // 8: kratos.admin.conf.DataConfig.redis:type_name -> kratos.admin.conf.DataConfig.Redis
-	10, // 9: kratos.admin.conf.DataConfig.rabbitmq:type_name -> kratos.admin.conf.DataConfig.RabbitMQ
-	11, // 10: kratos.admin.conf.AuthConfig.access_ttl:type_name -> google.protobuf.Duration
-	11, // 11: kratos.admin.conf.AuthConfig.refresh_ttl:type_name -> google.protobuf.Duration
-	11, // 12: kratos.admin.conf.ServerConfig.HTTP.timeout:type_name -> google.protobuf.Duration
-	11, // 13: kratos.admin.conf.ServerConfig.GRPC.timeout:type_name -> google.protobuf.Duration
-	11, // 14: kratos.admin.conf.DataConfig.Redis.read_timeout:type_name -> google.protobuf.Duration
-	11, // 15: kratos.admin.conf.DataConfig.Redis.write_timeout:type_name -> google.protobuf.Duration
-	16, // [16:16] is the sub-list for method output_type
-	16, // [16:16] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	6,  // 5: kratos.admin.conf.Bootstrap.setup:type_name -> kratos.admin.conf.SetupConfig
+	7,  // 6: kratos.admin.conf.ServerConfig.http:type_name -> kratos.admin.conf.ServerConfig.HTTP
+	8,  // 7: kratos.admin.conf.ServerConfig.grpc:type_name -> kratos.admin.conf.ServerConfig.GRPC
+	9,  // 8: kratos.admin.conf.DataConfig.database:type_name -> kratos.admin.conf.DataConfig.Database
+	10, // 9: kratos.admin.conf.DataConfig.redis:type_name -> kratos.admin.conf.DataConfig.Redis
+	11, // 10: kratos.admin.conf.DataConfig.rabbitmq:type_name -> kratos.admin.conf.DataConfig.RabbitMQ
+	13, // 11: kratos.admin.conf.AuthConfig.access_ttl:type_name -> google.protobuf.Duration
+	13, // 12: kratos.admin.conf.AuthConfig.refresh_ttl:type_name -> google.protobuf.Duration
+	12, // 13: kratos.admin.conf.SetupConfig.admin:type_name -> kratos.admin.conf.SetupConfig.Admin
+	13, // 14: kratos.admin.conf.ServerConfig.HTTP.timeout:type_name -> google.protobuf.Duration
+	13, // 15: kratos.admin.conf.ServerConfig.GRPC.timeout:type_name -> google.protobuf.Duration
+	13, // 16: kratos.admin.conf.DataConfig.Redis.read_timeout:type_name -> google.protobuf.Duration
+	13, // 17: kratos.admin.conf.DataConfig.Redis.write_timeout:type_name -> google.protobuf.Duration
+	18, // [18:18] is the sub-list for method output_type
+	18, // [18:18] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_conf_conf_proto_init() }
@@ -975,7 +1125,7 @@ func file_conf_conf_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_conf_conf_proto_rawDesc), len(file_conf_conf_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
