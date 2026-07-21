@@ -105,4 +105,45 @@ describe('AppShell', () => {
     expect(wrapper.get('[role="dialog"]').attributes('aria-label')).toBe('切换租户')
     expect(wrapper.get('[data-testid="mobile-navigation"]').attributes('aria-hidden')).toBe('true')
   })
+
+  it('移动端按分组展示所有已授权日志入口', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', component: { template: '<div />' } }]
+    })
+    const wrapper = mount(AppShell, {
+      global: {
+        plugins: [
+          createTestingPinia({
+            createSpy: vi.fn,
+            initialState: {
+              auth: {
+                currentTenant: { id: '0', name: '平台管理' },
+                navigationItems: [
+                  { name: '登录日志', routePath: '/logs/login', componentKey: 'login-logs' },
+                  { name: '操作审计', routePath: '/logs/audit', componentKey: 'audit-logs' },
+                  { name: 'API 日志', routePath: '/logs/api', componentKey: 'api-logs' },
+                  { name: '导出记录', routePath: '/logs/exports', componentKey: 'log-exports' }
+                ]
+              }
+            }
+          }),
+          router
+        ],
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+          RouterView: { template: '<main>页面内容</main>' }
+        }
+      }
+    })
+
+    await wrapper.get('[data-testid="mobile-menu-button"]').trigger('click')
+
+    const navigation = wrapper.get('[data-testid="mobile-navigation"]')
+    expect(navigation.text()).toContain('日志中心')
+    expect(navigation.text()).toContain('登录日志')
+    expect(navigation.text()).toContain('操作审计')
+    expect(navigation.text()).toContain('API 日志')
+    expect(navigation.text()).toContain('导出记录')
+  })
 })

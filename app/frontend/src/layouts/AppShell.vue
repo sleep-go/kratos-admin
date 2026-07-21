@@ -3,8 +3,9 @@ import { computed, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 
-import TopNavigation, { type NavigationItem } from './components/TopNavigation.vue'
+import TopNavigation from './components/TopNavigation.vue'
 import { resolveNavigation, resolveTopNavigation } from '@/features/navigation/registry'
+import type { NavigationItem } from '@/features/navigation/types'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -72,7 +73,8 @@ async function selectTenant(tenantID: string) {
           :class="{ active: String(currentTenant?.id) === String(tenant.id) }"
           @click="selectTenant(String(tenant.id))"
         >
-          <strong>{{ tenant.name }}</strong><span>租户 ID {{ tenant.id }}</span>
+          <strong>{{ tenant.name }}</strong
+          ><span>租户 ID {{ tenant.id }}</span>
         </button>
       </section>
     </div>
@@ -94,23 +96,27 @@ async function selectTenant(tenantID: string) {
       <div class="mobile-account">
         <strong>{{ userName }}</strong>
         <span>{{ tenantName }}</span>
-        <button
-          type="button"
-          data-testid="mobile-tenant-switcher"
-          @click="openMobileTenantDialog"
-        >
+        <button type="button" data-testid="mobile-tenant-switcher" @click="openMobileTenantDialog">
           切换租户
         </button>
       </div>
-      <RouterLink
-        v-for="item in navigation"
-        :key="item.to"
-        :to="item.to"
-        class="mobile-link"
-        @click="mobileOpen = false"
-      >
-        {{ item.label }}
-      </RouterLink>
+      <template v-for="item in navigation" :key="item.to">
+        <section v-if="item.children?.length" class="mobile-navigation-group">
+          <strong>{{ item.label }}</strong>
+          <RouterLink
+            v-for="child in item.children"
+            :key="child.to"
+            :to="child.to"
+            class="mobile-link mobile-link--child"
+            @click="mobileOpen = false"
+          >
+            {{ child.label }}
+          </RouterLink>
+        </section>
+        <RouterLink v-else :to="item.to" class="mobile-link" @click="mobileOpen = false">
+          {{ item.label }}
+        </RouterLink>
+      </template>
       <RouterLink to="/account" class="mobile-link" @click="mobileOpen = false">
         个人中心
       </RouterLink>
@@ -204,6 +210,27 @@ async function selectTenant(tenantID: string) {
     color: #fff;
     background: rgb(255 255 255 / 5%);
   }
+}
+
+.mobile-navigation-group {
+  padding-top: 18px;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+
+  > strong {
+    display: block;
+    padding: 0 8px 8px;
+    color: rgb(255 255 255 / 52%);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+  }
+
+  .mobile-link {
+    border-bottom: 0;
+  }
+}
+
+.mobile-link--child {
+  padding-left: 20px;
 }
 
 .mobile-logout {

@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 
-export interface NavigationItem {
-  label: string
-  to: string
-}
+import type { NavigationItem } from '@/features/navigation/types'
 
 const props = defineProps<{
   items: NavigationItem[]
@@ -14,6 +11,12 @@ const props = defineProps<{
 }>()
 
 const initials = computed(() => props.userName.trim().slice(0, 1) || '管')
+const route = useRoute()
+
+function isActive(item: NavigationItem) {
+  if (item.to === '/') return route.path === '/'
+  return item.children?.some((child) => route.path === child.to) ?? route.path === item.to
+}
 
 const emit = defineEmits<{
   openMobile: []
@@ -30,9 +33,35 @@ const emit = defineEmits<{
     </div>
 
     <nav class="desktop-navigation" aria-label="主导航">
-      <RouterLink v-for="item in items" :key="item.to" :to="item.to" class="navigation-link">
-        {{ item.label }}
-      </RouterLink>
+      <template v-for="item in items" :key="item.to">
+        <div
+          v-if="item.children?.length"
+          class="navigation-group"
+          :data-testid="`navigation-group-${item.label}`"
+        >
+          <button
+            type="button"
+            class="navigation-link navigation-group__trigger"
+            :class="{ 'navigation-link--active': isActive(item) }"
+            aria-haspopup="menu"
+          >
+            {{ item.label }}<span aria-hidden="true">⌄</span>
+          </button>
+          <div class="navigation-submenu" role="menu">
+            <RouterLink
+              v-for="child in item.children"
+              :key="child.to"
+              :to="child.to"
+              role="menuitem"
+            >
+              {{ child.label }}
+            </RouterLink>
+          </div>
+        </div>
+        <RouterLink v-else :to="item.to" class="navigation-link">
+          {{ item.label }}
+        </RouterLink>
+      </template>
     </nav>
 
     <div class="account-area">
@@ -113,6 +142,9 @@ const emit = defineEmits<{
   font-weight: 650;
   text-decoration: none;
   transition: color 180ms ease;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 
   &::after {
     position: absolute;
@@ -127,13 +159,64 @@ const emit = defineEmits<{
   }
 
   &:hover,
-  &.router-link-active {
+  &.router-link-active,
+  &.navigation-link--active {
     color: #fff;
   }
 
-  &.router-link-active::after {
+  &.router-link-active::after,
+  &.navigation-link--active::after {
     transform: scaleX(1);
   }
+}
+
+.navigation-group {
+  position: relative;
+  display: flex;
+}
+
+.navigation-group__trigger {
+  gap: 6px;
+  font-family: inherit;
+}
+
+.navigation-submenu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% - 1px);
+  left: 50%;
+  min-width: 168px;
+  padding: 8px 0;
+  visibility: hidden;
+  background: #fff;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 20%);
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    visibility 160ms ease;
+
+  a {
+    display: block;
+    padding: 11px 18px;
+    color: #444;
+    font-size: 13px;
+    text-decoration: none;
+
+    &:hover,
+    &.router-link-active {
+      color: var(--ka-accent);
+      background: #f6f6f6;
+    }
+  }
+}
+
+.navigation-group:hover .navigation-submenu,
+.navigation-group:focus-within .navigation-submenu {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .account-area {
