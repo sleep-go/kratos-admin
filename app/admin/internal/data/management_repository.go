@@ -25,6 +25,7 @@ import (
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider/message"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider/storage"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 type resourceDefinition struct {
@@ -1316,6 +1317,21 @@ func writeAuditOutbox(tx *gorm.DB, scope managementbiz.Scope, action, resource, 
 		return err
 	}
 	return tx.Create(&model.AuditOutbox{ID: id, TenantID: scope.TenantID, EventType: "management." + action, AggregateType: resource, AggregateID: resourceID, Payload: datatypes.JSON(payload), Status: 1}).Error
+}
+
+func writeAuditOutboxGen(ctx context.Context, tx *query.Query, scope managementbiz.Scope, action, resource, resourceID string, after map[string]any) error {
+	payload, err := json.Marshal(map[string]any{"user_id": scope.UserID, "member_id": scope.MemberID, "action": action, "resource_type": resource, "resource_id": resourceID, "after": after})
+	if err != nil {
+		return err
+	}
+	id, err := randomEventID()
+	if err != nil {
+		return err
+	}
+	return tx.AuditOutbox.WithContext(ctx).Create(&model.AuditOutbox{
+		ID: id, TenantID: scope.TenantID, EventType: "management." + action,
+		AggregateType: resource, AggregateID: resourceID, Payload: datatypes.JSON(payload), Status: 1,
+	})
 }
 
 func randomEventID() (string, error) {

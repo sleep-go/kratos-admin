@@ -13,6 +13,7 @@ import (
 	filebiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/file"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/logexport"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 func TestTaskRepositoryIgnoresStaleConfirmAndDuplicateFailure(t *testing.T) {
@@ -48,7 +49,7 @@ func TestTaskRepositoryIgnoresStaleConfirmAndDuplicateFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	repository := &TaskRepository{db: tx}
+	repository := &TaskRepository{q: query.Use(tx)}
 	tests := []struct {
 		name             string
 		task             PendingTask

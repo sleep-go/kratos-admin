@@ -11,6 +11,7 @@ import (
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/providerconfig"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider/secret"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 func TestResourceRegistryRejectsUnknownAndTenantOverride(t *testing.T) {
@@ -273,7 +274,7 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	if adminCount != 1 {
 		t.Fatalf("tenant admin membership count = %d, want 1", adminCount)
 	}
-	tasks, err := (&TaskRepository{db: tx}).Pending(context.Background(), 10, time.Now().UTC())
+	tasks, err := (&TaskRepository{q: query.Use(tx)}).Pending(context.Background(), 10, time.Now().UTC())
 	foundAudit := false
 	for _, task := range tasks {
 		foundAudit = foundAudit || task.Kind == TaskKindAudit
