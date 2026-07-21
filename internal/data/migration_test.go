@@ -4,13 +4,55 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 )
 
 type fakeLockRow struct {
 	value int64
 	err   error
+}
+
+func TestMigrationLockSerializesConcurrentMySQLMigrations(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 并发迁移集成测试")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	start := make(chan struct{})
+	errorsChannel := make(chan error, 2)
+	var ready sync.WaitGroup
+	ready.Add(2)
+	for range 2 {
+		go func() {
+			ready.Done()
+			<-start
+			errorsChannel <- Migrate(ctx, dsn)
+		}()
+	}
+	ready.Wait()
+	close(start)
+	for range 2 {
+		if err := <-errorsChannel; err != nil {
+			t.Fatalf("并发迁移失败: %v", err)
+		}
+	}
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var applied int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT version_id) FROM goose_db_version WHERE is_applied = 1 AND version_id BETWEEN 1 AND 6").Scan(&applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied != 6 {
+		t.Fatalf("已应用迁移数量 = %d，期望 6", applied)
+	}
 }
 
 func (r fakeLockRow) Scan(dest ...any) error {
