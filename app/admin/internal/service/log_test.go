@@ -26,7 +26,7 @@ func (h *fakeLogHandler) DownloadURL(context.Context, logexport.Access, string) 
 
 func TestPlatformAdministratorInTenantContextDoesNotBypassLogPermission(t *testing.T) {
 	handler := &fakeLogHandler{}
-	service := NewLogService(handler, fakePermissionChecker{allowed: false})
+	service := NewLogService(handler, &fakePermissionChecker{allowed: false})
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 1, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant, ImpersonatorID: 1})
 	if _, err := service.CreateExport(ctx, &v1.CreateExportRequest{LogType: "api"}); err == nil {
 		t.Fatal("平台管理员在租户上下文必须接受日志导出权限检查")
@@ -38,7 +38,7 @@ func TestPlatformAdministratorInTenantContextDoesNotBypassLogPermission(t *testi
 
 func TestPlatformAdministratorInPlatformContextCanExportLogs(t *testing.T) {
 	handler := &fakeLogHandler{}
-	service := NewLogService(handler, fakePermissionChecker{allowed: false})
+	service := NewLogService(handler, &fakePermissionChecker{allowed: false})
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 1, TenantID: 0, Realm: bizauth.RealmPlatform})
 	reply, err := service.CreateExport(ctx, &v1.CreateExportRequest{LogType: "api"})
 	if err != nil || reply.Item.GetId() != "export-1" || !handler.access.PlatformAdmin {

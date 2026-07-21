@@ -3,7 +3,7 @@ import { createConnection } from 'node:net'
 
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
-const password = process.env.E2E_ADMIN_PASSWORD ?? 'Admin@123456'
+const password = process.env.E2E_ADMIN_PASSWORD ?? 'ChangeMe!2026'
 const redisHost = process.env.E2E_REDIS_HOST ?? '127.0.0.1'
 const redisPort = Number(process.env.E2E_REDIS_PORT ?? '6379')
 const apiBaseURL = process.env.E2E_API_BASE_URL ?? 'http://127.0.0.1:8000'

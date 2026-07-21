@@ -5,10 +5,11 @@ import (
 	"strconv"
 
 	kratoserrors "github.com/go-kratos/kratos/v2/errors"
+	"github.com/go-kratos/kratos/v2/transport"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
 	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // PlatformLoginHandler 定义平台管理员登录能力。
@@ -27,6 +28,7 @@ type PlatformAuthService struct {
 	loginHandler       PlatformLoginHandler
 	sessionHandler     SessionHandler
 	impersonateHandler ImpersonateHandler
+	captcha            CaptchaHandler
 	secureCookie       bool
 }
 
@@ -38,12 +40,29 @@ func NewPlatformAuthService(loginHandler PlatformLoginHandler, sessionHandler Se
 	}
 }
 
+// ConfigureCaptcha 启用平台登录图形验证码校验。
+func (s *PlatformAuthService) ConfigureCaptcha(handler CaptchaHandler) {
+	s.captcha = handler
+}
+
 // Login 平台管理员登录。
 func (s *PlatformAuthService) Login(ctx context.Context, request *v1.PlatformAuthServiceLoginRequest) (*v1.PlatformAuthServiceLoginResponse, error) {
+	if request.GetIdentifier() == "" || request.GetPassword() == "" {
+		return nil, kratoserrors.BadRequest("AUTH_INVALID_ARGUMENT", "账号和密码不能为空")
+	}
+	if s.captcha != nil {
+		if err := s.captcha.Verify(ctx, request.GetCaptchaId(), request.GetCaptchaCode()); err != nil {
+			return nil, kratoserrors.BadRequest("CAPTCHA_INVALID", bizauth.ErrCaptchaInvalid.Error())
+		}
+	}
 	input := bizauth.LoginInput{
 		Identifier: request.GetIdentifier(),
 		Password:   request.GetPassword(),
 		DeviceName: request.GetDeviceName(),
+	}
+	if transporter, ok := transport.FromServerContext(ctx); ok {
+		input.IP = transporter.RequestHeader().Get("X-Real-IP")
+		input.UserAgent = transporter.RequestHeader().Get("User-Agent")
 	}
 	result, err := s.loginHandler.Login(ctx, input)
 	if err != nil {
@@ -57,12 +76,12 @@ func (s *PlatformAuthService) Login(ctx context.Context, request *v1.PlatformAut
 		Tenants:        mapTenantOptions(result.Tenants),
 		CurrentTenant: mapTenantOption(result.CurrentTenant),
 		MfaRequired:    result.MFARequired,
-			MfaChallengeId: func() string {
-				if !result.MFARequired {
-					return ""
-				}
-				return strconv.FormatUint(result.MFAChallenge.ID, 10)
-			}(),
+		MfaChallengeId: func() string {
+			if !result.MFARequired {
+				return ""
+			}
+			return strconv.FormatUint(result.MFAChallenge.ID, 10)
+		}(),
 	}, nil
 }
 
@@ -145,7 +164,7 @@ func (s *PlatformAuthService) ListSessions(ctx context.Context, _ *v1.PlatformAu
 	if !ok || s.sessionHandler == nil {
 		return nil, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
-	items, err := s.sessionHandler.List(ctx, claims.UserID, claims.SessionID)
+	items, err := s.sessionHandler.List(ctx, claims.UserID, claims.Realm, claims.SessionID)
 	if err != nil {
 		return nil, kratoserrors.InternalServer("AUTH_SESSION_LIST_FAILED", "查询设备会话失败")
 	}
@@ -181,7 +200,12 @@ func (s *PlatformAuthService) Impersonate(ctx context.Context, request *v1.Platf
 	if !ok || s.impersonateHandler == nil {
 		return nil, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
-	result, err := s.impersonateHandler.Impersonate(ctx, claims, bizauth.ImpersonateInput{TenantID: request.GetTenantId()})
+	input := bizauth.ImpersonateInput{TenantID: request.GetTenantId()}
+	if transporter, ok := transport.FromServerContext(ctx); ok {
+		input.IP = transporter.RequestHeader().Get("X-Real-IP")
+		input.UserAgent = transporter.RequestHeader().Get("User-Agent")
+	}
+	result, err := s.impersonateHandler.Impersonate(ctx, claims, input)
 	if err != nil {
 		return nil, mapAuthError(err)
 	}

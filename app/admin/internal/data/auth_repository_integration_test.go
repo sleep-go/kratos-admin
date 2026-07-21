@@ -144,7 +144,7 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 	if err != nil || !allowed {
 		t.Fatalf("Allowed(audit-logs:list) = %v, %v", allowed, err)
 	}
-	navigation, err := repository.ListNavigation(context.Background(), tenant.ID, member.ID, bizauth.RealmTenant)
+	navigation, err := repository.ListNavigation(context.Background(), tenant.ID, member.ID, bizauth.RealmTenant, 0)
 	if err != nil || len(navigation) != 1 || navigation[0].Code != "integration-menu" {
 		t.Fatalf("ListNavigation() = %+v, %v", navigation, err)
 	}

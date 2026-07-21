@@ -182,6 +182,13 @@ func (r *ManagementRepository) Allowed(ctx context.Context, scope managementbiz.
 		}
 		return count > 0, nil
 	}
+	if scope.Impersonating {
+		count, err := base.Count()
+		if err != nil {
+			return false, err
+		}
+		return count > 0, nil
+	}
 	p := q.CasbinRule.As("p")
 	g := q.CasbinRule.As("g")
 	count, err := base.

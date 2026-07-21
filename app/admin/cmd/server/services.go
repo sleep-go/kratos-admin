@@ -30,7 +30,9 @@ func provideServices(cfg conf.Config, resources *data.Data, providers *provider.
 	authService.ConfigureAccessSecurity(tokenManager, sessionUsecase)
 	authService.ConfigureAccessLog(repository)
 	authService.ConfigureLoginLog(repository)
-	authService.ConfigureCaptcha(bizauth.NewCaptchaUsecase(data.NewCaptchaStore(resources), nil))
+	captchaUsecase := bizauth.NewCaptchaUsecase(data.NewCaptchaStore(resources), nil)
+	authService.ConfigureCaptcha(captchaUsecase)
+	platformAuthService.ConfigureCaptcha(captchaUsecase)
 
 	verificationKey := sha256.Sum256([]byte(cfg.Auth.SecretKey + ":verification"))
 	verificationUsecase, err := bizauth.NewVerificationUsecase(

@@ -27,7 +27,7 @@ type fakeSessionManagerRepository struct {
 	navigationRealm         Realm
 }
 
-func (r *fakeSessionManagerRepository) ListNavigation(_ context.Context, tenantID, memberID uint64, realm Realm) ([]NavigationItem, error) {
+func (r *fakeSessionManagerRepository) ListNavigation(_ context.Context, tenantID, memberID uint64, realm Realm, impersonatorID uint64) ([]NavigationItem, error) {
 	r.navigationTenantID = tenantID
 	r.navigationMemberID = memberID
 	r.navigationRealm = realm
@@ -60,8 +60,15 @@ func (r *fakeSessionManagerRepository) ListMemberships(_ context.Context, _ uint
 	return items, nil
 }
 
-func (r *fakeSessionManagerRepository) List(_ context.Context, _ uint64) ([]DeviceSession, error) {
+func (r *fakeSessionManagerRepository) List(_ context.Context, _ uint64, _ Realm) ([]DeviceSession, error) {
 	return r.sessions, nil
+}
+
+func (r *fakeSessionManagerRepository) FindTenant(_ context.Context, tenantID uint64) (TenantOption, error) {
+	if membership, ok := r.memberships[tenantID]; ok {
+		return TenantOption{ID: membership.TenantID, Name: membership.TenantName}, nil
+	}
+	return TenantOption{}, ErrNoTenantMembership
 }
 
 func (r *fakeSessionManagerRepository) Find(_ context.Context, _ string) (SessionRecord, error) {
@@ -235,7 +242,7 @@ func TestListSessionsMarksCurrentDevice(t *testing.T) {
 		{ID: "other", DeviceName: "其他设备", ExpiresAt: now.Add(time.Hour)},
 	}
 
-	items, err := usecase.List(context.Background(), 1, "session")
+	items, err := usecase.List(context.Background(), 1, RealmTenant, "session")
 	if err != nil || len(items) != 2 || !items[0].Current || items[1].Current {
 		t.Fatalf("List() = %+v, err %v", items, err)
 	}

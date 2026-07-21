@@ -64,18 +64,22 @@ func (u *ImpersonateUsecase) Impersonate(ctx context.Context, claims *TokenClaim
 	if err != nil || admin.Status != UserStatusEnabled {
 		return ImpersonateResult{}, ErrAccountDisabled
 	}
+	tenant, err := u.users.FindTenant(ctx, input.TenantID)
+	if err != nil {
+		return ImpersonateResult{}, err
+	}
 	sessionID, err := randomTokenID()
 	if err != nil {
 		return ImpersonateResult{}, err
 	}
-	// 使用短 TTL 令牌管理器签发代维令牌
-	tokens, err := u.tokens.Issue(TokenSubject{
+	// 代维会话使用更短的 refresh 有效期。
+	tokens, err := u.tokens.IssueWithRefreshTTL(TokenSubject{
 		UserID:         admin.ID,
 		TenantID:       input.TenantID,
 		Realm:          RealmTenant,
 		ImpersonatorID: admin.ID,
 		SessionID:      sessionID,
-	})
+	}, u.ttl)
 	if err != nil {
 		return ImpersonateResult{}, err
 	}
@@ -101,6 +105,6 @@ func (u *ImpersonateUsecase) Impersonate(ctx context.Context, claims *TokenClaim
 	return ImpersonateResult{
 		Tokens:        tokens,
 		User:          profile,
-		CurrentTenant: TenantOption{ID: input.TenantID},
+		CurrentTenant: tenant,
 	}, nil
 }

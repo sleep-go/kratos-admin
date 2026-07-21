@@ -35,7 +35,6 @@ func TestModelNameForTable(t *testing.T) {
 
 func TestModelTypeForBooleanColumns(t *testing.T) {
 	columns := []string{
-		"is_platform_admin",
 		"mfa_enabled",
 		"is_tenant_admin",
 		"visible",

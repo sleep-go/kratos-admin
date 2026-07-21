@@ -38,6 +38,15 @@ func (r *fakeUserRepository) ListMemberships(_ context.Context, _ uint64) ([]Mem
 	return r.memberships, nil
 }
 
+func (r *fakeUserRepository) FindTenant(_ context.Context, tenantID uint64) (TenantOption, error) {
+	for _, membership := range r.memberships {
+		if membership.TenantID == tenantID {
+			return TenantOption{ID: membership.TenantID, Name: membership.TenantName}, nil
+		}
+	}
+	return TenantOption{}, ErrNoTenantMembership
+}
+
 func (r *fakeUserRepository) UpdateLoginFailure(_ context.Context, _ uint64, count uint32, lockedUntil *time.Time) error {
 	r.failureCount = count
 	r.lockedUntil = lockedUntil

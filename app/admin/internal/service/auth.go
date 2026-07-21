@@ -43,7 +43,7 @@ type SessionHandler interface {
 	Profile(ctx context.Context, userID, tenantID uint64) (bizauth.SessionProfile, error)
 	SwitchTenant(ctx context.Context, refreshToken string, tenantID uint64) (bizauth.SwitchTenantResult, error)
 	Logout(ctx context.Context, refreshToken string) error
-	List(ctx context.Context, userID uint64, currentSessionID string) ([]bizauth.DeviceSession, error)
+	List(ctx context.Context, userID uint64, realm bizauth.Realm, currentSessionID string) ([]bizauth.DeviceSession, error)
 	Revoke(ctx context.Context, sessionID string, userID uint64) error
 	UpdateProfile(ctx context.Context, userID uint64, displayName, avatarURL, email, phone string) (bizauth.UserProfile, error)
 	Navigation(ctx context.Context, tenantID, memberID uint64, realm bizauth.Realm) ([]bizauth.NavigationItem, error)
@@ -332,7 +332,7 @@ func (s *AuthService) ListSessions(ctx context.Context, _ *v1.ListSessionsReques
 	if !ok || s.sessionHandler == nil {
 		return nil, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
-	items, err := s.sessionHandler.List(ctx, claims.UserID, claims.SessionID)
+	items, err := s.sessionHandler.List(ctx, claims.UserID, claims.Realm, claims.SessionID)
 	if err != nil {
 		return nil, kratoserrors.InternalServer("AUTH_SESSION_LIST_FAILED", "查询设备会话失败")
 	}

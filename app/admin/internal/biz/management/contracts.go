@@ -9,6 +9,7 @@ type Scope struct {
 	UserID        uint64
 	MemberID      uint64
 	PlatformAdmin bool
+	Impersonating bool
 }
 
 // PageQuery 描述统一分页、排序、关键词与白名单筛选条件。

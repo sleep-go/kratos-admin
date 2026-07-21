@@ -28,7 +28,6 @@ var (
 		"allow_tenant_override": {},
 		"is_builtin":            {},
 		"is_default":            {},
-		"is_platform_admin":     {},
 		"is_primary":            {},
 		"is_secret":             {},
 		"is_tenant_admin":       {},

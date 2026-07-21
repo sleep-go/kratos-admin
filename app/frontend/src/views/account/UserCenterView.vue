@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -14,18 +14,28 @@ const { currentTenant, currentUser } = storeToRefs(authStore)
 const sessions = ref<DeviceSession[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const isPlatformAccount = computed(
+  () => currentUser.value?.realm === 'platform' && !currentUser.value?.impersonating
+)
 const form = reactive({ displayName: '', avatarUrl: '', email: '', phone: '' })
 
 async function loadSessions() {
   loading.value = true
   try {
-    sessions.value = (await authApi.listSessions()).items ?? []
+    const response = isPlatformAccount.value
+      ? await authApi.platformListSessions()
+      : await authApi.listSessions()
+    sessions.value = response.items ?? []
   } finally {
     loading.value = false
   }
 }
 
 async function saveProfile() {
+  if (isPlatformAccount.value) {
+    ElMessage.info('平台管理员资料请在平台治理入口维护')
+    return
+  }
   saving.value = true
   try {
     const response = await authApi.updateProfile(form)
@@ -41,7 +51,11 @@ async function revoke(session: DeviceSession) {
   await ElMessageBox.confirm('撤销后该设备需要重新登录，确认继续？', '撤销设备会话', {
     type: 'warning'
   })
-  await authApi.revokeSession(session.id)
+  if (isPlatformAccount.value) {
+    await authApi.platformRevokeSession(session.id)
+  } else {
+    await authApi.revokeSession(session.id)
+  }
   ElMessage.success('设备会话已撤销')
   await loadSessions()
 }
@@ -95,7 +109,7 @@ onMounted(() => {
             <dd>{{ currentUser?.mfaEnabled ? `已启用 · ${currentUser.mfaChannel}` : '未启用' }}</dd>
           </div>
         </dl>
-        <el-form label-position="top" @submit.prevent="saveProfile">
+        <el-form v-if="!isPlatformAccount" label-position="top" @submit.prevent="saveProfile">
           <div class="form-grid">
             <el-form-item label="显示名称" required>
               <el-input v-model="form.displayName" />
@@ -107,6 +121,7 @@ onMounted(() => {
           <el-button type="danger" native-type="submit" :icon="Check" :loading="saving">保存资料</el-button>
           <router-link to="/forgot-password" class="password-link">通过验证码重置密码</router-link>
         </el-form>
+        <p v-else class="platform-note">平台管理员账号资料由平台治理模块统一维护，此处仅展示会话信息。</p>
       </article>
 
       <article class="panel sessions-panel">
@@ -238,6 +253,12 @@ onMounted(() => {
   margin-left: 14px;
   color: var(--ka-muted);
   font-size: 12px;
+}
+.platform-note {
+  margin: 0;
+  color: var(--ka-muted);
+  font-size: 13px;
+  line-height: 1.7;
 }
 .panel-title {
   display: flex;

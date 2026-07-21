@@ -277,11 +277,11 @@ func (r *AuthRepository) FindMembership(ctx context.Context, userID, tenantID ui
 	return bizauth.Membership{}, bizauth.ErrNoTenantMembership
 }
 
-// List 返回用户当前有效的全部设备会话。
-func (r *AuthRepository) List(ctx context.Context, userID uint64) ([]bizauth.DeviceSession, error) {
+// List 返回用户在指定认证域下当前有效的全部设备会话。
+func (r *AuthRepository) List(ctx context.Context, userID uint64, realm bizauth.Realm) ([]bizauth.DeviceSession, error) {
 	s := r.q.AuthSession
 	rows, err := s.WithContext(ctx).
-		Where(s.UserID.Eq(userID), s.RevokedAt.IsNull(), s.ExpiresAt.Gt(time.Now().UTC())).
+		Where(s.UserID.Eq(userID), s.Realm.Eq(string(realm)), s.RevokedAt.IsNull(), s.ExpiresAt.Gt(time.Now().UTC())).
 		Order(s.CreatedAt.Desc()).
 		Find()
 	if err != nil {
@@ -298,7 +298,7 @@ func (r *AuthRepository) List(ctx context.Context, userID uint64) ([]bizauth.Dev
 }
 
 // ListNavigation 仅返回当前认证域可见的目录与菜单资源。
-func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID uint64, realm bizauth.Realm) ([]bizauth.NavigationItem, error) {
+func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID uint64, realm bizauth.Realm, impersonatorID uint64) ([]bizauth.NavigationItem, error) {
 	type row struct {
 		ID           uint64
 		ParentID     uint64
@@ -317,9 +317,13 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID 
 		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(1).Eq(1))
 	} else {
 		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(2).Eq(2))
-		tenantAdmin, err := r.isTenantAdmin(ctx, tenantID, memberID)
-		if err != nil {
-			return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)
+		tenantAdmin := impersonatorID > 0
+		var err error
+		if !tenantAdmin {
+			tenantAdmin, err = r.isTenantAdmin(ctx, tenantID, memberID)
+			if err != nil {
+				return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)
+			}
 		}
 		tr := r.q.TenantResource.As("tr")
 		navigationQuery = navigationQuery.Join(tr, tr.ResourceID.EqCol(resource.ID), tr.TenantID.Eq(tenantID))
@@ -345,6 +349,21 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID 
 		})
 	}
 	return items, nil
+}
+
+// FindTenant 按 ID 查询租户摘要信息。
+func (r *AuthRepository) FindTenant(ctx context.Context, tenantID uint64) (bizauth.TenantOption, error) {
+	t := r.q.Tenant
+	row, err := t.WithContext(ctx).
+		Where(t.ID.Eq(tenantID), t.Status.Eq(1), t.DeletedAt.IsNull()).
+		First()
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return bizauth.TenantOption{}, bizauth.ErrNoTenantMembership
+	}
+	if err != nil {
+		return bizauth.TenantOption{}, fmt.Errorf("查询租户失败: %w", err)
+	}
+	return bizauth.TenantOption{ID: row.ID, Name: row.Name}, nil
 }
 
 // tenantAdminPermissions 返回目标租户中所有已授权资源的通配权限。

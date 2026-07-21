@@ -87,6 +87,7 @@ type UserRepository interface {
 	FindByID(ctx context.Context, userID uint64) (*User, error)
 	ListMemberships(ctx context.Context, userID uint64) ([]Membership, error)
 	ListPermissions(ctx context.Context, realm Realm, tenantID, memberID, impersonatorID uint64) ([]string, error)
+	FindTenant(ctx context.Context, tenantID uint64) (TenantOption, error)
 	UpdateLoginFailure(ctx context.Context, userID uint64, count uint32, lockedUntil *time.Time) error
 	ResetLoginFailures(ctx context.Context, userID uint64) error
 }

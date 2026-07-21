@@ -9,6 +9,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const { loading } = storeToRefs(authStore)
+const isPlatformFlow = computed(() => route.query.from === 'platform')
 const challengeId = computed(() =>
   typeof route.query.challenge === 'string' ? route.query.challenge : ''
 )
@@ -16,12 +17,12 @@ const form = reactive({ code: '' })
 
 async function submit() {
   if (!challengeId.value) {
-    await router.replace('/login')
+    await router.replace(isPlatformFlow.value ? '/platform/login' : '/login')
     return
   }
   try {
     await authStore.verifyMfa(challengeId.value, form.code)
-    await router.replace('/')
+    await router.replace(isPlatformFlow.value ? '/platform/tenants' : '/console')
   } catch {
     form.code = ''
   }
@@ -49,7 +50,7 @@ async function submit() {
           {{ loading ? '验证中…' : '验证并登录' }}
         </button>
       </form>
-      <RouterLink to="/login">返回登录</RouterLink>
+      <RouterLink :to="isPlatformFlow ? '/platform/login' : '/login'">返回登录</RouterLink>
     </section>
   </main>
 </template>

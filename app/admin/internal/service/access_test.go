@@ -99,6 +99,18 @@ func TestAccessMiddlewareAllowsPublicLoginWithoutToken(t *testing.T) {
 	}
 }
 
+func TestAccessMiddlewareAllowsPlatformLoginWithoutToken(t *testing.T) {
+	service := NewAuthService(&fakeLoginHandler{}, false)
+	ctx := transport.NewServerContext(context.Background(), &testTransport{
+		operation: v1.OperationPlatformAuthServiceLogin, request: testHeader{}, reply: testHeader{},
+	})
+	called := false
+	_, err := service.AccessMiddleware()(func(context.Context, any) (any, error) { called = true; return nil, nil })(ctx, nil)
+	if err != nil || !called {
+		t.Fatalf("platform public middleware err = %v, called = %v", err, called)
+	}
+}
+
 func TestAccessMiddlewareRecordsUnauthorizedRequest(t *testing.T) {
 	recorder := &fakeAccessRecorder{}
 	service := NewAuthService(&fakeLoginHandler{}, false)

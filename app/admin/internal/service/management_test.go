@@ -31,9 +31,13 @@ func (r *fakeManagementRepository) UpdateRoleAuthorization(_ context.Context, _ 
 	return nil
 }
 
-type fakePermissionChecker struct{ allowed bool }
+type fakePermissionChecker struct {
+	allowed bool
+	scope   managementbiz.Scope
+}
 
-func (c fakePermissionChecker) Allowed(context.Context, managementbiz.Scope, string, string) (bool, error) {
+func (c *fakePermissionChecker) Allowed(_ context.Context, scope managementbiz.Scope, _, _ string) (bool, error) {
+	c.scope = scope
 	return c.allowed, nil
 }
 
@@ -95,7 +99,8 @@ func TestManagementServiceRejectsPlatformResourceInTenantContext(t *testing.T) {
 
 func TestPlatformAdministratorInTenantContextDoesNotBypassPermission(t *testing.T) {
 	repository := &fakeManagementRepository{}
-	service := NewManagementService(repository, fakePermissionChecker{allowed: false})
+	checker := &fakePermissionChecker{allowed: false}
+	service := NewManagementService(repository, checker)
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{
 		UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant, ImpersonatorID: 1,
 	})
@@ -103,13 +108,16 @@ func TestPlatformAdministratorInTenantContextDoesNotBypassPermission(t *testing.
 	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "login-logs"}); err == nil {
 		t.Fatal("平台管理员在租户上下文必须接受租户权限检查")
 	}
-	if repository.scope.PlatformAdmin {
-		t.Fatalf("scope = %+v", repository.scope)
+	if checker.scope.PlatformAdmin {
+		t.Fatalf("scope = %+v", checker.scope)
+	}
+	if !checker.scope.Impersonating {
+		t.Fatalf("scope = %+v", checker.scope)
 	}
 }
 
 func TestManagementServiceRejectsMissingCasbinPermission(t *testing.T) {
-	service := NewManagementService(&fakeManagementRepository{}, fakePermissionChecker{allowed: false})
+	service := NewManagementService(&fakeManagementRepository{}, &fakePermissionChecker{allowed: false})
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 
 	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "departments"}); err == nil {
@@ -133,7 +141,7 @@ func TestGetEffectiveSettingsUsesAuthenticatedTenant(t *testing.T) {
 
 func TestProviderConnectionTestRequiresUpdatePermission(t *testing.T) {
 	repository := &fakeManagementRepository{}
-	service := NewManagementService(repository, fakePermissionChecker{allowed: false})
+	service := NewManagementService(repository, &fakePermissionChecker{allowed: false})
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 	if _, err := service.TestProviderConnection(ctx, &v1.TestProviderConnectionRequest{Id: 7}); err == nil {
 		t.Fatal("connection test must require provider update permission")
@@ -145,7 +153,7 @@ func TestProviderConnectionTestRequiresUpdatePermission(t *testing.T) {
 
 func TestUpdateRoleAuthorizationIsSingleAuthorizedOperation(t *testing.T) {
 	repository := &fakeManagementRepository{}
-	service := NewManagementService(repository, fakePermissionChecker{allowed: true})
+	service := NewManagementService(repository, &fakePermissionChecker{allowed: true})
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 8, MemberID: 9, Realm: bizauth.RealmTenant})
 
 	_, err := service.UpdateRoleAuthorization(ctx, &v1.UpdateRoleAuthorizationRequest{

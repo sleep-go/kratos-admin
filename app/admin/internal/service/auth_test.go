@@ -80,7 +80,7 @@ func (h *fakeSessionHandler) SwitchTenant(context.Context, string, uint64) (biza
 	return bizauth.SwitchTenantResult{}, nil
 }
 func (h *fakeSessionHandler) Logout(context.Context, string) error { return nil }
-func (h *fakeSessionHandler) List(context.Context, uint64, string) ([]bizauth.DeviceSession, error) {
+func (h *fakeSessionHandler) List(_ context.Context, _ uint64, _ bizauth.Realm, _ string) ([]bizauth.DeviceSession, error) {
 	return h.sessions, nil
 }
 func (h *fakeSessionHandler) Revoke(_ context.Context, sessionID string, _ uint64) error {

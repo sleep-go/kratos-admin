@@ -249,6 +249,7 @@ func managementScope(ctx context.Context, resource string, targetTenantID uint64
 	return managementbiz.Scope{
 		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID,
 		PlatformAdmin: claims.Realm == bizauth.RealmPlatform,
+		Impersonating: claims.ImpersonatorID > 0,
 	}, nil
 }
 

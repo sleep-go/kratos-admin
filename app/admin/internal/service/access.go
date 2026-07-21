@@ -27,14 +27,17 @@ type AccessValidator interface {
 }
 
 var publicOperations = map[string]struct{}{
-	v1.OperationAuthServiceGetCaptcha:     {},
-	v1.OperationAuthServiceLogin:          {},
-	v1.OperationAuthServiceVerifyMfa:      {},
-	v1.OperationAuthServiceRefresh:        {},
-	v1.OperationAuthServiceLogout:         {},
-	v1.OperationAuthServiceForgotPassword: {},
-	v1.OperationAuthServiceResetPassword:  {},
-	v1.OperationHealthServiceCheck:        {},
+	v1.OperationAuthServiceGetCaptcha:          {},
+	v1.OperationAuthServiceLogin:               {},
+	v1.OperationAuthServiceVerifyMfa:           {},
+	v1.OperationAuthServiceRefresh:             {},
+	v1.OperationAuthServiceLogout:              {},
+	v1.OperationAuthServiceForgotPassword:      {},
+	v1.OperationAuthServiceResetPassword:       {},
+	v1.OperationPlatformAuthServiceLogin:       {},
+	v1.OperationPlatformAuthServiceRefresh:     {},
+	v1.OperationPlatformAuthServiceLogout:      {},
+	v1.OperationHealthServiceCheck:             {},
 }
 
 // ConfigureAccessSecurity 配置 access token 签名验证和服务端权限版本复核。

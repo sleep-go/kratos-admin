@@ -62,12 +62,19 @@ func TestMigrationLockSerializesConcurrentMySQLMigrations(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	var applied int
-	if err := db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT version_id) FROM goose_db_version WHERE is_applied = 1 AND version_id BETWEEN 1 AND 7").Scan(&applied); err != nil {
+	var version8 int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM goose_db_version WHERE is_applied = 1 AND version_id = 8").Scan(&version8); err != nil {
 		t.Fatal(err)
 	}
-	if applied != 7 {
-		t.Fatalf("已应用迁移数量 = %d，期望 7", applied)
+	if version8 != 1 {
+		t.Fatalf("平台认证隔离迁移 version_id=8 未应用")
+	}
+	var platformAdmins int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'platform_admins'").Scan(&platformAdmins); err != nil {
+		t.Fatal(err)
+	}
+	if platformAdmins != 1 {
+		t.Fatal("platform_admins 表不存在")
 	}
 }
 

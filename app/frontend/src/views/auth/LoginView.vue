@@ -28,7 +28,13 @@ async function submit() {
       ? await authStore.platformLogin({ ...form })
       : await authStore.login({ ...form })
     if (response.mfaRequired) {
-      await router.push({ name: 'mfa', query: { challenge: response.mfaChallengeId } })
+      await router.push({
+        name: 'mfa',
+        query: {
+          challenge: response.mfaChallengeId,
+          ...(isPlatformLogin ? { from: 'platform' } : {})
+        }
+      })
       return
     }
     const defaultRedirect = isPlatformLogin ? '/platform/tenants' : '/console'

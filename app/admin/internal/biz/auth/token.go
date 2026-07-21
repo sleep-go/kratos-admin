@@ -92,6 +92,14 @@ func NewTokenManager(privateKey ed25519.PrivateKey, accessTTL, refreshTTL time.D
 
 // Issue 为认证上下文签发一对具有独立 jti 的令牌。
 func (m *TokenManager) Issue(subject TokenSubject) (TokenPair, error) {
+	return m.IssueWithRefreshTTL(subject, m.refreshTTL)
+}
+
+// IssueWithRefreshTTL 签发令牌，并允许覆盖 refresh 令牌有效期。
+func (m *TokenManager) IssueWithRefreshTTL(subject TokenSubject, refreshTTL time.Duration) (TokenPair, error) {
+	if refreshTTL <= 0 {
+		refreshTTL = m.refreshTTL
+	}
 	if subject.UserID == 0 || subject.SessionID == "" {
 		return TokenPair{}, errors.New("令牌用户和会话不能为空")
 	}
@@ -99,7 +107,7 @@ func (m *TokenManager) Issue(subject TokenSubject) (TokenPair, error) {
 	if err != nil {
 		return TokenPair{}, err
 	}
-	refreshToken, refreshJTI, refreshExpiresAt, err := m.sign(subject, TokenTypeRefresh, m.refreshTTL)
+	refreshToken, refreshJTI, refreshExpiresAt, err := m.sign(subject, TokenTypeRefresh, refreshTTL)
 	if err != nil {
 		return TokenPair{}, err
 	}

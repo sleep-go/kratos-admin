@@ -8,7 +8,9 @@ vi.mock('@/api/auth', () => ({
   listSessions: vi.fn().mockResolvedValue({
     items: [{ id: 'current', deviceName: 'Chrome on macOS', ip: '127.0.0.1', current: true }]
   }),
+  platformListSessions: vi.fn().mockResolvedValue({ items: [] }),
   revokeSession: vi.fn(),
+  platformRevokeSession: vi.fn(),
   updateProfile: vi.fn()
 }))
 
@@ -26,7 +28,7 @@ describe('个人中心', () => {
                   username: 'admin',
                   displayName: '超级管理员',
                   email: 'admin@example.com',
-                  realm: 'platform'
+                  realm: 'tenant'
                 },
                 currentTenant: { id: '10', name: '演示租户' }
               }
