@@ -1,17 +1,37 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import * as managementApi from '@/api/management'
 import * as logApi from '@/api/logs'
-import { resourceDefinitions } from '@/features/management/resourceDefinitions'
+import ResourceFormField from '@/features/management/ResourceFormField.vue'
+import {
+  resourceDefinitions,
+  type ResourceField,
+  type ResourceOption
+} from '@/features/management/resourceDefinitions'
+import { buildLookupOptions, resolveFieldLookup } from '@/features/management/resourceFormOptions'
 import type { ResourceRow } from '@/api/management'
 import type { AdminV1LogExport } from '@/api/generated'
-import type { ResourceField } from '@/features/management/resourceDefinitions'
 
 const props = defineProps<{ resourceKey: string }>()
 const definition = computed(() => resourceDefinitions[props.resourceKey])
 const tableFields = computed(() => definition.value.fields.filter((field) => field.table))
+const formFields = computed(() =>
+  definition.value.fields.filter(
+    (field) =>
+      field.form !== false &&
+      ![
+        'created_at',
+        'updated_at',
+        'permission_version',
+        'version',
+        'created_by',
+        'is_builtin'
+      ].includes(field.key) &&
+      !(editingID.value && field.createOnly)
+  )
+)
 const loading = ref(false)
 const items = ref<ResourceRow[]>([])
 const total = ref(0)
@@ -19,9 +39,11 @@ const page = ref(1)
 const pageSize = ref(20)
 const keyword = ref('')
 const filters = reactive<Record<string, string>>({})
-const dialogOpen = ref(false)
+const drawerOpen = ref(false)
 const editingID = ref('')
 const form = reactive<ResourceRow>({})
+const fieldOptions = shallowRef<Record<string, ResourceOption[]>>({})
+const optionsLoading = shallowRef(false)
 const exportTask = ref<AdminV1LogExport>()
 const exporting = ref(false)
 let active = true
@@ -65,27 +87,102 @@ function query() {
 function openCreate() {
   editingID.value = ''
   for (const key of Object.keys(form)) delete form[key]
-  for (const field of definition.value.fields) {
+  for (const field of formFields.value) {
     if (field.default !== undefined) form[field.key] = field.default
     if (field.type === 'status') form[field.key] = 1
     if (field.type === 'boolean') form[field.key] = false
     if (field.type === 'number') form[field.key] = 0
   }
-  dialogOpen.value = true
+  drawerOpen.value = true
+  void loadFormOptions()
 }
 
 function openEdit(row: ResourceRow) {
   editingID.value = String(row.id ?? '')
   for (const key of Object.keys(form)) delete form[key]
-  for (const field of definition.value.fields) {
+  for (const field of formFields.value) {
     if (field.key in row) form[field.key] = row[field.key]
   }
-  dialogOpen.value = true
+  drawerOpen.value = true
+  void loadFormOptions()
+}
+
+async function loadFormOptions() {
+  const fields = formFields.value
+    .map((field) => ({ field, lookup: resolveFieldLookup(field, form) }))
+    .filter(
+      (entry): entry is { field: ResourceField; lookup: NonNullable<ResourceField['lookup']> } =>
+        Boolean(entry.lookup)
+    )
+  if (fields.length === 0) {
+    fieldOptions.value = {}
+    return
+  }
+  optionsLoading.value = true
+  try {
+    const resources = [
+      ...new Set(
+        fields.flatMap((entry) => [
+          entry.lookup.resource,
+          ...(entry.lookup.exclude ? [entry.lookup.exclude.resource] : [])
+        ])
+      )
+    ]
+    const responses = await Promise.all(
+      resources.map(
+        async (resource) =>
+          [
+            resource,
+            await managementApi.listResources(resource, { page: 1, page_size: 200, sort: 'id:asc' })
+          ] as const
+      )
+    )
+    const rowsByResource = new Map(
+      responses.map(([resource, response]) => [resource, response.items ?? []])
+    )
+    fieldOptions.value = Object.fromEntries(
+      fields.map(({ field, lookup }) => {
+        const excludedValues = new Set(
+          lookup.exclude
+            ? (rowsByResource.get(lookup.exclude.resource) ?? [])
+                .filter((row) => String(row.id ?? '') !== editingID.value)
+                .map((row) => String(row[lookup.exclude!.valueKey] ?? ''))
+            : []
+        )
+        return [
+          field.key,
+          buildLookupOptions(
+            rowsByResource.get(lookup.resource) ?? [],
+            lookup,
+            editingID.value,
+            excludedValues
+          )
+        ]
+      })
+    )
+  } catch (error) {
+    fieldOptions.value = {}
+    ElMessage.error(error instanceof Error ? error.message : '表单候选项加载失败')
+  } finally {
+    optionsLoading.value = false
+  }
 }
 
 async function save() {
+  const missingField = formFields.value.find((field) => {
+    if (!field.required) return false
+    const value = form[field.key]
+    return (
+      value === undefined || value === null || (typeof value === 'string' && value.trim() === '')
+    )
+  })
+  if (missingField) {
+    ElMessage.warning(`请填写或选择${missingField.label}`)
+    return
+  }
+
   const payload: ResourceRow = {}
-  for (const field of definition.value.fields) {
+  for (const field of formFields.value) {
     if (
       field.key in form &&
       ![
@@ -103,7 +200,7 @@ async function save() {
   if (editingID.value)
     await managementApi.updateResource(definition.value.resource, editingID.value, payload)
   else await managementApi.createResource(definition.value.resource, payload)
-  dialogOpen.value = false
+  drawerOpen.value = false
   ElMessage.success(editingID.value ? '更新成功' : '创建成功')
   await load()
 }
@@ -171,10 +268,26 @@ async function downloadExportRow(row: ResourceRow) {
 function displayValue(value: unknown, field: ResourceField) {
   const label = field.valueLabels?.[String(value)]
   if (label) return label
+  if (field.options) {
+    return (
+      field.options.find((option) => String(option.value) === String(value))?.label ?? value ?? '—'
+    )
+  }
   if (field.type === 'status') return Number(value) === 1 ? '启用' : '禁用'
   if (field.type === 'boolean') return value === true || value === 1 || value === '1' ? '是' : '否'
   return value ?? '—'
 }
+
+watch(
+  () => form.ptype,
+  (value, previous) => {
+    if (!drawerOpen.value || value === previous) return
+    delete form.v1
+    delete form.v2
+    void loadFormOptions()
+  },
+  { flush: 'sync' }
+)
 
 watch(
   () => props.resourceKey,
@@ -182,6 +295,8 @@ watch(
     page.value = 1
     keyword.value = ''
     clearFilters()
+    drawerOpen.value = false
+    fieldOptions.value = {}
     void load()
   }
 )
@@ -282,8 +397,8 @@ onBeforeUnmount(() => {
               link
               @click="openEdit(scope.row)"
             >
-              编辑 </el-button
-            ><el-button
+              编辑
+            </el-button><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
@@ -314,12 +429,10 @@ onBeforeUnmount(() => {
       <div v-if="!loading && items.length === 0" class="mobile-empty">暂无数据</div>
       <div class="mobile-cards">
         <article v-for="row in items" :key="String(row.id)">
-          <strong
-            >#{{ row.id }} ·
+          <strong>#{{ row.id }} ·
             {{
               row.name ?? row.display_name ?? row.summary ?? row.original_name ?? definition.title
-            }}</strong
-          >
+            }}</strong>
           <dl>
             <template v-for="field in tableFields.slice(0, 5)" :key="field.key">
               <dt>{{ field.label }}</dt>
@@ -328,8 +441,8 @@ onBeforeUnmount(() => {
           </dl>
           <div v-if="!definition.readOnly">
             <el-button v-permission="`${definition.resource}:update`" link @click="openEdit(row)">
-              编辑 </el-button
-            ><el-button
+              编辑
+            </el-button><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
@@ -357,51 +470,31 @@ onBeforeUnmount(() => {
         @change="load"
       />
     </div>
-    <el-dialog
-      v-model="dialogOpen"
+    <el-drawer
+      v-model="drawerOpen"
       :title="editingID ? `编辑${definition.title}` : `新建${definition.title}`"
-      width="min(560px, 92vw)"
+      direction="rtl"
+      size="min(560px, 100%)"
     >
       <el-form label-position="top">
         <el-form-item
-          v-for="field in definition.fields.filter(
-            (item) =>
-              ![
-                'created_at',
-                'updated_at',
-                'permission_version',
-                'version',
-                'created_by',
-                'is_builtin'
-              ].includes(item.key) && !(editingID && item.key === 'initial_password')
-          )"
+          v-for="field in formFields"
           :key="field.key"
           :label="field.label"
           :required="field.required"
         >
-          <el-switch v-if="field.type === 'boolean'" v-model="form[field.key]" />
-          <el-select v-else-if="field.type === 'status'" v-model="form[field.key]">
-            <el-option label="启用" :value="1" /><el-option label="禁用" :value="2" />
-          </el-select>
-          <el-input-number v-else-if="field.type === 'number'" v-model="form[field.key]" :min="0" />
-          <el-input
-            v-else
+          <ResourceFormField
             v-model="form[field.key]"
-            :type="
-              field.type === 'textarea'
-                ? 'textarea'
-                : field.type === 'password'
-                  ? 'password'
-                  : 'text'
-            "
+            :field="field"
+            :options="fieldOptions[field.key]"
+            :loading="optionsLoading"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogOpen = false">取消</el-button
-        ><el-button type="danger" @click="save">保存</el-button>
+        <el-button @click="drawerOpen = false">取消</el-button><el-button type="danger" @click="save">保存</el-button>
       </template>
-    </el-dialog>
+    </el-drawer>
   </section>
 </template>
 

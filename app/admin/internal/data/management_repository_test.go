@@ -35,6 +35,86 @@ func TestResourceRegistryRejectsUnknownAndTenantOverride(t *testing.T) {
 	}
 }
 
+func TestValidateManagementEnumValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		resource string
+		values   map[string]any
+		wantErr  bool
+	}{
+		{name: "MFA邮件渠道", resource: "users", values: map[string]any{"mfa_channel": "email"}},
+		{name: "MFA短信渠道", resource: "users", values: map[string]any{"mfa_channel": "sms"}},
+		{name: "拒绝未知MFA渠道", resource: "users", values: map[string]any{"mfa_channel": "voice"}, wantErr: true},
+		{name: "角色数据范围", resource: "roles", values: map[string]any{"data_scope": 5}},
+		{name: "拒绝未知数据范围", resource: "roles", values: map[string]any{"data_scope": 6}, wantErr: true},
+		{name: "API资源类型", resource: "resources", values: map[string]any{"type": 4}},
+		{name: "拒绝未知资源类型", resource: "resources", values: map[string]any{"type": 0}, wantErr: true},
+		{name: "资源授权策略", resource: "casbin-rules", values: map[string]any{"ptype": "p"}},
+		{name: "角色继承策略", resource: "casbin-rules", values: map[string]any{"ptype": "g"}},
+		{name: "拒绝未知策略类型", resource: "casbin-rules", values: map[string]any{"ptype": "x"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateManagementEnumValues(tt.resource, tt.values)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validateManagementEnumValues() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestBuildDepartmentPathUsesDatabaseID(t *testing.T) {
+	if got := buildDepartmentPath("", 12); got != "/12" {
+		t.Fatalf("buildDepartmentPath(root) = %q, want /12", got)
+	}
+	if got := buildDepartmentPath("/4/9", 12); got != "/4/9/12" {
+		t.Fatalf("buildDepartmentPath(child) = %q, want /4/9/12", got)
+	}
+}
+
+func TestManagementAssociationDefinitionsCoverWritableForeignKeys(t *testing.T) {
+	expected := map[string][]string{
+		"members":          {"user_id", "primary_department_id", "position_id"},
+		"departments":      {"parent_id"},
+		"resources":        {"parent_id"},
+		"dictionary-items": {"type_id"},
+	}
+	for resource, fields := range expected {
+		for _, field := range fields {
+			definition, ok := managementAssociation(resource, field)
+			if !ok || definition.table == "" {
+				t.Fatalf("managementAssociation(%q, %q) = %+v, %v", resource, field, definition, ok)
+			}
+		}
+	}
+}
+
+func TestCasbinAssociationTargetsFollowPolicyType(t *testing.T) {
+	policy, err := casbinAssociationTargets(map[string]any{"ptype": "p", "v1": "8", "v2": "files"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(policy) != 2 || policy[0].table != "roles" || policy[1].table != "resources" || policy[1].column != "code" {
+		t.Fatalf("policy targets = %+v", policy)
+	}
+	group, err := casbinAssociationTargets(map[string]any{"ptype": "g", "v1": "9", "v2": "8"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(group) != 2 || group[0].table != "tenant_members" || group[1].table != "roles" {
+		t.Fatalf("group targets = %+v", group)
+	}
+}
+
+func TestResourceParentChainDetectsCycles(t *testing.T) {
+	if !resourceParentChainContains(8, []uint64{12, 10, 8}) {
+		t.Fatal("父级链包含当前资源时必须判定为循环")
+	}
+	if resourceParentChainContains(8, []uint64{12, 10, 1}) {
+		t.Fatal("正常父级链不应判定为循环")
+	}
+}
+
 func TestSettingsAndProviderConfigsAreEncryptedAndResolvedInMySQL(t *testing.T) {
 	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
 	if dsn == "" {
@@ -200,6 +280,66 @@ func TestManagementCreateReturnsMySQLAutoIncrementID(t *testing.T) {
 	}
 	if err != nil || !foundAudit {
 		t.Fatalf("Pending() = %+v, err %v", tasks, err)
+	}
+}
+
+func TestManagementRepositoryValidatesAssociationsAndMaintainsDepartmentPathInMySQL(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := OpenMySQL(context.Background(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := db.Begin()
+	t.Cleanup(func() { tx.Rollback() })
+	tenant := &model.Tenant{Code: "relation-main", Name: "关联校验租户", Status: 1, PermissionVersion: 1}
+	otherTenant := &model.Tenant{Code: "relation-other", Name: "其他租户", Status: 1, PermissionVersion: 1}
+	user := &model.User{Username: "relation-user", PasswordHash: "hash", DisplayName: "关联用户", Status: 1, PasswordChangedAt: time.Now().UTC()}
+	for _, value := range []any{tenant, otherTenant, user} {
+		if err := tx.Create(value).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	repository := &ManagementRepository{db: tx}
+	scope := managementbiz.Scope{TenantID: tenant.ID, UserID: user.ID, PlatformAdmin: true}
+	rootID, err := repository.Create(context.Background(), scope, "departments", map[string]any{
+		"name": "总部", "code": "root", "status": 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	childID, err := repository.Create(context.Background(), scope, "departments", map[string]any{
+		"name": "研发部", "code": "rd", "parent_id": rootID, "path": "/伪造路径", "status": 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	if err := tx.Table("departments").Where("id IN ?", []uint64{rootID, childID}).Order("id").Pluck("path", &paths).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 2 || paths[0] != fmt.Sprintf("/%d", rootID) || paths[1] != fmt.Sprintf("/%d/%d", rootID, childID) {
+		t.Fatalf("department paths = %#v", paths)
+	}
+	otherDepartment := &model.Department{TenantID: otherTenant.ID, Name: "外部部门", Code: "outside", Path: "/outside", Status: 1}
+	if err := tx.Create(otherDepartment).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(context.Background(), scope, "members", map[string]any{
+		"user_id": user.ID, "primary_department_id": otherDepartment.ID, "display_name": "越租户成员", "status": 1,
+	}); err == nil {
+		t.Fatal("创建成员必须拒绝其他租户的部门")
+	}
+	otherType := &model.DictionaryType{TenantID: otherTenant.ID, Code: "outside", Name: "外部字典", Status: 1}
+	if err := tx.Create(otherType).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repository.Create(context.Background(), scope, "dictionary-items", map[string]any{
+		"type_id": otherType.ID, "item_value": "x", "label": "越租户字典项", "status": 1,
+	}); err == nil {
+		t.Fatal("创建字典项必须拒绝其他租户的字典类型")
 	}
 }
 

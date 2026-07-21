@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,6 +40,25 @@ type resourceDefinition struct {
 	defaultOrder  string
 }
 
+type associationDefinition struct {
+	table        string
+	tenantColumn string
+	required     bool
+	activeOnly   bool
+	softDelete   bool
+	errorMessage string
+}
+
+type associationReference struct {
+	table        string
+	column       string
+	value        any
+	tenantColumn string
+	activeOnly   bool
+	softDelete   bool
+	errorMessage string
+}
+
 func fieldSet(fields ...string) map[string]struct{} {
 	result := make(map[string]struct{}, len(fields))
 	for _, field := range fields {
@@ -51,7 +71,7 @@ var managementResources = map[string]resourceDefinition{
 	"users":                  {table: "users", columns: []string{"id", "username", "email", "phone", "display_name", "is_platform_admin", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status", "mfa_enabled", "mfa_channel"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
 	"tenants":                {table: "tenants", columns: []string{"id", "code", "name", "status", "permission_version", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("status"), keywordFields: []string{"code", "name"}, softDelete: true},
 	"members":                {table: "tenant_members", columns: []string{"id", "tenant_id", "user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin", "joined_at"}, writeFields: fieldSet("user_id", "primary_department_id", "position_id", "display_name", "status", "is_tenant_admin"), filterFields: fieldSet("status", "primary_department_id", "position_id"), keywordFields: []string{"display_name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
-	"departments":            {table: "departments", columns: []string{"id", "tenant_id", "parent_id", "name", "code", "path", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("parent_id", "name", "code", "path", "sort_order", "status"), filterFields: fieldSet("parent_id", "status"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
+	"departments":            {table: "departments", columns: []string{"id", "tenant_id", "parent_id", "name", "code", "path", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("parent_id", "name", "code", "sort_order", "status"), filterFields: fieldSet("parent_id", "status"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"positions":              {table: "positions", columns: []string{"id", "tenant_id", "code", "name", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "sort_order", "status"), filterFields: fieldSet("status"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"roles":                  {table: "roles", columns: []string{"id", "tenant_id", "code", "name", "data_scope", "is_builtin", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "data_scope", "status"), filterFields: fieldSet("status", "data_scope"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"resources":              {table: "resources", columns: []string{"id", "parent_id", "type", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status"}, writeFields: fieldSet("parent_id", "type", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status"), filterFields: fieldSet("parent_id", "type", "status"), keywordFields: []string{"name", "code", "route_path", "api_path"}, softDelete: true},
@@ -67,6 +87,54 @@ var managementResources = map[string]resourceDefinition{
 	"dictionary-items":       {table: "dictionary_items", columns: []string{"id", "tenant_id", "type_id", "item_value", "label", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("type_id", "item_value", "label", "sort_order", "status"), filterFields: fieldSet("type_id", "status"), keywordFields: []string{"item_value", "label"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"providers":              {table: "provider_configs", columns: []string{"id", "tenant_id", "provider_type", "provider_name", "display_name", "encrypted_config", "status", "is_default", "updated_by", "created_at", "updated_at"}, writeFields: fieldSet("provider_type", "provider_name", "display_name", "config", "status", "is_default"), filterFields: fieldSet("provider_type", "status", "is_default"), keywordFields: []string{"provider_name", "display_name"}, tenantScoped: true, tenantColumn: "tenant_id"},
 	"files":                  {table: "files", columns: []string{"id", "tenant_id", "uploader_member_id", "provider_name", "object_key", "original_name", "content_type", "size_bytes", "sha256", "status", "created_at"}, filterFields: fieldSet("provider_name", "content_type", "status"), keywordFields: []string{"original_name", "object_key", "sha256"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true, readOnly: true},
+}
+
+var managementAssociations = map[string]map[string]associationDefinition{
+	"members": {
+		"user_id":               {table: "users", required: true, activeOnly: true, softDelete: true, errorMessage: "所选用户不存在或已禁用"},
+		"primary_department_id": {table: "departments", tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选主部门不存在或已禁用"},
+		"position_id":           {table: "positions", tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选岗位不存在或已禁用"},
+	},
+	"departments": {
+		"parent_id": {table: "departments", tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选上级部门不存在或已禁用"},
+	},
+	"resources": {
+		"parent_id": {table: "resources", activeOnly: true, softDelete: true, errorMessage: "所选父资源不存在或已禁用"},
+	},
+	"dictionary-items": {
+		"type_id": {table: "dictionary_types", tenantColumn: "tenant_id", required: true, activeOnly: true, softDelete: true, errorMessage: "所选字典类型不存在或已禁用"},
+	},
+}
+
+func managementAssociation(resource, field string) (associationDefinition, bool) {
+	definition, ok := managementAssociations[resource][field]
+	return definition, ok
+}
+
+func casbinAssociationTargets(values map[string]any) ([]associationReference, error) {
+	ptype, _ := values["ptype"].(string)
+	v1 := values["v1"]
+	v2 := values["v2"]
+	if ptype == "" || numericID(v1) == 0 || v2 == nil || strings.TrimSpace(fmt.Sprint(v2)) == "" {
+		return nil, errors.New("策略关联对象不能为空")
+	}
+	switch ptype {
+	case "p":
+		return []associationReference{
+			{table: "roles", column: "id", value: v1, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选角色不存在或已禁用"},
+			{table: "resources", column: "code", value: v2, activeOnly: true, softDelete: true, errorMessage: "所选权限资源不存在或已禁用"},
+		}, nil
+	case "g":
+		if numericID(v2) == 0 {
+			return nil, errors.New("所选角色不存在或已禁用")
+		}
+		return []associationReference{
+			{table: "tenant_members", column: "id", value: v1, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选成员不存在或已禁用"},
+			{table: "roles", column: "id", value: v2, tenantColumn: "tenant_id", activeOnly: true, softDelete: true, errorMessage: "所选角色不存在或已禁用"},
+		}, nil
+	default:
+		return nil, errors.New("策略类型取值无效")
+	}
 }
 
 // ManagementRepository 使用编译期白名单访问后台资源。
@@ -274,8 +342,14 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 	if err != nil {
 		return 0, err
 	}
+	if err := validateManagementEnumValues(resource, values); err != nil {
+		return 0, err
+	}
 	if definition.tenantScoped {
 		values[definition.tenantColumn] = targetTenantID(scope, data)
+	}
+	if resource == "departments" {
+		values["path"] = "/"
 	}
 	if err := r.prepareCreateValues(resource, values, scope); err != nil {
 		return 0, err
@@ -300,6 +374,10 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 	}
 	var id uint64
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		tenantID := numericID(values[definition.tenantColumn])
+		if err := validateManagementAssociations(tx, resource, values, tenantID, 0, true); err != nil {
+			return err
+		}
 		if err := validateSettingOverride(tx, resource, values); err != nil {
 			return err
 		}
@@ -312,6 +390,16 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 			if err := tx.Raw("SELECT LAST_INSERT_ID()").Scan(&id).Error; err != nil {
 				return fmt.Errorf("读取资源自增主键失败: %w", err)
 			}
+		}
+		if resource == "departments" {
+			path, err := resolveDepartmentPath(tx, tenantID, numericID(values["parent_id"]), id)
+			if err != nil {
+				return err
+			}
+			if err := tx.Table(definition.table).Where("id = ?", id).Update("path", path).Error; err != nil {
+				return err
+			}
+			values["path"] = path
 		}
 		if resource == "tenants" {
 			adminUserID := numericID(data["admin_user_id"])
@@ -374,6 +462,9 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 	if err != nil {
 		return err
 	}
+	if err := validateManagementEnumValues(resource, values); err != nil {
+		return err
+	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		query := tx.Table(definition.table).Where("id = ?", id)
 		if definition.tenantScoped && (scope.TenantID != 0 || !scope.PlatformAdmin) {
@@ -382,6 +473,22 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 		query, err = r.applyDataScope(ctx, query, scope, resource)
 		if err != nil {
 			return err
+		}
+		tenantID := scope.TenantID
+		if definition.tenantScoped && scope.PlatformAdmin && tenantID == 0 {
+			if err := query.Session(&gorm.Session{}).Pluck(definition.tenantColumn, &tenantID).Error; err != nil {
+				return err
+			}
+		}
+		if err := validateManagementAssociations(tx, resource, values, tenantID, id, false); err != nil {
+			return err
+		}
+		var departmentChange *departmentPathChange
+		if resource == "departments" {
+			departmentChange, err = prepareDepartmentPathUpdate(tx, query, values, tenantID, id)
+			if err != nil {
+				return err
+			}
 		}
 		if err := r.prepareUpdateValues(tx, query, resource, values, scope); err != nil {
 			return err
@@ -392,6 +499,11 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 		}
 		if result.RowsAffected != 1 {
 			return errors.New("资源不存在或无权访问")
+		}
+		if departmentChange != nil && departmentChange.oldPath != departmentChange.newPath {
+			if err := updateDepartmentDescendantPaths(tx, *departmentChange); err != nil {
+				return err
+			}
 		}
 		if err := incrementPermissionVersion(tx, scope, resource, values, id); err != nil {
 			return err
@@ -987,6 +1099,211 @@ func numericID(value any) uint64 {
 		return parsed
 	}
 	return 0
+}
+
+func validateManagementEnumValues(resource string, values map[string]any) error {
+	switch resource {
+	case "users":
+		if value, exists := values["mfa_channel"]; exists && value != "email" && value != "sms" {
+			return errors.New("MFA渠道取值无效")
+		}
+	case "roles":
+		if value, exists := values["data_scope"]; exists {
+			scope, ok := exactUint(value)
+			if !ok || scope < 1 || scope > 5 {
+				return errors.New("数据范围取值无效")
+			}
+		}
+	case "resources":
+		if value, exists := values["type"]; exists {
+			resourceType, ok := exactUint(value)
+			if !ok || resourceType < 1 || resourceType > 4 {
+				return errors.New("资源类型取值无效")
+			}
+		}
+	case "casbin-rules":
+		if value, exists := values["ptype"]; exists && value != "p" && value != "g" {
+			return errors.New("策略类型取值无效")
+		}
+	}
+	return nil
+}
+
+func exactUint(value any) (uint64, bool) {
+	switch number := value.(type) {
+	case float64:
+		if number < 0 || number != math.Trunc(number) {
+			return 0, false
+		}
+		return uint64(number), true
+	case float32:
+		converted := float64(number)
+		if converted < 0 || converted != math.Trunc(converted) {
+			return 0, false
+		}
+		return uint64(converted), true
+	case string:
+		parsed, err := strconv.ParseUint(number, 10, 64)
+		return parsed, err == nil
+	default:
+		return numericID(value), numericID(value) != 0
+	}
+}
+
+func buildDepartmentPath(parentPath string, id uint64) string {
+	return strings.TrimRight(parentPath, "/") + "/" + strconv.FormatUint(id, 10)
+}
+
+type departmentPathChange struct {
+	tenantID uint64
+	oldPath  string
+	newPath  string
+}
+
+func resolveDepartmentPath(tx *gorm.DB, tenantID, parentID, id uint64) (string, error) {
+	if parentID == 0 {
+		return buildDepartmentPath("", id), nil
+	}
+	var parentPath string
+	if err := tx.Table("departments").Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", parentID, tenantID).
+		Pluck("path", &parentPath).Error; err != nil {
+		return "", err
+	}
+	if parentPath == "" {
+		return "", errors.New("所选上级部门不存在或已禁用")
+	}
+	return buildDepartmentPath(parentPath, id), nil
+}
+
+func prepareDepartmentPathUpdate(tx, query *gorm.DB, values map[string]any, tenantID, id uint64) (*departmentPathChange, error) {
+	var current struct {
+		ParentID uint64
+		Path     string
+	}
+	if err := query.Session(&gorm.Session{}).Select("parent_id, path").Take(&current).Error; err != nil {
+		return nil, errors.New("资源不存在或无权访问")
+	}
+	parentID := current.ParentID
+	if value, exists := values["parent_id"]; exists {
+		parentID = numericID(value)
+	}
+	newPath, err := resolveDepartmentPath(tx, tenantID, parentID, id)
+	if err != nil {
+		return nil, err
+	}
+	if parentID != 0 && (newPath == current.Path || strings.HasPrefix(newPath, current.Path+"/")) {
+		return nil, errors.New("上级部门不能选择当前部门或其下级")
+	}
+	values["path"] = newPath
+	return &departmentPathChange{tenantID: tenantID, oldPath: current.Path, newPath: newPath}, nil
+}
+
+func updateDepartmentDescendantPaths(tx *gorm.DB, change departmentPathChange) error {
+	return tx.Table("departments").
+		Where("tenant_id = ? AND path LIKE ?", change.tenantID, change.oldPath+"/%").
+		Update("path", gorm.Expr("CONCAT(?, SUBSTRING(path, ?))", change.newPath, len(change.oldPath)+1)).Error
+}
+
+func validateManagementAssociations(tx *gorm.DB, resource string, values map[string]any, tenantID, currentID uint64, creating bool) error {
+	for field, definition := range managementAssociations[resource] {
+		value, exists := values[field]
+		if !exists {
+			if creating && definition.required {
+				return errors.New(definition.errorMessage)
+			}
+			continue
+		}
+		id := numericID(value)
+		if id == 0 {
+			if definition.required {
+				return errors.New(definition.errorMessage)
+			}
+			continue
+		}
+		if currentID != 0 && id == currentID && (resource == "departments" || resource == "resources") {
+			return errors.New("不能选择当前记录作为上级")
+		}
+		query := tx.Table(definition.table).Where("id = ?", id)
+		if definition.tenantColumn != "" {
+			query = query.Where(definition.tenantColumn+" = ?", tenantID)
+		}
+		if definition.activeOnly {
+			query = query.Where("status = 1")
+		}
+		if definition.softDelete {
+			query = query.Where("deleted_at IS NULL")
+		}
+		var count int64
+		if err := query.Count(&count).Error; err != nil {
+			return err
+		}
+		if count != 1 {
+			return errors.New(definition.errorMessage)
+		}
+	}
+	if resource == "resources" && currentID != 0 && numericID(values["parent_id"]) != 0 {
+		if err := validateResourceParentChain(tx, numericID(values["parent_id"]), currentID); err != nil {
+			return err
+		}
+	}
+	if resource == "casbin-rules" && (creating || values["ptype"] != nil || values["v1"] != nil || values["v2"] != nil) {
+		targets, err := casbinAssociationTargets(values)
+		if err != nil {
+			return err
+		}
+		for _, target := range targets {
+			query := tx.Table(target.table).Where(target.column+" = ?", target.value)
+			if target.tenantColumn != "" {
+				query = query.Where(target.tenantColumn+" = ?", tenantID)
+			}
+			if target.activeOnly {
+				query = query.Where("status = 1")
+			}
+			if target.softDelete {
+				query = query.Where("deleted_at IS NULL")
+			}
+			var count int64
+			if err := query.Count(&count).Error; err != nil {
+				return err
+			}
+			if count != 1 {
+				return errors.New(target.errorMessage)
+			}
+		}
+	}
+	return nil
+}
+
+func validateResourceParentChain(tx *gorm.DB, parentID, currentID uint64) error {
+	chain := make([]uint64, 0, 8)
+	seen := make(map[uint64]struct{})
+	for parentID != 0 {
+		if _, exists := seen[parentID]; exists {
+			return errors.New("资源层级已存在循环")
+		}
+		seen[parentID] = struct{}{}
+		chain = append(chain, parentID)
+		var parent struct {
+			ParentID uint64
+		}
+		if err := tx.Table("resources").Select("parent_id").Where("id = ? AND deleted_at IS NULL", parentID).Take(&parent).Error; err != nil {
+			return errors.New("所选父资源不存在")
+		}
+		parentID = parent.ParentID
+	}
+	if resourceParentChainContains(currentID, chain) {
+		return errors.New("父资源不能选择当前资源或其下级")
+	}
+	return nil
+}
+
+func resourceParentChainContains(currentID uint64, chain []uint64) bool {
+	for _, id := range chain {
+		if id == currentID {
+			return true
+		}
+	}
+	return false
 }
 
 func writeAuditOutbox(tx *gorm.DB, scope managementbiz.Scope, action, resource, resourceID string, after map[string]any) error {
