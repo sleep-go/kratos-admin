@@ -17,6 +17,21 @@ type fakeLockRow struct {
 	err   error
 }
 
+func TestApplyMigrationsUsesProvidedDatabase(t *testing.T) {
+	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
+	if dsn == "" {
+		t.Skip("未配置 KRATOS_ADMIN_TEST_MYSQL_DSN，跳过 MySQL 8 集成测试")
+	}
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := ApplyMigrations(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMigrationLockSerializesConcurrentMySQLMigrations(t *testing.T) {
 	dsn := os.Getenv("KRATOS_ADMIN_TEST_MYSQL_DSN")
 	if dsn == "" {
