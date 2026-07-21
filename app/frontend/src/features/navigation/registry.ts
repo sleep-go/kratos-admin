@@ -1,4 +1,5 @@
 import type { AdminV1NavigationItem } from '@/api/generated'
+import type { NavigationItem } from './types'
 
 export interface ResolvedNavigationItem {
   label: string
@@ -47,8 +48,7 @@ export function resolveNavigation(items: AdminV1NavigationItem[]): ResolvedNavig
     .sort((left, right) => left.sortOrder - right.sortOrder)
 }
 
-export function resolveTopNavigation(items: ResolvedNavigationItem[]) {
-  const paths = new Set(items.map((item) => item.to))
+export function resolveTopNavigation(items: ResolvedNavigationItem[]): NavigationItem[] {
   const groups = [
     { label: '平台管理', to: '/platform/tenants', prefixes: ['/platform/'] },
     { label: '组织管理', to: '/organization/users', prefixes: ['/organization/'] },
@@ -59,17 +59,18 @@ export function resolveTopNavigation(items: ResolvedNavigationItem[]) {
   ]
   return [
     { label: '工作台', to: '/' },
-    ...groups.flatMap((group) =>
-      group.prefixes.some((prefix) => [...paths].some((path) => path.startsWith(prefix)))
-        ? [
-            {
-              label: group.label,
-              to: paths.has(group.to)
-                ? group.to
-                : [...paths].find((path) => path.startsWith(group.prefixes[0]))!
-            }
-          ]
-        : []
-    )
+    ...groups.flatMap((group) => {
+      const children = items
+        .filter((item) => group.prefixes.some((prefix) => item.to.startsWith(prefix)))
+        .map((item) => ({ label: item.label, to: item.to }))
+      if (children.length === 0) return []
+      return [
+        {
+          label: group.label,
+          to: children.some((item) => item.to === group.to) ? group.to : children[0].to,
+          children
+        }
+      ]
+    })
   ]
 }
