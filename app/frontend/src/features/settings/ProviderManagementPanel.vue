@@ -7,6 +7,13 @@ import * as managementApi from '@/api/management'
 import type { ResourceRow } from '@/api/management'
 import ProviderConfigDialog from './ProviderConfigDialog.vue'
 import { useAuthStore } from '@/stores/auth'
+import {
+  Connection,
+  Delete,
+  Edit,
+  Plus,
+  Setting
+} from '@/components/icons/actions'
 
 const authStore = useAuthStore()
 const { currentTenant } = storeToRefs(authStore)
@@ -75,7 +82,7 @@ onMounted(load)
         <span>管理邮件、短信与对象存储实现，敏感参数使用主密钥加密。</span>
       </div>
       <div>
-        <router-link to="/settings"><el-button>系统设置</el-button></router-link><el-button type="danger" @click="openEditor()">新建渠道</el-button>
+        <router-link to="/settings"><el-button :icon="Setting">系统设置</el-button></router-link><el-button type="danger" :icon="Plus" @click="openEditor()">新建渠道</el-button>
       </div>
     </header>
     <div class="provider-summary">
@@ -109,13 +116,13 @@ onMounted(load)
           </div>
         </dl>
         <footer>
-          <el-button link @click="openEditor(row)">编辑</el-button><el-button link :loading="testingID === String(row.id)" @click="testConnection(row)">
+          <el-button link :icon="Edit" @click="openEditor(row)">编辑</el-button><el-button link :icon="Connection" :loading="testingID === String(row.id)" @click="testConnection(row)">
             连接测试
-          </el-button><el-button link type="danger" @click="remove(row)">删除</el-button>
+          </el-button><el-button link type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
         </footer>
       </article>
       <div v-if="!loading && items.length === 0" class="provider-empty">
-        <strong>尚未配置渠道</strong><span>先创建本地模拟器、SMTP、阿里云短信或 OSS 配置。</span><el-button type="danger" @click="openEditor()">创建第一个渠道</el-button>
+        <strong>尚未配置渠道</strong><span>先创建本地模拟器、SMTP、阿里云短信或 OSS 配置。</span><el-button type="danger" :icon="Plus" @click="openEditor()">创建第一个渠道</el-button>
       </div>
     </div>
     <ProviderConfigDialog

@@ -6,6 +6,15 @@ import * as managementApi from '@/api/management'
 import * as logApi from '@/api/logs'
 import ResourceFormField from '@/features/management/ResourceFormField.vue'
 import {
+  Check,
+  Delete,
+  Download,
+  Edit,
+  Plus,
+  RefreshLeft,
+  Search
+} from '@/components/icons/actions'
+import {
   resourceDefinitions,
   type ResourceField,
   type ResourceOption
@@ -319,18 +328,20 @@ onBeforeUnmount(() => {
           v-if="definition.exportLogType"
           v-permission="`${definition.resource}:export`"
           data-testid="export-button"
+          :icon="Download"
           :loading="exporting"
           @click="startExport"
         >
           异步导出
         </el-button>
         <router-link v-if="definition.exportLogType" to="/logs/exports">
-          <el-button>导出记录</el-button>
+          <el-button :icon="Download">导出记录</el-button>
         </router-link>
         <el-button
           v-if="!definition.readOnly"
           v-permission="`${definition.resource}:create`"
           type="danger"
+          :icon="Plus"
           @click="openCreate"
         >
           新建
@@ -345,7 +356,7 @@ onBeforeUnmount(() => {
         <span v-else-if="exportTask.status === 3">已完成，共 {{ exportTask.rowCount }} 条</span>
         <span v-else>失败：{{ exportTask.failureReason || '请稍后重试' }}</span>
       </div>
-      <el-button v-if="exportTask.status === 3" type="danger" @click="downloadExport">
+      <el-button v-if="exportTask.status === 3" type="danger" :icon="Download" @click="downloadExport">
         下载文件
       </el-button>
     </div>
@@ -375,8 +386,8 @@ onBeforeUnmount(() => {
           @keyup.enter="query"
         />
       </template>
-      <el-button data-testid="query-button" @click="query">查询</el-button>
-      <el-button data-testid="reset-button" @click="resetQuery">重置</el-button>
+      <el-button data-testid="query-button" :icon="Search" @click="query">查询</el-button>
+      <el-button data-testid="reset-button" :icon="RefreshLeft" @click="resetQuery">重置</el-button>
     </div>
     <div class="table-panel">
       <el-table v-loading="loading" :data="items" stripe>
@@ -395,6 +406,7 @@ onBeforeUnmount(() => {
             <el-button
               v-permission="`${definition.resource}:update`"
               link
+              :icon="Edit"
               @click="openEdit(scope.row)"
             >
               编辑
@@ -402,6 +414,7 @@ onBeforeUnmount(() => {
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
+              :icon="Delete"
               @click="remove(scope.row)"
             >
               删除
@@ -419,6 +432,7 @@ onBeforeUnmount(() => {
               :disabled="Number(scope.row.status) !== 3"
               link
               type="danger"
+              :icon="Download"
               @click="downloadExportRow(scope.row)"
             >
               下载
@@ -440,12 +454,13 @@ onBeforeUnmount(() => {
             </template>
           </dl>
           <div v-if="!definition.readOnly">
-            <el-button v-permission="`${definition.resource}:update`" link @click="openEdit(row)">
+            <el-button v-permission="`${definition.resource}:update`" link :icon="Edit" @click="openEdit(row)">
               编辑
             </el-button><el-button
               v-permission="`${definition.resource}:delete`"
               link
               type="danger"
+              :icon="Delete"
               @click="remove(row)"
             >
               删除
@@ -456,6 +471,7 @@ onBeforeUnmount(() => {
             :disabled="Number(row.status) !== 3"
             link
             type="danger"
+            :icon="Download"
             @click="downloadExportRow(row)"
           >
             下载文件
@@ -492,7 +508,7 @@ onBeforeUnmount(() => {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="drawerOpen = false">取消</el-button><el-button type="danger" @click="save">保存</el-button>
+        <el-button @click="drawerOpen = false">取消</el-button><el-button type="danger" :icon="Check" @click="save">保存</el-button>
       </template>
     </el-drawer>
   </section>

@@ -4,6 +4,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 import * as fileApi from '@/api/files'
 import * as managementApi from '@/api/management'
+import AppIcon from '@/components/icons/AppIcon.vue'
+import { Delete, Download, Upload } from '@/components/icons/actions'
 
 type FileRow = Record<string, unknown> & { id?: string }
 type BrowserFile = InstanceType<typeof globalThis.File>
@@ -114,6 +116,7 @@ onMounted(load)
       </div>
       <label v-permission="'files:create'" class="upload-trigger">
         <input type="file" aria-label="选择文件直传" :disabled="uploading" @change="selectFile" />
+        <el-icon :size="15"><Upload /></el-icon>
         {{ uploading ? '上传中' : '选择文件直传' }}
       </label>
     </header>
@@ -136,18 +139,26 @@ onMounted(load)
             <el-button
               v-permission="'files:download'"
               link
+              :icon="Download"
               :disabled="Number(scope.row.status) !== 2"
               @click="download(scope.row)"
             >
               下载
             </el-button>
-            <el-button v-permission="'files:delete'" link type="danger" @click="remove(scope.row)">
+            <el-button
+              v-permission="'files:delete'"
+              link
+              type="danger"
+              :icon="Delete"
+              @click="remove(scope.row)"
+            >
               删除
             </el-button>
           </template>
         </el-table-column>
       </el-table>
       <div v-if="!loading && items.length === 0" class="empty-state">
+        <AppIcon name="empty" :size="28" />
         <strong>还没有文件</strong>
         <span>选择文件后将按“预登记 → 直传 → 服务端确认”的链路保存。</span>
       </div>
@@ -194,6 +205,7 @@ onMounted(load)
   min-height: 40px;
   display: inline-flex;
   align-items: center;
+  gap: 7px;
   padding: 0 18px;
   color: #fff;
   background: var(--ka-accent);

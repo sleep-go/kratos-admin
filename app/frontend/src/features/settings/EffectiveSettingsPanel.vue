@@ -12,6 +12,7 @@ import {
   settingValueTypeLabel
 } from './settingLabels'
 import { useAuthStore } from '@/stores/auth'
+import { Connection, Setting } from '@/components/icons/actions'
 
 const authStore = useAuthStore()
 const { currentTenant, currentUser } = storeToRefs(authStore)
@@ -82,7 +83,7 @@ onMounted(load)
         <h1>系统设置</h1>
         <span>按代码安全默认、平台默认和租户允许覆盖值解析当前生效配置。</span>
       </div>
-      <router-link to="/settings/providers"><el-button>渠道配置</el-button></router-link>
+      <router-link to="/settings/providers"><el-button :icon="Connection">渠道配置</el-button></router-link>
     </header>
 
     <div class="scope-notice">
@@ -108,7 +109,7 @@ onMounted(load)
           <footer>
             <span>{{ settingValueTypeLabel(String(item.value_type))
             }}<template v-if="item.allow_tenant_override"> · 可覆盖</template></span>
-            <el-button link type="danger" @click="edit(item)">配置</el-button>
+            <el-button link type="danger" :icon="Setting" @click="edit(item)">配置</el-button>
           </footer>
         </article>
       </div>

@@ -2,9 +2,12 @@
 import { computed, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
+import { SwitchButton } from '@element-plus/icons-vue'
 
+import AppIcon from '@/components/icons/AppIcon.vue'
 import TopNavigation from './components/TopNavigation.vue'
 import { resolveNavigation, resolveTopNavigation } from '@/features/navigation/registry'
+import { resolveNavigationIconName } from '@/components/icons/registry'
 import type { NavigationItem } from '@/features/navigation/types'
 import { useAuthStore } from '@/stores/auth'
 
@@ -55,7 +58,7 @@ async function selectTenant(tenantID: string) {
             <h2>切换租户</h2>
           </div>
           <button type="button" aria-label="关闭租户切换" @click="tenantDialogOpen = false">
-            ×
+            <AppIcon name="close" :size="18" />
           </button>
         </header>
         <button
@@ -90,18 +93,26 @@ async function selectTenant(tenantID: string) {
         aria-label="关闭导航菜单"
         @click="mobileOpen = false"
       >
-        ×
+        <AppIcon name="close" :size="22" />
       </button>
       <div class="mobile-account">
         <strong>{{ userName }}</strong>
         <span>{{ tenantName }}</span>
         <button type="button" data-testid="mobile-tenant-switcher" @click="openMobileTenantDialog">
+          <AppIcon name="switch" :size="14" />
           切换租户
         </button>
       </div>
       <template v-for="item in navigation" :key="item.to">
         <section v-if="item.children?.length" class="mobile-navigation-group">
-          <strong>{{ item.label }}</strong>
+          <strong>
+            <AppIcon
+              v-if="resolveNavigationIconName(item.label)"
+              :name="resolveNavigationIconName(item.label)!"
+              :size="13"
+            />
+            {{ item.label }}
+          </strong>
           <RouterLink
             v-for="child in item.children"
             :key="child.to"
@@ -113,13 +124,22 @@ async function selectTenant(tenantID: string) {
           </RouterLink>
         </section>
         <RouterLink v-else :to="item.to" class="mobile-link" @click="mobileOpen = false">
+          <AppIcon
+            v-if="resolveNavigationIconName(item.label)"
+            :name="resolveNavigationIconName(item.label)!"
+            :size="15"
+          />
           {{ item.label }}
         </RouterLink>
       </template>
       <RouterLink to="/account" class="mobile-link" @click="mobileOpen = false">
+        <AppIcon name="account" :size="15" />
         个人中心
       </RouterLink>
-      <button class="mobile-logout" type="button" @click="authStore.logout()">退出登录</button>
+      <button class="mobile-logout" type="button" @click="authStore.logout()">
+        <el-icon :size="15"><SwitchButton /></el-icon>
+        退出登录
+      </button>
     </div>
     <button
       v-if="mobileOpen"
@@ -168,10 +188,11 @@ async function selectTenant(tenantID: string) {
 
 .mobile-close {
   float: right;
+  display: grid;
+  place-items: center;
   border: 0;
   color: #fff;
   background: transparent;
-  font-size: 28px;
 }
 
 .mobile-account {
@@ -186,6 +207,9 @@ async function selectTenant(tenantID: string) {
   }
 
   button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     width: fit-content;
     margin-top: 8px;
     padding: 0;
@@ -198,7 +222,9 @@ async function selectTenant(tenantID: string) {
 }
 
 .mobile-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 15px 8px;
   border-bottom: 1px solid rgb(255 255 255 / 10%);
   color: rgb(255 255 255 / 78%);
@@ -216,7 +242,9 @@ async function selectTenant(tenantID: string) {
   border-bottom: 1px solid rgb(255 255 255 / 10%);
 
   > strong {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 7px;
     padding: 0 8px 8px;
     color: rgb(255 255 255 / 52%);
     font-size: 11px;
@@ -233,6 +261,9 @@ async function selectTenant(tenantID: string) {
 }
 
 .mobile-logout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 15px 8px;
   border: 0;

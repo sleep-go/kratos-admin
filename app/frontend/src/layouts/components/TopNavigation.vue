@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { Menu } from '@element-plus/icons-vue'
 
+import AppIcon from '@/components/icons/AppIcon.vue'
+import { SwitchButton } from '@/components/icons/actions'
+import { resolveNavigationIconName } from '@/components/icons/registry'
 import type { NavigationItem } from '@/features/navigation/types'
 
 const props = defineProps<{
@@ -45,7 +49,13 @@ const emit = defineEmits<{
             :class="{ 'navigation-link--active': isActive(item) }"
             aria-haspopup="menu"
           >
-            {{ item.label }}<span aria-hidden="true">⌄</span>
+            <AppIcon
+              v-if="resolveNavigationIconName(item.label)"
+              :name="resolveNavigationIconName(item.label)!"
+              :size="15"
+            />
+            {{ item.label }}
+            <AppIcon name="arrow-down" :size="12" />
           </button>
           <div class="navigation-submenu" role="menu">
             <RouterLink
@@ -59,6 +69,11 @@ const emit = defineEmits<{
           </div>
         </div>
         <RouterLink v-else :to="item.to" class="navigation-link">
+          <AppIcon
+            v-if="resolveNavigationIconName(item.label)"
+            :name="resolveNavigationIconName(item.label)!"
+            :size="15"
+          />
           {{ item.label }}
         </RouterLink>
       </template>
@@ -71,15 +86,19 @@ const emit = defineEmits<{
         type="button"
         @click="emit('switchTenant')"
       >
+        <AppIcon name="switch" :size="14" />
         {{ tenantName }}
-        <span aria-hidden="true">⌄</span>
+        <AppIcon name="arrow-down" :size="12" />
       </button>
       <span class="account-divider" aria-hidden="true"></span>
       <RouterLink class="account-button" to="/account" aria-label="打开个人中心">
         <span class="avatar">{{ initials }}</span>
         <span class="account-name">{{ userName }}</span>
       </RouterLink>
-      <button class="logout-button" type="button" @click="emit('logout')">退出</button>
+      <button class="logout-button" type="button" @click="emit('logout')">
+        <el-icon :size="14"><SwitchButton /></el-icon>
+        退出
+      </button>
     </div>
 
     <button
@@ -89,7 +108,7 @@ const emit = defineEmits<{
       aria-label="打开导航菜单"
       @click="emit('openMobile')"
     >
-      <span></span><span></span><span></span>
+      <el-icon :size="22"><Menu /></el-icon>
     </button>
   </header>
 </template>
@@ -136,6 +155,7 @@ const emit = defineEmits<{
   position: relative;
   display: flex;
   align-items: center;
+  gap: 6px;
   padding: 0 3px;
   color: rgb(255 255 255 / 84%);
   font-size: 14px;
@@ -176,7 +196,6 @@ const emit = defineEmits<{
 }
 
 .navigation-group__trigger {
-  gap: 6px;
   font-family: inherit;
 }
 
@@ -249,6 +268,9 @@ const emit = defineEmits<{
 }
 
 .logout-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   opacity: 0.78;
 }
@@ -273,13 +295,8 @@ const emit = defineEmits<{
   display: none;
   width: 40px;
   padding: 10px;
-
-  span {
-    display: block;
-    height: 2px;
-    margin: 4px 0;
-    background: #fff;
-  }
+  place-items: center;
+  grid-template-columns: 1fr;
 }
 
 @media (max-width: 1040px) {
@@ -293,7 +310,7 @@ const emit = defineEmits<{
   }
 
   .mobile-menu-button {
-    display: block;
+    display: grid;
   }
 }
 </style>

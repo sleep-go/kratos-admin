@@ -7,6 +7,9 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { init, use, type ECharts } from 'echarts/core'
 
 import * as managementApi from '@/api/management'
+import AppIcon from '@/components/icons/AppIcon.vue'
+import { Refresh } from '@/components/icons/actions'
+import type { IconName } from '@/components/icons/registry'
 import { useAuthStore } from '@/stores/auth'
 import type { ResourceRow } from '@/api/management'
 
@@ -28,13 +31,29 @@ const perspective = computed(() =>
   String(currentTenant.value?.id ?? '0') === '0' ? '平台治理视角' : '当前租户运行视角'
 )
 const metrics = computed(() => [
-  { label: '成员总数', value: memberTotal.value.toLocaleString('zh-CN'), note: '有效组织成员' },
-  { label: '角色数量', value: roleTotal.value.toLocaleString('zh-CN'), note: '当前权限角色' },
-  { label: 'API 日志', value: requestTotal.value.toLocaleString('zh-CN'), note: '当前可见记录' },
+  {
+    label: '成员总数',
+    value: memberTotal.value.toLocaleString('zh-CN'),
+    note: '有效组织成员',
+    icon: 'members' as IconName
+  },
+  {
+    label: '角色数量',
+    value: roleTotal.value.toLocaleString('zh-CN'),
+    note: '当前权限角色',
+    icon: 'roles' as IconName
+  },
+  {
+    label: 'API 日志',
+    value: requestTotal.value.toLocaleString('zh-CN'),
+    note: '当前可见记录',
+    icon: 'logs' as IconName
+  },
   {
     label: '异常请求',
     value: exceptionTotal.value.toLocaleString('zh-CN'),
-    note: '最近 200 条样本'
+    note: '最近 200 条样本',
+    icon: 'security' as IconName
   }
 ])
 
@@ -142,11 +161,12 @@ onBeforeUnmount(() => {
         <h1>工作台</h1>
         <p>{{ perspective }}，展示真实业务数据与安全动态。</p>
       </div>
-      <el-button @click="load">刷新数据</el-button>
+      <el-button :icon="Refresh" @click="load">刷新数据</el-button>
     </header>
 
     <div class="metric-grid">
       <article v-for="metric in metrics" :key="metric.label" class="metric-card">
+        <AppIcon class="metric-card__icon" :name="metric.icon" :size="20" />
         <span>{{ metric.label }}</span><strong>{{ metric.value }}</strong><small>{{ metric.note }}</small>
       </article>
     </div>
@@ -177,7 +197,10 @@ onBeforeUnmount(() => {
             }}</span>
           </li>
         </ul>
-        <div v-else class="empty-state">暂无可见安全动态</div>
+        <div v-else class="empty-state">
+          <AppIcon name="empty" :size="28" />
+          <span>暂无可见安全动态</span>
+        </div>
       </article>
     </div>
   </section>
@@ -230,6 +253,12 @@ h1 {
   gap: 7px;
   padding: 24px;
   overflow: hidden;
+}
+.metric-card__icon {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  color: rgb(0 0 0 / 14%);
 }
 .metric-card::before {
   position: absolute;
@@ -292,6 +321,7 @@ time {
   min-height: 210px;
   display: grid;
   place-items: center;
+  gap: 10px;
   color: var(--ka-muted);
 }
 @media (max-width: 900px) {
