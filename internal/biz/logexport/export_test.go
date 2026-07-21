@@ -26,9 +26,6 @@ func (r *fakeRepository) Create(_ context.Context, record Record) error {
 func (r *fakeRepository) Find(_ context.Context, _ Access, _ string) (Record, error) {
 	return r.record, nil
 }
-func (r *fakeRepository) PendingIDs(context.Context, int) ([]string, error) {
-	return []string{r.record.ID}, nil
-}
 func (r *fakeRepository) Claim(_ context.Context, _ string) (Record, bool, error) {
 	if r.completed {
 		return r.record, false, nil

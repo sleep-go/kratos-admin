@@ -66,9 +66,13 @@ func TestFileRepositoryUsesTenantBoundaryAndAuditOutbox(t *testing.T) {
 	if err := repository.RequestDelete(context.Background(), tenant.ID, record.ID); err != nil {
 		t.Fatal(err)
 	}
-	pending, err := repository.PendingCleanup(context.Background(), 10)
-	if err != nil || len(pending) != 1 || pending[0].ID != record.ID {
-		t.Fatalf("PendingCleanup() = %+v, %v", pending, err)
+	pending, err := (&TaskRepository{db: tx}).Pending(context.Background(), 10, time.Now().UTC())
+	foundCleanup := false
+	for _, task := range pending {
+		foundCleanup = foundCleanup || task.ID == record.ID && task.Kind == TaskKindFileCleanup
+	}
+	if err != nil || !foundCleanup {
+		t.Fatalf("Pending() = %+v, %v", pending, err)
 	}
 	if err := repository.CompleteCleanup(context.Background(), tenant.ID, record.ID); err != nil {
 		t.Fatal(err)

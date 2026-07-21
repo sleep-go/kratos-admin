@@ -52,20 +52,6 @@ func NewAdminSet(cfg conf.Config) (*AdminSet, error) {
 	}, nil
 }
 
-// WorkerSet 汇集 Worker 运行时 Provider。
-type WorkerSet struct {
-	Storage storage.Provider
-}
-
-// NewWorkerSet 创建 Worker 所需的对象存储 Provider。
-func NewWorkerSet(cfg conf.Config) (*WorkerSet, error) {
-	storageProvider, _, err := buildStorageProvider(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &WorkerSet{Storage: storageProvider}, nil
-}
-
 func buildMessageSenders(cfg conf.Config) ([]message.Sender, error) {
 	emailSender := message.Sender(message.NewLocalSender("email"))
 	if cfg.Messaging.SMTPAddress != "" {

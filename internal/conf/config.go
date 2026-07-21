@@ -18,7 +18,7 @@ const (
 	defaultRabbitMQ = "amqp://kratos:kratos@127.0.0.1:5672/kratos_admin"
 )
 
-// Config 描述 API 与 Worker 共享的完整运行配置。
+// Config 描述 Admin API 与后台任务共享的完整运行配置。
 type Config struct {
 	Environment string
 	Server      Server

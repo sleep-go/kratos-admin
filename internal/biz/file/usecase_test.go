@@ -130,7 +130,7 @@ func TestCreateRejectsMaliciousFilenameAndOversize(t *testing.T) {
 	}
 }
 
-func TestDeleteOnlyMarksCleanupPendingForWorker(t *testing.T) {
+func TestDeleteOnlyMarksCleanupPendingForBackgroundTask(t *testing.T) {
 	repository := &fakeRepository{record: Record{ID: "file-id", TenantID: 8, ProviderName: "fake", ObjectKey: "8/file.txt", Status: StatusAvailable}}
 	provider := &fakeProvider{}
 	usecase := NewUsecase(repository, provider, 10, nil)

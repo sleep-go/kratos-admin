@@ -9,7 +9,6 @@ import (
 	"gorm.io/gen"
 
 	adminapp "github.com/sleep-go/kratos-admin/app/admin"
-	workerapp "github.com/sleep-go/kratos-admin/app/worker"
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 	"github.com/sleep-go/kratos-admin/internal/biz/setup"
 	"github.com/sleep-go/kratos-admin/internal/conf"
@@ -64,22 +63,6 @@ func runServerWith(ctx context.Context, confPath string, dependencies serverDepe
 	defer cleanup()
 	if err := application.Run(); err != nil {
 		return fmt.Errorf("Admin 进程退出: %w", err)
-	}
-	return nil
-}
-
-func runWorker(ctx context.Context, confPath string) error {
-	cfg, err := conf.Load(confPath)
-	if err != nil {
-		return fmt.Errorf("加载 Worker 配置失败: %w", err)
-	}
-	application, cleanup, err := workerapp.NewApplication(ctx, cfg)
-	if err != nil {
-		return fmt.Errorf("初始化 Worker 依赖失败: %w", err)
-	}
-	defer cleanup()
-	if err := application.Run(); err != nil {
-		return fmt.Errorf("Worker 进程退出: %w", err)
 	}
 	return nil
 }

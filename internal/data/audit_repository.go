@@ -68,13 +68,4 @@ func (r *AuditRepository) Publish(ctx context.Context, event audit.Event, entry 
 	return published, err
 }
 
-// PendingEventIDs 返回到期且尚未发布的 Outbox 事件 ID。
-func (r *AuditRepository) PendingEventIDs(ctx context.Context, limit int) ([]string, error) {
-	var ids []string
-	err := r.db.WithContext(ctx).Model(&model.AuditOutbox{}).
-		Where("status IN ? AND (next_retry_at IS NULL OR next_retry_at <= ?)", []int{1, 3}, time.Now().UTC()).
-		Order("created_at ASC").Limit(limit).Pluck("id", &ids).Error
-	return ids, err
-}
-
 var _ audit.Repository = (*AuditRepository)(nil)

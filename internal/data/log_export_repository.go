@@ -59,15 +59,6 @@ func (r *LogExportRepository) Find(ctx context.Context, access logexport.Access,
 	return mapExportRow(row), nil
 }
 
-// PendingIDs 返回已到执行时间的待处理任务ID。
-func (r *LogExportRepository) PendingIDs(ctx context.Context, limit int) ([]string, error) {
-	var ids []string
-	err := r.db.WithContext(ctx).Model(&model.LogExport{}).
-		Where("status = ? AND (next_retry_at IS NULL OR next_retry_at <= ?)", logexport.StatusPending, time.Now().UTC()).
-		Order("created_at ASC").Limit(limit).Pluck("id", &ids).Error
-	return ids, err
-}
-
 // Claim 使用行锁原子领取一个到期任务。
 func (r *LogExportRepository) Claim(ctx context.Context, exportID string) (logexport.Record, bool, error) {
 	var claimed model.LogExport

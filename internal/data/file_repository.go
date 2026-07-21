@@ -74,7 +74,7 @@ func (r *FileRepository) Confirm(ctx context.Context, tenantID uint64, fileID, e
 	})
 }
 
-// RequestDelete 检查业务引用后冻结文件，等待 Worker 异步清理对象。
+// RequestDelete 检查业务引用后冻结文件，等待后台异步清理对象。
 func (r *FileRepository) RequestDelete(ctx context.Context, tenantID uint64, fileID string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var row model.File
@@ -126,19 +126,6 @@ func (r *FileRepository) RemoveReference(ctx context.Context, tenantID uint64, f
 	return nil
 }
 
-// PendingCleanup 返回等待 Worker 删除对象的文件。
-func (r *FileRepository) PendingCleanup(ctx context.Context, limit int) ([]filebiz.Record, error) {
-	var rows []model.File
-	if err := r.db.WithContext(ctx).Where("status = ? AND deleted_at IS NULL", filebiz.StatusDeletionPending).Order("updated_at ASC").Limit(limit).Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	result := make([]filebiz.Record, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, filebiz.Record{ID: row.ID, TenantID: row.TenantID, ProviderName: row.ProviderName, ObjectKey: row.ObjectKey, Status: row.Status})
-	}
-	return result, nil
-}
-
 // CompleteCleanup 在对象删除成功后逻辑删除文件元数据。
 func (r *FileRepository) CompleteCleanup(ctx context.Context, tenantID uint64, fileID string) error {
 	now := time.Now().UTC()
@@ -151,12 +138,6 @@ func (r *FileRepository) CompleteCleanup(ctx context.Context, tenantID uint64, f
 		return filebiz.ErrFileUnavailable
 	}
 	return nil
-}
-
-// FailCleanup 在超过最大重试次数后记录对象清理失败状态。
-func (r *FileRepository) FailCleanup(ctx context.Context, tenantID uint64, fileID string) error {
-	return r.db.WithContext(ctx).Table("files").Where("id = ? AND tenant_id = ? AND status = ? AND deleted_at IS NULL", fileID, tenantID, filebiz.StatusDeletionPending).
-		Updates(map[string]any{"status": filebiz.StatusCleanupFailed, "updated_at": time.Now().UTC()}).Error
 }
 
 var _ filebiz.Repository = (*FileRepository)(nil)

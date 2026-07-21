@@ -2,7 +2,7 @@ GOHOSTOS := $(shell go env GOHOSTOS)
 GOPATH := $(shell go env GOPATH)
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
 GOCACHE ?= /tmp/go-build
-GO_APP_PACKAGES := ./app/admin/... ./app/worker/...
+GO_APP_PACKAGES := ./app/admin/...
 GO_PACKAGES := $(GO_APP_PACKAGES) ./internal/...
 COMPOSE_ENV_FILE ?= $(if $(wildcard .env),.env,.env.example)
 
@@ -48,8 +48,8 @@ all: ## 生成 API、配置及依赖注入代码
 	$(MAKE) generate
 
 .PHONY: wire
-wire: ## 生成 Admin 与 Worker 的 Wire 依赖注入代码
-	GOCACHE=$(GOCACHE) go tool wire ./app/admin ./app/worker
+wire: ## 生成 Admin 的 Wire 依赖注入代码
+	GOCACHE=$(GOCACHE) go tool wire ./app/admin
 
 .PHONY: gorm-gen
 gorm-gen: ## 生成 GORM Gen 类型安全查询代码

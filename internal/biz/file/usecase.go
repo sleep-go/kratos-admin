@@ -26,9 +26,9 @@ const (
 	StatusAvailable uint8 = 2
 	// StatusDeleted 表示文件已删除。
 	StatusDeleted uint8 = 3
-	// StatusCleanupFailed 表示 Worker 多次清理对象失败。
+	// StatusCleanupFailed 表示后台处理器多次清理对象失败。
 	StatusCleanupFailed uint8 = 4
-	// StatusDeletionPending 表示元数据已冻结并等待 Worker 清理对象。
+	// StatusDeletionPending 表示元数据已冻结并等待后台处理器清理对象。
 	StatusDeletionPending uint8 = 5
 )
 
@@ -165,7 +165,7 @@ func (u *Usecase) DownloadURL(ctx context.Context, tenantID uint64, fileID strin
 	return u.provider.PresignDownload(ctx, record.ObjectKey, record.OriginalName, 5*time.Minute)
 }
 
-// Delete 冻结文件并请求 Worker 异步清理对象。
+// Delete 冻结文件并请求后台异步清理对象。
 func (u *Usecase) Delete(ctx context.Context, tenantID uint64, fileID string) error {
 	record, err := u.repository.Find(ctx, tenantID, fileID)
 	if err != nil || record.Status == StatusDeleted || record.ProviderName != u.provider.Name() {

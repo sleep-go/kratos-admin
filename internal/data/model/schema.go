@@ -270,7 +270,7 @@ type AuditOutbox struct {
 // TableName 返回审计 Outbox 表名。
 func (AuditOutbox) TableName() string { return "audit_outbox" }
 
-// AuditLog 表示 Worker 幂等生成的操作审计。
+// AuditLog 表示后台处理器幂等生成的操作审计。
 type AuditLog struct {
 	ID           uint64         `gorm:"primaryKey"`
 	EventID      string         `gorm:"type:char(36);not null"`

@@ -11,6 +11,7 @@ import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/server"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/service"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/task"
 	"github.com/sleep-go/kratos-admin/internal/conf"
 	"github.com/sleep-go/kratos-admin/internal/data"
 	"github.com/sleep-go/kratos-admin/internal/provider"
@@ -36,7 +37,8 @@ func wireApplication(ctx context.Context, cfg conf.Config) (*kratos.App, func(),
 	httpServer := server.NewHTTPServer(cfg, services, adminSet)
 	grpcServer := server.NewGRPCServer(cfg, services)
 	logger := newLogger()
-	app := server.NewApp(httpServer, grpcServer, logger)
+	taskServer := task.NewServer(cfg, dataData, adminSet, logger)
+	app := server.NewApp(httpServer, grpcServer, taskServer, logger)
 	return app, func() {
 		cleanup()
 	}, nil

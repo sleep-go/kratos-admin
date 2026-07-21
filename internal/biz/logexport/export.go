@@ -78,7 +78,6 @@ type CSVData struct {
 type Repository interface {
 	Create(ctx context.Context, record Record) error
 	Find(ctx context.Context, access Access, exportID string) (Record, error)
-	PendingIDs(ctx context.Context, limit int) ([]string, error)
 	Claim(ctx context.Context, exportID string) (Record, bool, error)
 	ReadRows(ctx context.Context, record Record, limit int) (CSVData, error)
 	Complete(ctx context.Context, record Record, object storage.ObjectMeta, objectKey, fileID string, rowCount uint32) error
