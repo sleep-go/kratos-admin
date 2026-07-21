@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"gorm.io/datatypes"
+	"gorm.io/gen/field"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -141,16 +142,24 @@ func casbinAssociationTargets(values map[string]any) ([]associationReference, er
 // ManagementRepository 使用编译期白名单访问后台资源。
 type ManagementRepository struct {
 	db            *gorm.DB
+	q             *query.Query
 	providerCodec *providerconfig.Codec
 }
 
 // NewManagementRepository 创建统一后台资源仓储。
 func NewManagementRepository(data *Data, codecs ...*providerconfig.Codec) *ManagementRepository {
-	repository := &ManagementRepository{db: data.DB}
+	repository := &ManagementRepository{db: data.DB, q: data.Query}
 	if len(codecs) > 0 {
 		repository.providerCodec = codecs[0]
 	}
 	return repository
+}
+
+func (r *ManagementRepository) gen() *query.Query {
+	if r.q != nil {
+		return r.q
+	}
+	return query.Use(r.db)
 }
 
 // Allowed 按 tenant、member、role 的 Casbin domain 关系校验资源动作，并限制在租户功能授权集合内。
@@ -158,27 +167,30 @@ func (r *ManagementRepository) Allowed(ctx context.Context, scope managementbiz.
 	if scope.PlatformAdmin {
 		return true, nil
 	}
-	var tenantAdmin bool
-	if err := r.db.WithContext(ctx).Table("tenant_members").Select("is_tenant_admin").
-		Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", scope.MemberID, scope.TenantID).
-		Scan(&tenantAdmin).Error; err != nil {
+	q := r.gen()
+	m := q.TenantMember
+	member, err := m.WithContext(ctx).Select(m.IsTenantAdmin).
+		Where(m.ID.Eq(scope.MemberID), m.TenantID.Eq(scope.TenantID), m.Status.Eq(1), m.DeletedAt.IsNull()).Take()
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return false, err
 	}
-	base := r.db.WithContext(ctx).Table("tenant_resources AS tr").
-		Joins("JOIN resources AS res ON res.id = tr.resource_id AND res.code = ? AND res.status = 1 AND res.deleted_at IS NULL", resource).
-		Where("tr.tenant_id = ?", scope.TenantID)
-	if tenantAdmin {
-		var count int64
-		if err := base.Count(&count).Error; err != nil {
+	tr := q.TenantResource.As("tr")
+	res := q.Resource.As("res")
+	base := tr.WithContext(ctx).Join(res, res.ID.EqCol(tr.ResourceID), res.Code.Eq(resource), res.Status.Eq(1), res.DeletedAt.IsNull()).
+		Where(tr.TenantID.Eq(scope.TenantID))
+	if member != nil && member.IsTenantAdmin {
+		count, err := base.Count()
+		if err != nil {
 			return false, err
 		}
 		return count > 0, nil
 	}
-	var count int64
-	err := base.
-		Joins("JOIN casbin_rules AS p ON p.ptype = 'p' AND p.v0 = ? AND p.v2 = res.code AND (p.v3 = ? OR p.v3 = '*')", fmt.Sprint(scope.TenantID), action).
-		Joins("JOIN casbin_rules AS g ON g.ptype = 'g' AND g.v0 = p.v0 AND g.v2 = p.v1 AND g.v1 = ?", fmt.Sprint(scope.MemberID)).
-		Count(&count).Error
+	p := q.CasbinRule.As("p")
+	g := q.CasbinRule.As("g")
+	count, err := base.
+		Join(p, p.Ptype.Eq("p"), p.V0.Eq(fmt.Sprint(scope.TenantID)), p.V2.EqCol(res.Code), field.Or(p.V3.Eq(action), p.V3.Eq("*"))).
+		Join(g, g.Ptype.Eq("g"), g.V0.EqCol(p.V0), g.V2.EqCol(p.V1), g.V1.Eq(fmt.Sprint(scope.MemberID))).
+		Count()
 	return count > 0, err
 }
 
@@ -545,11 +557,10 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 			})
 		}
 	}
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var role model.Role
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", roleID, scope.TenantID).
-			Take(&role).Error; err != nil {
+	return r.gen().Transaction(func(tx *query.Query) error {
+		role := tx.Role
+		if _, err := role.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where(role.ID.Eq(roleID), role.TenantID.Eq(scope.TenantID), role.Status.Eq(1), role.DeletedAt.IsNull()).Take(); err != nil {
 			return errors.New("角色不存在或已禁用")
 		}
 		if len(seenPolicies) > 0 {
@@ -561,10 +572,11 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 					codes = append(codes, policy.V2)
 				}
 			}
-			var count int64
-			if err := tx.Table("tenant_resources AS tr").
-				Joins("JOIN resources AS res ON res.id = tr.resource_id AND res.code IN ? AND res.status = 1 AND res.deleted_at IS NULL", codes).
-				Where("tr.tenant_id = ?", scope.TenantID).Distinct("res.code").Count(&count).Error; err != nil {
+			tr := tx.TenantResource.As("tr")
+			resource := tx.Resource.As("res")
+			count, err := tr.WithContext(ctx).Join(resource, resource.ID.EqCol(tr.ResourceID), resource.Code.In(codes...), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+				Where(tr.TenantID.Eq(scope.TenantID)).Distinct(resource.Code).Count()
+			if err != nil {
 				return err
 			}
 			if count != int64(len(codes)) {
@@ -572,28 +584,35 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 			}
 		}
 		if dataScope == 5 && len(departmentIDs) > 0 {
-			var count int64
-			if err := tx.Table("departments").Where("tenant_id = ? AND id IN ? AND status = 1 AND deleted_at IS NULL", scope.TenantID, departmentIDs).
-				Distinct("id").Count(&count).Error; err != nil {
+			department := tx.Department
+			count, err := department.WithContext(ctx).
+				Where(department.TenantID.Eq(scope.TenantID), department.ID.In(departmentIDs...), department.Status.Eq(1), department.DeletedAt.IsNull()).
+				Distinct(department.ID).Count()
+			if err != nil {
 				return err
 			}
 			if count != int64(len(uniqueUint64(departmentIDs))) {
 				return errors.New("自定义数据范围包含无效部门")
 			}
 		}
-		if err := tx.Model(&model.Role{}).Where("id = ? AND tenant_id = ?", roleID, scope.TenantID).
-			Update("data_scope", dataScope).Error; err != nil {
+		if _, err := role.WithContext(ctx).Where(role.ID.Eq(roleID), role.TenantID.Eq(scope.TenantID)).Update(role.DataScope, uint8(dataScope)); err != nil {
 			return err
 		}
-		if err := tx.Where("ptype = 'p' AND v0 = ? AND v1 = ?", fmt.Sprint(scope.TenantID), fmt.Sprint(roleID)).Delete(&model.CasbinRule{}).Error; err != nil {
+		casbin := tx.CasbinRule
+		if _, err := casbin.WithContext(ctx).Where(casbin.Ptype.Eq("p"), casbin.V0.Eq(fmt.Sprint(scope.TenantID)), casbin.V1.Eq(fmt.Sprint(roleID))).Delete(); err != nil {
 			return err
 		}
 		if len(policies) > 0 {
-			if err := tx.Create(&policies).Error; err != nil {
+			policyRows := make([]*model.CasbinRule, 0, len(policies))
+			for index := range policies {
+				policyRows = append(policyRows, &policies[index])
+			}
+			if err := casbin.WithContext(ctx).Create(policyRows...); err != nil {
 				return err
 			}
 		}
-		if err := tx.Where("tenant_id = ? AND role_id = ?", scope.TenantID, roleID).Delete(&model.RoleScopeDepartment{}).Error; err != nil {
+		scopeDepartment := tx.RoleScopeDepartment
+		if _, err := scopeDepartment.WithContext(ctx).Where(scopeDepartment.TenantID.Eq(scope.TenantID), scopeDepartment.RoleID.Eq(roleID)).Delete(); err != nil {
 			return err
 		}
 		if dataScope == 5 {
@@ -602,16 +621,21 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 				rows = append(rows, model.RoleScopeDepartment{TenantID: scope.TenantID, RoleID: roleID, DepartmentID: departmentID})
 			}
 			if len(rows) > 0 {
-				if err := tx.Create(&rows).Error; err != nil {
+				rowPointers := make([]*model.RoleScopeDepartment, 0, len(rows))
+				for index := range rows {
+					rowPointers = append(rowPointers, &rows[index])
+				}
+				if err := scopeDepartment.WithContext(ctx).Create(rowPointers...); err != nil {
 					return err
 				}
 			}
 		}
-		if err := tx.Table("tenants").Where("id = ? AND deleted_at IS NULL", scope.TenantID).
-			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error; err != nil {
+		tenant := tx.Tenant
+		if _, err := tenant.WithContext(ctx).Where(tenant.ID.Eq(scope.TenantID), tenant.DeletedAt.IsNull()).
+			Update(tenant.PermissionVersion, tenant.PermissionVersion.Add(1)); err != nil {
 			return err
 		}
-		return writeAuditOutbox(tx, scope, "update_authorization", "roles", fmt.Sprint(roleID), map[string]any{
+		return writeAuditOutboxGen(ctx, tx, scope, "update_authorization", "roles", fmt.Sprint(roleID), map[string]any{
 			"data_scope": dataScope, "grant_count": len(policies), "department_count": len(departmentIDs),
 		})
 	})
@@ -623,22 +647,23 @@ func (r *ManagementRepository) UpdateTenantFeatures(ctx context.Context, scope m
 		return errors.New("仅平台管理员可配置租户功能")
 	}
 	resourceIDs = uniqueUint64(resourceIDs)
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var tenant model.Tenant
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", tenantID).Take(&tenant).Error; err != nil {
+	return r.gen().Transaction(func(tx *query.Query) error {
+		tenant := tx.Tenant
+		if _, err := tenant.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where(tenant.ID.Eq(tenantID), tenant.DeletedAt.IsNull()).Take(); err != nil {
 			return errors.New("目标租户不存在")
 		}
 		if len(resourceIDs) > 0 {
-			var count int64
-			if err := tx.Table("resources").Where("id IN ? AND status = 1 AND deleted_at IS NULL", resourceIDs).
-				Distinct("id").Count(&count).Error; err != nil {
+			resource := tx.Resource
+			count, err := resource.WithContext(ctx).Where(resource.ID.In(resourceIDs...), resource.Status.Eq(1), resource.DeletedAt.IsNull()).Distinct(resource.ID).Count()
+			if err != nil {
 				return err
 			}
 			if count != int64(len(resourceIDs)) {
 				return errors.New("租户功能集合包含无效资源")
 			}
 		}
-		if err := tx.Where("tenant_id = ?", tenantID).Delete(&model.TenantResource{}).Error; err != nil {
+		tr := tx.TenantResource
+		if _, err := tr.WithContext(ctx).Where(tr.TenantID.Eq(tenantID)).Delete(); err != nil {
 			return err
 		}
 		rows := make([]model.TenantResource, 0, len(resourceIDs))
@@ -646,17 +671,20 @@ func (r *ManagementRepository) UpdateTenantFeatures(ctx context.Context, scope m
 			rows = append(rows, model.TenantResource{TenantID: tenantID, ResourceID: resourceID, CreatedBy: scope.UserID})
 		}
 		if len(rows) > 0 {
-			if err := tx.Create(&rows).Error; err != nil {
+			rowPointers := make([]*model.TenantResource, 0, len(rows))
+			for index := range rows {
+				rowPointers = append(rowPointers, &rows[index])
+			}
+			if err := tr.WithContext(ctx).Create(rowPointers...); err != nil {
 				return err
 			}
 		}
-		if err := tx.Model(&model.Tenant{}).Where("id = ?", tenantID).
-			UpdateColumn("permission_version", gorm.Expr("permission_version + 1")).Error; err != nil {
+		if _, err := tenant.WithContext(ctx).Where(tenant.ID.Eq(tenantID)).Update(tenant.PermissionVersion, tenant.PermissionVersion.Add(1)); err != nil {
 			return err
 		}
 		auditScope := scope
 		auditScope.TenantID = tenantID
-		return writeAuditOutbox(tx, auditScope, "update_features", "tenants", fmt.Sprint(tenantID), map[string]any{"resource_count": len(resourceIDs)})
+		return writeAuditOutboxGen(ctx, tx, auditScope, "update_features", "tenants", fmt.Sprint(tenantID), map[string]any{"resource_count": len(resourceIDs)})
 	})
 }
 
@@ -933,36 +961,49 @@ func (r *ManagementRepository) resolveDataScope(ctx context.Context, scope manag
 	if scope.PlatformAdmin {
 		return resolvedDataScope{QueryDataScope: permissionbiz.QueryDataScope{All: true}}, nil
 	}
-	var member struct {
-		PrimaryDepartmentID uint64
-		IsTenantAdmin       bool
-	}
-	if err := r.db.WithContext(ctx).Table("tenant_members").Select("primary_department_id, is_tenant_admin").
-		Where("id = ? AND tenant_id = ? AND status = 1 AND deleted_at IS NULL", scope.MemberID, scope.TenantID).Take(&member).Error; err != nil {
+	q := r.gen()
+	m := q.TenantMember
+	member, err := m.WithContext(ctx).Select(m.PrimaryDepartmentID, m.IsTenantAdmin).
+		Where(m.ID.Eq(scope.MemberID), m.TenantID.Eq(scope.TenantID), m.Status.Eq(1), m.DeletedAt.IsNull()).Take()
+	if err != nil {
 		return resolvedDataScope{}, errors.New("当前租户成员不存在或已禁用")
 	}
 	if member.IsTenantAdmin {
 		return resolvedDataScope{QueryDataScope: permissionbiz.QueryDataScope{All: true}, PrimaryDepartmentID: member.PrimaryDepartmentID}, nil
 	}
-	var roleRows []struct {
+	g := q.CasbinRule
+	groupRows, err := g.WithContext(ctx).Select(g.V2).
+		Where(g.Ptype.Eq("g"), g.V0.Eq(fmt.Sprint(scope.TenantID)), g.V1.Eq(fmt.Sprint(scope.MemberID))).Find()
+	if err != nil {
+		return resolvedDataScope{}, err
+	}
+	roleIDs := make([]uint64, 0, len(groupRows))
+	for _, group := range groupRows {
+		if id := numericID(group.V2); id != 0 {
+			roleIDs = append(roleIDs, id)
+		}
+	}
+	type roleScopeRow struct {
 		ID        uint64
 		DataScope uint8
 	}
-	if err := r.db.WithContext(ctx).Table("casbin_rules AS g").
-		Select("r.id, r.data_scope").
-		Joins("JOIN roles AS r ON r.id = CAST(g.v2 AS UNSIGNED) AND r.tenant_id = ? AND r.status = 1 AND r.deleted_at IS NULL", scope.TenantID).
-		Where("g.ptype = 'g' AND g.v0 = ? AND g.v1 = ?", fmt.Sprint(scope.TenantID), fmt.Sprint(scope.MemberID)).
-		Find(&roleRows).Error; err != nil {
-		return resolvedDataScope{}, err
-	}
-	roleIDs := make([]uint64, 0, len(roleRows))
-	for _, role := range roleRows {
-		roleIDs = append(roleIDs, role.ID)
+	roleRows := make([]roleScopeRow, 0, len(roleIDs))
+	if len(roleIDs) > 0 {
+		role := q.Role
+		storedRoles, roleErr := role.WithContext(ctx).Select(role.ID, role.DataScope).
+			Where(role.ID.In(roleIDs...), role.TenantID.Eq(scope.TenantID), role.Status.Eq(1), role.DeletedAt.IsNull()).Find()
+		if roleErr != nil {
+			return resolvedDataScope{}, roleErr
+		}
+		for _, stored := range storedRoles {
+			roleRows = append(roleRows, roleScopeRow{ID: stored.ID, DataScope: stored.DataScope})
+		}
 	}
 	custom := make(map[uint64][]uint64)
 	if len(roleIDs) > 0 {
-		var rows []model.RoleScopeDepartment
-		if err := r.db.WithContext(ctx).Where("tenant_id = ? AND role_id IN ?", scope.TenantID, roleIDs).Find(&rows).Error; err != nil {
+		d := q.RoleScopeDepartment
+		rows, err := d.WithContext(ctx).Where(d.TenantID.Eq(scope.TenantID), d.RoleID.In(roleIDs...)).Find()
+		if err != nil {
 			return resolvedDataScope{}, err
 		}
 		for _, row := range rows {
@@ -985,11 +1026,9 @@ func (r *ManagementRepository) resolveDataScope(ctx context.Context, scope manag
 }
 
 func (r *ManagementRepository) expandDepartmentDescendants(ctx context.Context, tenantID uint64, departmentIDs, roots []uint64) ([]uint64, error) {
-	var rows []struct {
-		ID       uint64
-		ParentID uint64
-	}
-	if err := r.db.WithContext(ctx).Table("departments").Select("id, parent_id").Where("tenant_id = ? AND deleted_at IS NULL", tenantID).Find(&rows).Error; err != nil {
+	d := r.gen().Department
+	rows, err := d.WithContext(ctx).Select(d.ID, d.ParentID).Where(d.TenantID.Eq(tenantID), d.DeletedAt.IsNull()).Find()
+	if err != nil {
 		return nil, err
 	}
 	children := make(map[uint64][]uint64)
@@ -1364,13 +1403,18 @@ var codeDefaultSettings = []defaultSetting{
 
 // EffectiveSettings 返回代码默认、平台默认与租户覆盖合并后的配置，不回传敏感值。
 func (r *ManagementRepository) EffectiveSettings(ctx context.Context, scope managementbiz.Scope, category string) ([]map[string]any, error) {
-	query := r.db.WithContext(ctx).Where("tenant_id IN ?", []uint64{0, scope.TenantID})
+	s := r.gen().SystemSetting
+	read := s.WithContext(ctx).Where(s.TenantID.In(0, scope.TenantID))
 	if category != "" {
-		query = query.Where("category = ?", category)
+		read = read.Where(s.Category.Eq(category))
 	}
-	var stored []model.SystemSetting
-	if err := query.Find(&stored).Error; err != nil {
+	storedRows, err := read.Find()
+	if err != nil {
 		return nil, err
+	}
+	stored := make([]model.SystemSetting, 0, len(storedRows))
+	for _, row := range storedRows {
+		stored = append(stored, *row)
 	}
 	platform := make(map[string]*model.SystemSetting)
 	tenant := make(map[string]*model.SystemSetting)
@@ -1451,12 +1495,13 @@ func settingValue(item *model.SystemSetting) (*settingbiz.Value, error) {
 
 // TestProviderConnection 解密已保存配置并调用对应 Provider 的连接检查。
 func (r *ManagementRepository) TestProviderConnection(ctx context.Context, scope managementbiz.Scope, id uint64) error {
-	query := r.db.WithContext(ctx).Where("id = ?", id)
+	p := r.gen().ProviderConfig
+	read := p.WithContext(ctx).Where(p.ID.Eq(id))
 	if !scope.PlatformAdmin {
-		query = query.Where("tenant_id = ?", scope.TenantID)
+		read = read.Where(p.TenantID.Eq(scope.TenantID))
 	}
-	var record model.ProviderConfig
-	if err := query.Take(&record).Error; err != nil {
+	record, err := read.Take()
+	if err != nil {
 		return errors.New("Provider 不存在或无权访问")
 	}
 	if r.providerCodec == nil {
