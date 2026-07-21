@@ -1,6 +1,9 @@
 package secret
 
-import "testing"
+import (
+	"encoding/base64"
+	"testing"
+)
 
 func TestCipherEncryptsWithUniqueNonceAndDecrypts(t *testing.T) {
 	cipher, err := NewCipher([]byte("0123456789abcdef0123456789abcdef"))
@@ -38,7 +41,12 @@ func TestCipherRejectsTamperedValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
 	}
-	tampered := encrypted[:len(encrypted)-1] + "A"
+	payload, err := base64.RawURLEncoding.DecodeString(encrypted)
+	if err != nil {
+		t.Fatalf("DecodeString() error = %v", err)
+	}
+	payload[len(payload)-1] ^= 1
+	tampered := base64.RawURLEncoding.EncodeToString(payload)
 
 	if _, err := cipher.Decrypt(tampered); err == nil {
 		t.Fatal("Decrypt(tampered) error = nil")
