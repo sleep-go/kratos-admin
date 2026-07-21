@@ -36,7 +36,7 @@ func (r *AuthRepository) ListPermissions(ctx context.Context, tenantID, memberID
 		var codes []string
 		if err := tr.WithContext(ctx).
 			Join(resource, resource.ID.EqCol(tr.ResourceID)).
-			Where(tr.TenantID.Eq(tenantID), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+			Where(tr.TenantID.Eq(tenantID), resource.ScopeMask.BitAnd(2).Eq(2), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
 			Distinct(resource.Code).Pluck(resource.Code, &codes); err != nil {
 			return nil, fmt.Errorf("查询租户管理员权限失败: %w", err)
 		}
@@ -51,7 +51,7 @@ func (r *AuthRepository) ListPermissions(ctx context.Context, tenantID, memberID
 		var rows []struct{ V2, V3 string }
 		if err := g.WithContext(ctx).
 			Join(p, p.Ptype.Eq("p"), p.V0.EqCol(g.V0), p.V1.EqCol(g.V2)).
-			Join(resource, resource.Code.EqCol(p.V2), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+			Join(resource, resource.Code.EqCol(p.V2), resource.ScopeMask.BitAnd(2).Eq(2), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
 			Join(tr, tr.TenantID.Eq(tenantID), tr.ResourceID.EqCol(resource.ID)).
 			Where(g.Ptype.Eq("g"), g.V0.Eq(fmt.Sprint(tenantID)), g.V1.Eq(fmt.Sprint(memberID))).
 			Distinct(p.V2, p.V3).Select(p.V2, p.V3).Scan(&rows); err != nil {

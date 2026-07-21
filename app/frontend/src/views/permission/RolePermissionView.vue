@@ -76,7 +76,11 @@ async function load() {
         targetScope.value
       ),
       props.targetTenantId
-        ? managementApi.listResources('tenant-resources', { page: 1, page_size: 200 })
+        ? managementApi.listResources(
+            'tenant-resources',
+            { page: 1, page_size: 200 },
+            targetScope.value
+          )
         : Promise.resolve({ items: [], total: 0 })
     ])
     roles.value = roleResponse.items ?? []

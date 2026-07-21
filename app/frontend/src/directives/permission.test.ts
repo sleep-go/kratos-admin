@@ -45,7 +45,7 @@ describe('权限指令', () => {
       platformAdmin: true,
       permissions: []
     }
-    store.currentTenant = { id: '8', code: 'demo', name: '演示租户' }
+    store.currentTenant = { id: '8', name: '演示租户' }
     const component = defineComponent({
       template: `<button id="platform-action" v-permission="'tenants:update'">编辑租户</button>`
     })

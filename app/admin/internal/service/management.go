@@ -110,7 +110,7 @@ func NewManagementService(repository managementbiz.Repository, checkers ...manag
 
 // ListResources 按可信租户边界分页查询白名单资源。
 func (s *ManagementService) ListResources(ctx context.Context, request *v1.ListResourcesRequest) (*v1.ListResourcesResponse, error) {
-	scope, err := managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
+	scope, err := managementListScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -210,6 +210,20 @@ func (s *ManagementService) authorize(ctx context.Context, scope managementbiz.S
 var tenantSetupResources = map[string]struct{}{
 	"members": {}, "departments": {}, "positions": {}, "roles": {},
 	"casbin-rules": {}, "role-scope-departments": {},
+}
+
+func managementListScope(ctx context.Context, resource string, targetTenantID uint64) (managementbiz.Scope, error) {
+	if targetTenantID == 0 || resource != "tenant-resources" {
+		return managementScope(ctx, resource, targetTenantID)
+	}
+	claims, ok := bizauth.ClaimsFromContext(ctx)
+	if !ok {
+		return managementbiz.Scope{}, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
+	}
+	if !bizauth.IsPlatformContext(claims) {
+		return managementbiz.Scope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "租户初始化仅限平台管理员")
+	}
+	return managementbiz.Scope{TenantID: targetTenantID, UserID: claims.UserID, PlatformAdmin: true}, nil
 }
 
 func managementScope(ctx context.Context, resource string, targetTenantID uint64) (managementbiz.Scope, error) {

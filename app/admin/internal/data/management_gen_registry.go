@@ -16,7 +16,7 @@ var managementGenAdapters = map[string]managementResourceAdapter{
 	"departments":            {Fields: fieldSet("id", "tenant_id", "parent_id", "name", "code", "path", "sort_order", "status", "created_at", "updated_at")},
 	"positions":              {Fields: fieldSet("id", "tenant_id", "code", "name", "sort_order", "status", "created_at", "updated_at")},
 	"roles":                  {Fields: fieldSet("id", "tenant_id", "code", "name", "data_scope", "is_builtin", "status", "created_at", "updated_at")},
-	"resources":              {Fields: fieldSet("id", "parent_id", "type", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status")},
+	"resources":              {Fields: fieldSet("id", "parent_id", "type", "scope_mask", "code", "name", "route_path", "component_key", "http_method", "api_path", "icon", "sort_order", "visible", "status")},
 	"tenant-resources":       {Fields: fieldSet("id", "tenant_id", "resource_id", "created_by", "created_at")},
 	"casbin-rules":           {Fields: fieldSet("id", "ptype", "v0", "v1", "v2", "v3", "v4", "v5")},
 	"role-scope-departments": {Fields: fieldSet("id", "tenant_id", "role_id", "department_id", "created_at")},

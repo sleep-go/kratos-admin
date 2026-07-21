@@ -640,6 +640,22 @@ func TestPlatformTargetTenantCannotBeOverriddenByPayloadInMySQL(t *testing.T) {
 	if role.TenantID != target.ID || member.TenantID != target.ID {
 		t.Fatalf("role tenant=%d member tenant=%d, want trusted target %d", role.TenantID, member.TenantID, target.ID)
 	}
+	resource := &model.Resource{Type: 2, ScopeMask: 2, Code: "trusted-feature", Name: "可信功能", Visible: true, Status: 1}
+	if err := tx.Create(resource).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, tenantID := range []uint64{target.ID, other.ID} {
+		if err := tx.Create(&model.TenantResource{TenantID: tenantID, ResourceID: resource.ID, CreatedBy: 1}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	rows, total, err := repository.List(context.Background(), scope, "tenant-resources", managementbiz.PageQuery{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 1 || len(rows) != 1 || numericID(rows[0]["tenant_id"]) != target.ID {
+		t.Fatalf("target tenant feature rows=%v total=%d, want only tenant %d", rows, total, target.ID)
+	}
 }
 
 func TestPlatformAdminTenantContextStillEnforcesSelectedTenant(t *testing.T) {

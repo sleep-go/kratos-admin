@@ -34,7 +34,11 @@ async function load() {
     const [tenantResponse, resourceResponse, grantResponse] = await Promise.all([
       managementApi.listResources('tenants', { page: 1, page_size: 200, sort: 'id:asc' }),
       managementApi.listResources('resources', { page: 1, page_size: 200, sort: 'sort_order:asc' }),
-      managementApi.listResources('tenant-resources', { page: 1, page_size: 200 })
+      managementApi.listResources(
+        'tenant-resources',
+        { page: 1, page_size: 200 },
+        props.targetTenantId ? { targetTenantId: props.targetTenantId } : undefined
+      )
     ])
     tenants.value = tenantResponse.items ?? []
     resources.value = resourceResponse.items ?? []

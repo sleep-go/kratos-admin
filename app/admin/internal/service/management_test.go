@@ -204,3 +204,18 @@ func TestPlatformTenantSetupRejectsPlatformResource(t *testing.T) {
 		t.Fatal("平台专属资源不能通过目标租户初始化入口维护")
 	}
 }
+
+func TestPlatformTenantSetupCanListTargetTenantFeatures(t *testing.T) {
+	repository := &fakeManagementRepository{}
+	service := NewManagementService(repository)
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, PlatformAdmin: true})
+
+	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{
+		Resource: "tenant-resources", TargetTenantId: 8,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if repository.scope.TenantID != 8 || !repository.scope.PlatformAdmin {
+		t.Fatalf("scope = %+v, want target tenant 8", repository.scope)
+	}
+}

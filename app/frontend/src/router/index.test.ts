@@ -59,7 +59,7 @@ describe('路由鉴权', () => {
     authStore.accessToken = 'token'
     authStore.sessionRestored = true
     authStore.currentUser = { id: '1', displayName: '平台管理员', platformAdmin: true }
-    authStore.currentTenant = { id: '0', code: 'platform', name: '平台' }
+    authStore.currentTenant = { id: '0', name: '平台' }
     authStore.navigationItems = [
       { name: '租户管理', routePath: '/platform/tenants', componentKey: 'tenants' }
     ]
@@ -69,7 +69,7 @@ describe('路由鉴权', () => {
     await router.isReady()
     expect(router.currentRoute.value.name).toBe('tenant-setup')
 
-    authStore.currentTenant = { id: '8', code: 'demo', name: '演示租户' }
+    authStore.currentTenant = { id: '8', name: '演示租户' }
     await router.push('/platform/tenants/9/setup')
     expect(router.currentRoute.value.name).toBe('dashboard')
   })

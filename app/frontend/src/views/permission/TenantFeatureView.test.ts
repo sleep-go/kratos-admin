@@ -53,5 +53,10 @@ describe('租户功能授权', () => {
     await vi.waitFor(() => expect(wrapper.text()).toContain('演示租户'))
 
     expect(wrapper.find('.tenant-list').exists()).toBe(false)
+    expect(listResources).toHaveBeenCalledWith(
+      'tenant-resources',
+      { page: 1, page_size: 200 },
+      { targetTenantId: '10' }
+    )
   })
 })
