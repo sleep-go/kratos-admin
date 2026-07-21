@@ -40,28 +40,51 @@ func newTenantMember(db *gorm.DB, opts ...gen.DOOption) tenantMember {
 	_tenantMember.CreatedAt = field.NewTime(tableName, "created_at")
 	_tenantMember.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_tenantMember.DeletedAt = field.NewField(tableName, "deleted_at")
+	_tenantMember.User = tenantMemberBelongsToUser{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("User", "model.User"),
+	}
+
+	_tenantMember.PrimaryDepartment = tenantMemberBelongsToPrimaryDepartment{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("PrimaryDepartment", "model.Department"),
+	}
+
+	_tenantMember.Position = tenantMemberBelongsToPosition{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Position", "model.Position"),
+	}
 
 	_tenantMember.fillFieldMap()
 
 	return _tenantMember
 }
 
+// tenantMember 租户成员表
 type tenantMember struct {
 	tenantMemberDo tenantMemberDo
 
 	ALL                 field.Asterisk
-	ID                  field.Uint64
-	TenantID            field.Uint64
-	UserID              field.Uint64
-	PrimaryDepartmentID field.Uint64
-	PositionID          field.Uint64
-	DisplayName         field.String
-	Status              field.Uint8
-	IsTenantAdmin       field.Bool
-	JoinedAt            field.Time
-	CreatedAt           field.Time
-	UpdatedAt           field.Time
-	DeletedAt           field.Field
+	ID                  field.Uint64 // 租户成员主键
+	TenantID            field.Uint64 // 所属租户ID
+	UserID              field.Uint64 // 关联全局用户ID
+	PrimaryDepartmentID field.Uint64 // 主部门ID，0表示未分配
+	PositionID          field.Uint64 // 岗位ID，0表示未分配
+	DisplayName         field.String // 租户内显示名称
+	Status              field.Uint8  // 成员状态：1启用，2禁用
+	IsTenantAdmin       field.Bool   // 是否租户管理员：0否，1是
+	JoinedAt            field.Time   // 加入租户时间
+	CreatedAt           field.Time   // 创建时间
+	UpdatedAt           field.Time   // 更新时间
+	DeletedAt           field.Field  // 逻辑删除时间
+	User                tenantMemberBelongsToUser
+
+	PrimaryDepartment tenantMemberBelongsToPrimaryDepartment
+
+	Position tenantMemberBelongsToPosition
 
 	fieldMap map[string]field.Expr
 }
@@ -118,7 +141,7 @@ func (t *tenantMember) GetFieldByName(fieldName string) (field.OrderExpr, bool) 
 }
 
 func (t *tenantMember) fillFieldMap() {
-	t.fieldMap = make(map[string]field.Expr, 12)
+	t.fieldMap = make(map[string]field.Expr, 15)
 	t.fieldMap["id"] = t.ID
 	t.fieldMap["tenant_id"] = t.TenantID
 	t.fieldMap["user_id"] = t.UserID
@@ -131,16 +154,269 @@ func (t *tenantMember) fillFieldMap() {
 	t.fieldMap["created_at"] = t.CreatedAt
 	t.fieldMap["updated_at"] = t.UpdatedAt
 	t.fieldMap["deleted_at"] = t.DeletedAt
+
 }
 
 func (t tenantMember) clone(db *gorm.DB) tenantMember {
 	t.tenantMemberDo.ReplaceConnPool(db.Statement.ConnPool)
+	t.User.db = db.Session(&gorm.Session{Initialized: true})
+	t.User.db.Statement.ConnPool = db.Statement.ConnPool
+	t.PrimaryDepartment.db = db.Session(&gorm.Session{Initialized: true})
+	t.PrimaryDepartment.db.Statement.ConnPool = db.Statement.ConnPool
+	t.Position.db = db.Session(&gorm.Session{Initialized: true})
+	t.Position.db.Statement.ConnPool = db.Statement.ConnPool
 	return t
 }
 
 func (t tenantMember) replaceDB(db *gorm.DB) tenantMember {
 	t.tenantMemberDo.ReplaceDB(db)
+	t.User.db = db.Session(&gorm.Session{})
+	t.PrimaryDepartment.db = db.Session(&gorm.Session{})
+	t.Position.db = db.Session(&gorm.Session{})
 	return t
+}
+
+type tenantMemberBelongsToUser struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a tenantMemberBelongsToUser) Where(conds ...field.Expr) *tenantMemberBelongsToUser {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a tenantMemberBelongsToUser) WithContext(ctx context.Context) *tenantMemberBelongsToUser {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a tenantMemberBelongsToUser) Session(session *gorm.Session) *tenantMemberBelongsToUser {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a tenantMemberBelongsToUser) Model(m *model.TenantMember) *tenantMemberBelongsToUserTx {
+	return &tenantMemberBelongsToUserTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a tenantMemberBelongsToUser) Unscoped() *tenantMemberBelongsToUser {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type tenantMemberBelongsToUserTx struct{ tx *gorm.Association }
+
+func (a tenantMemberBelongsToUserTx) Find() (result *model.User, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a tenantMemberBelongsToUserTx) Append(values ...*model.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a tenantMemberBelongsToUserTx) Replace(values ...*model.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a tenantMemberBelongsToUserTx) Delete(values ...*model.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a tenantMemberBelongsToUserTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a tenantMemberBelongsToUserTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a tenantMemberBelongsToUserTx) Unscoped() *tenantMemberBelongsToUserTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
+type tenantMemberBelongsToPrimaryDepartment struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a tenantMemberBelongsToPrimaryDepartment) Where(conds ...field.Expr) *tenantMemberBelongsToPrimaryDepartment {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a tenantMemberBelongsToPrimaryDepartment) WithContext(ctx context.Context) *tenantMemberBelongsToPrimaryDepartment {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a tenantMemberBelongsToPrimaryDepartment) Session(session *gorm.Session) *tenantMemberBelongsToPrimaryDepartment {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a tenantMemberBelongsToPrimaryDepartment) Model(m *model.TenantMember) *tenantMemberBelongsToPrimaryDepartmentTx {
+	return &tenantMemberBelongsToPrimaryDepartmentTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a tenantMemberBelongsToPrimaryDepartment) Unscoped() *tenantMemberBelongsToPrimaryDepartment {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type tenantMemberBelongsToPrimaryDepartmentTx struct{ tx *gorm.Association }
+
+func (a tenantMemberBelongsToPrimaryDepartmentTx) Find() (result *model.Department, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a tenantMemberBelongsToPrimaryDepartmentTx) Append(values ...*model.Department) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a tenantMemberBelongsToPrimaryDepartmentTx) Replace(values ...*model.Department) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a tenantMemberBelongsToPrimaryDepartmentTx) Delete(values ...*model.Department) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a tenantMemberBelongsToPrimaryDepartmentTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a tenantMemberBelongsToPrimaryDepartmentTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a tenantMemberBelongsToPrimaryDepartmentTx) Unscoped() *tenantMemberBelongsToPrimaryDepartmentTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
+type tenantMemberBelongsToPosition struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a tenantMemberBelongsToPosition) Where(conds ...field.Expr) *tenantMemberBelongsToPosition {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a tenantMemberBelongsToPosition) WithContext(ctx context.Context) *tenantMemberBelongsToPosition {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a tenantMemberBelongsToPosition) Session(session *gorm.Session) *tenantMemberBelongsToPosition {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a tenantMemberBelongsToPosition) Model(m *model.TenantMember) *tenantMemberBelongsToPositionTx {
+	return &tenantMemberBelongsToPositionTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a tenantMemberBelongsToPosition) Unscoped() *tenantMemberBelongsToPosition {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type tenantMemberBelongsToPositionTx struct{ tx *gorm.Association }
+
+func (a tenantMemberBelongsToPositionTx) Find() (result *model.Position, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a tenantMemberBelongsToPositionTx) Append(values ...*model.Position) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a tenantMemberBelongsToPositionTx) Replace(values ...*model.Position) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a tenantMemberBelongsToPositionTx) Delete(values ...*model.Position) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a tenantMemberBelongsToPositionTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a tenantMemberBelongsToPositionTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a tenantMemberBelongsToPositionTx) Unscoped() *tenantMemberBelongsToPositionTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type tenantMemberDo struct{ gen.DO }

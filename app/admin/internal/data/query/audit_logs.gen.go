@@ -49,25 +49,26 @@ func newAuditLog(db *gorm.DB, opts ...gen.DOOption) auditLog {
 	return _auditLog
 }
 
+// auditLog 操作审计日志表
 type auditLog struct {
 	auditLogDo auditLogDo
 
 	ALL          field.Asterisk
-	ID           field.Uint64
-	EventID      field.String
-	TenantID     field.Uint64
-	UserID       field.Uint64
-	MemberID     field.Uint64
-	Action       field.String
-	ResourceType field.String
-	ResourceID   field.String
-	Summary      field.String
-	BeforeData   field.Field
-	AfterData    field.Field
-	IP           field.String
-	UserAgent    field.String
-	RequestID    field.String
-	CreatedAt    field.Time
+	ID           field.Uint64 // 操作审计日志主键
+	EventID      field.String // 来源Outbox事件UUID
+	TenantID     field.Uint64 // 所属租户ID，0表示平台域
+	UserID       field.Uint64 // 操作用户ID，系统任务为0
+	MemberID     field.Uint64 // 操作成员ID，平台域或系统任务为0
+	Action       field.String // 业务动作
+	ResourceType field.String // 资源类型
+	ResourceID   field.String // 资源ID
+	Summary      field.String // 中文操作摘要
+	BeforeData   field.Field  // 变更前脱敏数据
+	AfterData    field.Field  // 变更后脱敏数据
+	IP           field.String // 客户端IP
+	UserAgent    field.String // 客户端User-Agent
+	RequestID    field.String // 请求追踪ID
+	CreatedAt    field.Time   // 发生时间
 
 	fieldMap map[string]field.Expr
 }

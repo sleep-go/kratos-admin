@@ -34,6 +34,14 @@ pnpm dev
 
 `make migrate` 保留为人工检查、故障排查或受控维护入口，正常启动不需要先手工执行。修改依赖注入后执行 `make wire`，只生成 Admin 的 `wire_gen.go`。
 
+## GORM Gen 代码生成
+
+Goose SQL 是数据库结构的唯一真相源。修改 `migrations/*.sql` 后执行 `make gorm-gen`，工具会在同一 MySQL 实例创建随机临时数据库、执行全部迁移、反向生成 `model/*.gen.go` 和 `query/*.gen.go`，并在成功或失败后清理临时数据库。生成过程不会修改配置 DSN 指向的业务数据库。
+
+执行生成的 MySQL 账号需要 `CREATE DATABASE` 和 `DROP DATABASE` 权限。运行账号权限不足时，通过 `KRATOS_ADMIN_GORM_GEN_DSN` 仅为生成工具指定具备临时库权限的账号。Model 与 Query 是派生代码，不得手工修改；CI 或提交前使用 `make gorm-gen-check` 验证重复生成无差异。
+
+业务 Repository 使用 GORM Gen；完整关联优先 `Preload`，关联过滤、聚合或投影优先 `Join`。复杂联表按具体问题评审后使用自定义 Gen 查询，不在业务仓储中直接拼接 SQL。
+
 ## Docker Compose 仅启动依赖
 
 ```bash
@@ -80,6 +88,7 @@ make api
 make config
 make wire
 make gorm-gen
+make gorm-gen-check
 make test
 make vet
 make build

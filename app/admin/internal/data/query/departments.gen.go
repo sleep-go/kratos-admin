@@ -34,7 +34,7 @@ func newDepartment(db *gorm.DB, opts ...gen.DOOption) department {
 	_department.Name = field.NewString(tableName, "name")
 	_department.Code = field.NewString(tableName, "code")
 	_department.Path = field.NewString(tableName, "path")
-	_department.SortOrder = field.NewInt(tableName, "sort_order")
+	_department.SortOrder = field.NewInt32(tableName, "sort_order")
 	_department.Status = field.NewUint8(tableName, "status")
 	_department.CreatedAt = field.NewTime(tableName, "created_at")
 	_department.UpdatedAt = field.NewTime(tableName, "updated_at")
@@ -45,21 +45,22 @@ func newDepartment(db *gorm.DB, opts ...gen.DOOption) department {
 	return _department
 }
 
+// department 部门表
 type department struct {
 	departmentDo departmentDo
 
 	ALL       field.Asterisk
-	ID        field.Uint64
-	TenantID  field.Uint64
-	ParentID  field.Uint64
-	Name      field.String
-	Code      field.String
-	Path      field.String
-	SortOrder field.Int
-	Status    field.Uint8
-	CreatedAt field.Time
-	UpdatedAt field.Time
-	DeletedAt field.Field
+	ID        field.Uint64 // 部门主键
+	TenantID  field.Uint64 // 所属租户ID
+	ParentID  field.Uint64 // 父部门ID，0表示根部门
+	Name      field.String // 部门名称
+	Code      field.String // 租户内唯一部门编码
+	Path      field.String // 包含自身的部门层级路径
+	SortOrder field.Int32  // 显示排序值
+	Status    field.Uint8  // 部门状态：1启用，2禁用
+	CreatedAt field.Time   // 创建时间
+	UpdatedAt field.Time   // 更新时间
+	DeletedAt field.Field  // 逻辑删除时间
 
 	fieldMap map[string]field.Expr
 }
@@ -82,7 +83,7 @@ func (d *department) updateTableName(table string) *department {
 	d.Name = field.NewString(table, "name")
 	d.Code = field.NewString(table, "code")
 	d.Path = field.NewString(table, "path")
-	d.SortOrder = field.NewInt(table, "sort_order")
+	d.SortOrder = field.NewInt32(table, "sort_order")
 	d.Status = field.NewUint8(table, "status")
 	d.CreatedAt = field.NewTime(table, "created_at")
 	d.UpdatedAt = field.NewTime(table, "updated_at")

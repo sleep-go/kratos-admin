@@ -44,20 +44,21 @@ func newLoginLog(db *gorm.DB, opts ...gen.DOOption) loginLog {
 	return _loginLog
 }
 
+// loginLog 登录安全日志表
 type loginLog struct {
 	loginLogDo loginLogDo
 
 	ALL        field.Asterisk
-	ID         field.Uint64
-	TenantID   field.Uint64
-	UserID     field.Uint64
-	Identifier field.String
-	Result     field.Uint8
-	Reason     field.String
-	IP         field.String
-	UserAgent  field.String
-	RequestID  field.String
-	CreatedAt  field.Time
+	ID         field.Uint64 // 登录日志主键
+	TenantID   field.Uint64 // 登录租户ID，0表示未选择或平台域
+	UserID     field.Uint64 // 用户ID，未识别用户为0
+	Identifier field.String // 脱敏后的登录标识
+	Result     field.Uint8  // 登录结果：1成功，2失败，3锁定，4需要MFA
+	Reason     field.String // 登录结果原因
+	IP         field.String // 客户端IP
+	UserAgent  field.String // 客户端User-Agent
+	RequestID  field.String // 请求追踪ID
+	CreatedAt  field.Time   // 发生时间
 
 	fieldMap map[string]field.Expr
 }

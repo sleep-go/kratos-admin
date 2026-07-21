@@ -10,12 +10,13 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
+	"gorm.io/gen/field"
 	"gorm.io/gorm/clause"
 
 	filebiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/file"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/logexport"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 const (
@@ -46,11 +47,11 @@ type PendingTask struct {
 }
 
 // TaskRepository 统一管理三类异步任务的投递、重试和失败状态。
-type TaskRepository struct{ db *gorm.DB }
+type TaskRepository struct{ q *query.Query }
 
 // NewTaskRepository 创建异步任务状态仓储。
 func NewTaskRepository(data *Data) *TaskRepository {
-	return &TaskRepository{db: data.DB}
+	return &TaskRepository{q: data.Query}
 }
 
 // Pending 返回到期、未确认投递且仍处于待处理状态的任务。
@@ -60,22 +61,37 @@ func (r *TaskRepository) Pending(ctx context.Context, limit int, now time.Time) 
 	}
 
 	var auditRows []model.AuditOutbox
-	if err := r.db.WithContext(ctx).
-		Where("status IN ? AND dispatched_at IS NULL AND (next_retry_at IS NULL OR next_retry_at <= ?)", []int{int(auditStatusPending), int(auditStatusRetrying)}, now).
-		Order("created_at ASC").Limit(limit).Find(&auditRows).Error; err != nil {
+	a := r.q.AuditOutbox
+	rows, err := a.WithContext(ctx).
+		Where(a.Status.In(auditStatusPending, auditStatusRetrying), a.DispatchedAt.IsNull(), field.Or(a.NextRetryAt.IsNull(), a.NextRetryAt.Lte(now))).
+		Order(a.CreatedAt.Asc()).Limit(limit).Find()
+	if err != nil {
 		return nil, fmt.Errorf("查询待投递审计任务失败: %w", err)
 	}
+	for _, row := range rows {
+		auditRows = append(auditRows, *row)
+	}
 	var exportRows []model.LogExport
-	if err := r.db.WithContext(ctx).
-		Where("status = ? AND dispatched_at IS NULL AND (next_retry_at IS NULL OR next_retry_at <= ?)", logexport.StatusPending, now).
-		Order("created_at ASC").Limit(limit).Find(&exportRows).Error; err != nil {
+	le := r.q.LogExport
+	exportsFound, err := le.WithContext(ctx).
+		Where(le.Status.Eq(logexport.StatusPending), le.DispatchedAt.IsNull(), field.Or(le.NextRetryAt.IsNull(), le.NextRetryAt.Lte(now))).
+		Order(le.CreatedAt.Asc()).Limit(limit).Find()
+	if err != nil {
 		return nil, fmt.Errorf("查询待投递日志导出任务失败: %w", err)
 	}
+	for _, row := range exportsFound {
+		exportRows = append(exportRows, *row)
+	}
 	var fileRows []model.File
-	if err := r.db.WithContext(ctx).
-		Where("status = ? AND deleted_at IS NULL AND cleanup_dispatched_at IS NULL AND (cleanup_next_retry_at IS NULL OR cleanup_next_retry_at <= ?)", filebiz.StatusDeletionPending, now).
-		Order("updated_at ASC").Limit(limit).Find(&fileRows).Error; err != nil {
+	f := r.q.File
+	filesFound, err := f.WithContext(ctx).
+		Where(f.Status.Eq(filebiz.StatusDeletionPending), f.DeletedAt.IsNull(), f.CleanupDispatchedAt.IsNull(), field.Or(f.CleanupNextRetryAt.IsNull(), f.CleanupNextRetryAt.Lte(now))).
+		Order(f.UpdatedAt.Asc()).Limit(limit).Find()
+	if err != nil {
 		return nil, fmt.Errorf("查询待投递文件清理任务失败: %w", err)
+	}
+	for _, row := range filesFound {
+		fileRows = append(fileRows, *row)
 	}
 
 	audits := make([]PendingTask, 0, len(auditRows))
@@ -99,25 +115,28 @@ func (r *TaskRepository) Pending(ctx context.Context, limit int, now time.Time) 
 
 // MarkDispatched 在 RabbitMQ 确认接管消息后记录投递时间。
 func (r *TaskRepository) MarkDispatched(ctx context.Context, task PendingTask, at time.Time) error {
-	var result *gorm.DB
+	var err error
 	switch task.Kind {
 	case TaskKindAudit:
-		result = r.db.WithContext(ctx).Model(&model.AuditOutbox{}).
-			Where("id = ? AND status IN ? AND retry_count = ? AND dispatched_at IS NULL", task.ID, []int{int(auditStatusPending), int(auditStatusRetrying)}, task.RetryCount).
-			Update("dispatched_at", at)
+		a := r.q.AuditOutbox
+		_, err = a.WithContext(ctx).
+			Where(a.ID.Eq(task.ID), a.Status.In(auditStatusPending, auditStatusRetrying), a.RetryCount.Eq(task.RetryCount), a.DispatchedAt.IsNull()).
+			Update(a.DispatchedAt, at)
 	case TaskKindLogExport:
-		result = r.db.WithContext(ctx).Model(&model.LogExport{}).
-			Where("id = ? AND status = ? AND retry_count = ? AND dispatched_at IS NULL", task.ID, logexport.StatusPending, task.RetryCount).
-			Updates(map[string]any{"dispatched_at": at, "updated_at": at})
+		le := r.q.LogExport
+		_, err = le.WithContext(ctx).
+			Where(le.ID.Eq(task.ID), le.Status.Eq(logexport.StatusPending), le.RetryCount.Eq(task.RetryCount), le.DispatchedAt.IsNull()).
+			UpdateSimple(le.DispatchedAt.Value(at), le.UpdatedAt.Value(at))
 	case TaskKindFileCleanup:
-		result = r.db.WithContext(ctx).Model(&model.File{}).
-			Where("id = ? AND tenant_id = ? AND status = ? AND cleanup_retry_count = ? AND deleted_at IS NULL AND cleanup_dispatched_at IS NULL", task.ID, task.TenantID, filebiz.StatusDeletionPending, task.RetryCount).
-			Updates(map[string]any{"cleanup_dispatched_at": at, "updated_at": at})
+		f := r.q.File
+		_, err = f.WithContext(ctx).
+			Where(f.ID.Eq(task.ID), f.TenantID.Eq(task.TenantID), f.Status.Eq(filebiz.StatusDeletionPending), f.CleanupRetryCount.Eq(task.RetryCount), f.DeletedAt.IsNull(), f.CleanupDispatchedAt.IsNull()).
+			UpdateSimple(f.CleanupDispatchedAt.Value(at), f.UpdatedAt.Value(at))
 	default:
 		return fmt.Errorf("不支持的异步任务类型: %s", task.Kind)
 	}
-	if result.Error != nil {
-		return fmt.Errorf("记录异步任务投递状态失败: %w", result.Error)
+	if err != nil {
+		return fmt.Errorf("记录异步任务投递状态失败: %w", err)
 	}
 	return nil
 }
@@ -128,15 +147,15 @@ func (r *TaskRepository) RecordFailure(ctx context.Context, task PendingTask, ca
 		return false, errors.New("异步任务失败原因不能为空")
 	}
 	final := false
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := r.q.Transaction(func(tx *query.Query) error {
 		var err error
 		switch task.Kind {
 		case TaskKindAudit:
-			final, err = recordAuditFailure(tx, task, cause, now)
+			final, err = recordAuditFailure(ctx, tx, task, cause, now)
 		case TaskKindLogExport:
-			final, err = recordLogExportFailure(tx, task, cause, now)
+			final, err = recordLogExportFailure(ctx, tx, task, cause, now)
 		case TaskKindFileCleanup:
-			final, err = recordFileCleanupFailure(tx, task, cause, now)
+			final, err = recordFileCleanupFailure(ctx, tx, task, cause, now)
 		default:
 			err = fmt.Errorf("不支持的异步任务类型: %s", task.Kind)
 		}
@@ -151,14 +170,14 @@ func (r *TaskRepository) RecordFailure(ctx context.Context, task PendingTask, ca
 // RecoverStaleLogExports 将进程退出时遗留的超时处理中任务恢复为待投递状态。
 func (r *TaskRepository) RecoverStaleLogExports(ctx context.Context, before time.Time) (int64, error) {
 	now := time.Now().UTC()
-	result := r.db.WithContext(ctx).Model(&model.LogExport{}).
-		Where("status = ? AND started_at < ?", logexport.StatusProcessing, before).
-		Updates(map[string]any{
-			"status": logexport.StatusPending, "started_at": nil, "dispatched_at": nil,
-			"next_retry_at": nil, "failure_reason": "处理超时，等待重新投递", "updated_at": now,
-		})
-	if result.Error != nil {
-		return 0, fmt.Errorf("恢复超时日志导出任务失败: %w", result.Error)
+	le := r.q.LogExport
+	result, err := le.WithContext(ctx).Where(le.Status.Eq(logexport.StatusProcessing), le.StartedAt.Lt(before)).
+		UpdateSimple(
+			le.Status.Value(logexport.StatusPending), le.StartedAt.Null(), le.DispatchedAt.Null(), le.NextRetryAt.Null(),
+			le.FailureReason.Value("处理超时，等待重新投递"), le.UpdatedAt.Value(now),
+		)
+	if err != nil {
+		return 0, fmt.Errorf("恢复超时日志导出任务失败: %w", err)
 	}
 	return result.RowsAffected, nil
 }
@@ -191,9 +210,10 @@ func nextTaskFailure(currentRetry uint32, cause error, now time.Time) taskFailur
 	return state
 }
 
-func recordAuditFailure(tx *gorm.DB, task PendingTask, cause error, now time.Time) (bool, error) {
-	var row model.AuditOutbox
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", task.ID).Take(&row).Error; err != nil {
+func recordAuditFailure(ctx context.Context, tx *query.Query, task PendingTask, cause error, now time.Time) (bool, error) {
+	a := tx.AuditOutbox
+	row, err := a.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where(a.ID.Eq(task.ID)).Take()
+	if err != nil {
 		return false, err
 	}
 	if (row.Status != auditStatusPending && row.Status != auditStatusRetrying) || !isCurrentTaskAttempt(row.RetryCount, task) {
@@ -204,16 +224,18 @@ func recordAuditFailure(tx *gorm.DB, task PendingTask, cause error, now time.Tim
 	if state.Final {
 		status = auditStatusFailed
 	}
-	if err := tx.Model(&model.AuditOutbox{}).Where("id = ? AND status IN ?", row.ID, []int{int(auditStatusPending), int(auditStatusRetrying)}).
-		Updates(map[string]any{"status": status, "retry_count": state.RetryCount, "next_retry_at": state.NextRetryAt, "dispatched_at": nil, "last_error": state.Reason}).Error; err != nil {
+	assignments := []field.AssignExpr{a.Status.Value(status), a.RetryCount.Value(state.RetryCount), a.DispatchedAt.Null(), a.LastError.Value(state.Reason)}
+	assignments = append(assignments, nullableTimeAssignment(a.NextRetryAt, state.NextRetryAt))
+	if _, err := a.WithContext(ctx).Where(a.ID.Eq(row.ID), a.Status.In(auditStatusPending, auditStatusRetrying)).UpdateSimple(assignments...); err != nil {
 		return false, err
 	}
-	return state.Final, createFailedTask(tx, task, state, now)
+	return state.Final, createFailedTask(ctx, tx, task, state, now)
 }
 
-func recordLogExportFailure(tx *gorm.DB, task PendingTask, cause error, now time.Time) (bool, error) {
-	var row model.LogExport
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", task.ID).Take(&row).Error; err != nil {
+func recordLogExportFailure(ctx context.Context, tx *query.Query, task PendingTask, cause error, now time.Time) (bool, error) {
+	le := tx.LogExport
+	row, err := le.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where(le.ID.Eq(task.ID)).Take()
+	if err != nil {
 		return false, err
 	}
 	if (row.Status != logexport.StatusPending && row.Status != logexport.StatusProcessing) || !isCurrentTaskAttempt(row.RetryCount, task) {
@@ -221,22 +243,23 @@ func recordLogExportFailure(tx *gorm.DB, task PendingTask, cause error, now time
 	}
 	state := nextTaskFailure(row.RetryCount, cause, now)
 	status := logexport.StatusPending
-	updates := map[string]any{
-		"status": status, "retry_count": state.RetryCount, "next_retry_at": state.NextRetryAt,
-		"dispatched_at": nil, "failure_reason": state.Reason, "started_at": nil, "updated_at": now,
+	assignments := []field.AssignExpr{
+		le.Status.Value(status), le.RetryCount.Value(state.RetryCount), nullableTimeAssignment(le.NextRetryAt, state.NextRetryAt),
+		le.DispatchedAt.Null(), le.FailureReason.Value(state.Reason), le.StartedAt.Null(), le.UpdatedAt.Value(now),
 	}
 	if state.Final {
-		updates["status"], updates["finished_at"] = logexport.StatusFailed, now
+		assignments = append(assignments, le.Status.Value(logexport.StatusFailed), le.FinishedAt.Value(now))
 	}
-	if err := tx.Model(&model.LogExport{}).Where("id = ? AND status IN ?", row.ID, []int{int(logexport.StatusPending), int(logexport.StatusProcessing)}).Updates(updates).Error; err != nil {
+	if _, err := le.WithContext(ctx).Where(le.ID.Eq(row.ID), le.Status.In(logexport.StatusPending, logexport.StatusProcessing)).UpdateSimple(assignments...); err != nil {
 		return false, err
 	}
-	return state.Final, createFailedTask(tx, task, state, now)
+	return state.Final, createFailedTask(ctx, tx, task, state, now)
 }
 
-func recordFileCleanupFailure(tx *gorm.DB, task PendingTask, cause error, now time.Time) (bool, error) {
-	var row model.File
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND tenant_id = ?", task.ID, task.TenantID).Take(&row).Error; err != nil {
+func recordFileCleanupFailure(ctx context.Context, tx *query.Query, task PendingTask, cause error, now time.Time) (bool, error) {
+	f := tx.File
+	row, err := f.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).Where(f.ID.Eq(task.ID), f.TenantID.Eq(task.TenantID)).Take()
+	if err != nil {
 		return false, err
 	}
 	if row.Status != filebiz.StatusDeletionPending || row.DeletedAt.Valid || !isCurrentTaskAttempt(row.CleanupRetryCount, task) {
@@ -247,18 +270,18 @@ func recordFileCleanupFailure(tx *gorm.DB, task PendingTask, cause error, now ti
 	if state.Final {
 		status = filebiz.StatusCleanupFailed
 	}
-	if err := tx.Model(&model.File{}).Where("id = ? AND tenant_id = ? AND status = ? AND deleted_at IS NULL", row.ID, row.TenantID, filebiz.StatusDeletionPending).
-		Updates(map[string]any{
-			"status": status, "cleanup_retry_count": state.RetryCount, "cleanup_next_retry_at": state.NextRetryAt,
-			"cleanup_dispatched_at": nil, "cleanup_failure_reason": state.Reason, "updated_at": now,
-		}).Error; err != nil {
+	assignments := []field.AssignExpr{
+		f.Status.Value(status), f.CleanupRetryCount.Value(state.RetryCount), nullableTimeAssignment(f.CleanupNextRetryAt, state.NextRetryAt),
+		f.CleanupDispatchedAt.Null(), f.CleanupFailureReason.Value(state.Reason), f.UpdatedAt.Value(now),
+	}
+	if _, err := f.WithContext(ctx).Where(f.ID.Eq(row.ID), f.TenantID.Eq(row.TenantID), f.Status.Eq(filebiz.StatusDeletionPending), f.DeletedAt.IsNull()).UpdateSimple(assignments...); err != nil {
 		return false, err
 	}
 	task.ProviderName, task.ObjectKey = row.ProviderName, row.ObjectKey
-	return state.Final, createFailedTask(tx, task, state, now)
+	return state.Final, createFailedTask(ctx, tx, task, state, now)
 }
 
-func createFailedTask(tx *gorm.DB, task PendingTask, state taskFailureState, now time.Time) error {
+func createFailedTask(ctx context.Context, tx *query.Query, task PendingTask, state taskFailureState, now time.Time) error {
 	if !state.Final {
 		return nil
 	}
@@ -277,7 +300,14 @@ func createFailedTask(tx *gorm.DB, task PendingTask, state taskFailureState, now
 		IdempotencyKey: taskIdempotencyKey(task), Payload: datatypes.JSON(payload), RetryCount: state.RetryCount,
 		LastError: state.Reason, Status: 1, CreatedAt: now, UpdatedAt: now,
 	}
-	return tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "idempotency_key"}}, DoNothing: true}).Create(row).Error
+	return tx.FailedTask.WithContext(ctx).Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "idempotency_key"}}, DoNothing: true}).Create(row)
+}
+
+func nullableTimeAssignment(column field.Time, value *time.Time) field.AssignExpr {
+	if value == nil {
+		return column.Null()
+	}
+	return column.Value(*value)
 }
 
 func mergePendingTasks(limit int, groups ...[]PendingTask) []PendingTask {

@@ -46,34 +46,41 @@ func newFile(db *gorm.DB, opts ...gen.DOOption) file {
 	_file.CreatedAt = field.NewTime(tableName, "created_at")
 	_file.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_file.DeletedAt = field.NewField(tableName, "deleted_at")
+	_file.References = fileHasManyReferences{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("References", "model.FileReference"),
+	}
 
 	_file.fillFieldMap()
 
 	return _file
 }
 
+// file 租户文件元数据表
 type file struct {
 	fileDo fileDo
 
 	ALL                  field.Asterisk
-	ID                   field.String
-	TenantID             field.Uint64
-	UploaderMemberID     field.Uint64
-	ProviderName         field.String
-	ObjectKey            field.String
-	OriginalName         field.String
-	ContentType          field.String
-	SizeBytes            field.Uint64
-	SHA256               field.String
-	ETag                 field.String
-	Status               field.Uint8
-	CleanupDispatchedAt  field.Time
-	CleanupRetryCount    field.Uint32
-	CleanupNextRetryAt   field.Time
-	CleanupFailureReason field.String
-	CreatedAt            field.Time
-	UpdatedAt            field.Time
-	DeletedAt            field.Field
+	ID                   field.String // 文件UUID
+	TenantID             field.Uint64 // 所属租户ID
+	UploaderMemberID     field.Uint64 // 上传成员ID
+	ProviderName         field.String // 存储Provider名称
+	ObjectKey            field.String // 对象存储键
+	OriginalName         field.String // 原始文件名
+	ContentType          field.String // 文件MIME类型
+	SizeBytes            field.Uint64 // 文件大小字节数
+	SHA256               field.String // 文件SHA256摘要
+	ETag                 field.String // 对象存储返回的ETag
+	Status               field.Uint8  // 文件状态：1待确认，2可用，3已删除，4清理失败，5等待后台清理
+	CleanupDispatchedAt  field.Time   // 文件清理任务最近一次RabbitMQ确认投递时间
+	CleanupRetryCount    field.Uint32 // 文件清理失败重试次数
+	CleanupNextRetryAt   field.Time   // 文件清理下次重试时间
+	CleanupFailureReason field.String // 文件清理最后失败原因
+	CreatedAt            field.Time   // 创建时间
+	UpdatedAt            field.Time   // 更新时间
+	DeletedAt            field.Field  // 逻辑删除时间
+	References           fileHasManyReferences
 
 	fieldMap map[string]field.Expr
 }
@@ -132,7 +139,7 @@ func (f *file) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (f *file) fillFieldMap() {
-	f.fieldMap = make(map[string]field.Expr, 18)
+	f.fieldMap = make(map[string]field.Expr, 19)
 	f.fieldMap["id"] = f.ID
 	f.fieldMap["tenant_id"] = f.TenantID
 	f.fieldMap["uploader_member_id"] = f.UploaderMemberID
@@ -151,16 +158,101 @@ func (f *file) fillFieldMap() {
 	f.fieldMap["created_at"] = f.CreatedAt
 	f.fieldMap["updated_at"] = f.UpdatedAt
 	f.fieldMap["deleted_at"] = f.DeletedAt
+
 }
 
 func (f file) clone(db *gorm.DB) file {
 	f.fileDo.ReplaceConnPool(db.Statement.ConnPool)
+	f.References.db = db.Session(&gorm.Session{Initialized: true})
+	f.References.db.Statement.ConnPool = db.Statement.ConnPool
 	return f
 }
 
 func (f file) replaceDB(db *gorm.DB) file {
 	f.fileDo.ReplaceDB(db)
+	f.References.db = db.Session(&gorm.Session{})
 	return f
+}
+
+type fileHasManyReferences struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a fileHasManyReferences) Where(conds ...field.Expr) *fileHasManyReferences {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a fileHasManyReferences) WithContext(ctx context.Context) *fileHasManyReferences {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a fileHasManyReferences) Session(session *gorm.Session) *fileHasManyReferences {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a fileHasManyReferences) Model(m *model.File) *fileHasManyReferencesTx {
+	return &fileHasManyReferencesTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a fileHasManyReferences) Unscoped() *fileHasManyReferences {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type fileHasManyReferencesTx struct{ tx *gorm.Association }
+
+func (a fileHasManyReferencesTx) Find() (result []*model.FileReference, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a fileHasManyReferencesTx) Append(values ...*model.FileReference) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a fileHasManyReferencesTx) Replace(values ...*model.FileReference) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a fileHasManyReferencesTx) Delete(values ...*model.FileReference) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a fileHasManyReferencesTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a fileHasManyReferencesTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a fileHasManyReferencesTx) Unscoped() *fileHasManyReferencesTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type fileDo struct{ gen.DO }

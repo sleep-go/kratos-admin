@@ -47,35 +47,42 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 	_user.CreatedAt = field.NewTime(tableName, "created_at")
 	_user.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_user.DeletedAt = field.NewField(tableName, "deleted_at")
+	_user.Members = userHasManyMembers{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Members", "model.TenantMember"),
+	}
 
 	_user.fillFieldMap()
 
 	return _user
 }
 
+// user 全局用户表
 type user struct {
 	userDo userDo
 
 	ALL               field.Asterisk
-	ID                field.Uint64
-	Username          field.String
-	Email             field.String
-	Phone             field.String
-	PasswordHash      field.String
-	DisplayName       field.String
-	AvatarURL         field.String
-	IsPlatformAdmin   field.Bool
-	Status            field.Uint8
-	FailedLoginCount  field.Uint32
-	LockedUntil       field.Time
-	EmailVerifiedAt   field.Time
-	PhoneVerifiedAt   field.Time
-	MFAEnabled        field.Bool
-	MFAChannel        field.String
-	PasswordChangedAt field.Time
-	CreatedAt         field.Time
-	UpdatedAt         field.Time
-	DeletedAt         field.Field
+	ID                field.Uint64 // 用户主键
+	Username          field.String // 全局唯一用户名
+	Email             field.String // 全局唯一邮箱
+	Phone             field.String // 全局唯一手机号
+	PasswordHash      field.String // Argon2id密码哈希
+	DisplayName       field.String // 用户显示名称
+	AvatarURL         field.String // 头像地址
+	IsPlatformAdmin   field.Bool   // 是否平台管理员：0否，1是
+	Status            field.Uint8  // 用户状态：1启用，2禁用，3锁定
+	FailedLoginCount  field.Uint32 // 连续登录失败次数
+	LockedUntil       field.Time   // 锁定截止时间
+	EmailVerifiedAt   field.Time   // 邮箱验证时间
+	PhoneVerifiedAt   field.Time   // 手机号验证时间
+	MFAEnabled        field.Bool   // 是否启用登录MFA：0否，1是
+	MFAChannel        field.String // MFA渠道：email邮件，sms短信
+	PasswordChangedAt field.Time   // 密码最后修改时间
+	CreatedAt         field.Time   // 创建时间
+	UpdatedAt         field.Time   // 更新时间
+	DeletedAt         field.Field  // 逻辑删除时间
+	Members           userHasManyMembers
 
 	fieldMap map[string]field.Expr
 }
@@ -135,7 +142,7 @@ func (u *user) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (u *user) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 19)
+	u.fieldMap = make(map[string]field.Expr, 20)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["username"] = u.Username
 	u.fieldMap["email"] = u.Email
@@ -155,16 +162,101 @@ func (u *user) fillFieldMap() {
 	u.fieldMap["created_at"] = u.CreatedAt
 	u.fieldMap["updated_at"] = u.UpdatedAt
 	u.fieldMap["deleted_at"] = u.DeletedAt
+
 }
 
 func (u user) clone(db *gorm.DB) user {
 	u.userDo.ReplaceConnPool(db.Statement.ConnPool)
+	u.Members.db = db.Session(&gorm.Session{Initialized: true})
+	u.Members.db.Statement.ConnPool = db.Statement.ConnPool
 	return u
 }
 
 func (u user) replaceDB(db *gorm.DB) user {
 	u.userDo.ReplaceDB(db)
+	u.Members.db = db.Session(&gorm.Session{})
 	return u
+}
+
+type userHasManyMembers struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a userHasManyMembers) Where(conds ...field.Expr) *userHasManyMembers {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a userHasManyMembers) WithContext(ctx context.Context) *userHasManyMembers {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a userHasManyMembers) Session(session *gorm.Session) *userHasManyMembers {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a userHasManyMembers) Model(m *model.User) *userHasManyMembersTx {
+	return &userHasManyMembersTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a userHasManyMembers) Unscoped() *userHasManyMembers {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type userHasManyMembersTx struct{ tx *gorm.Association }
+
+func (a userHasManyMembersTx) Find() (result []*model.TenantMember, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a userHasManyMembersTx) Append(values ...*model.TenantMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a userHasManyMembersTx) Replace(values ...*model.TenantMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a userHasManyMembersTx) Delete(values ...*model.TenantMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a userHasManyMembersTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a userHasManyMembersTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a userHasManyMembersTx) Unscoped() *userHasManyMembersTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type userDo struct{ gen.DO }

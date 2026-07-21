@@ -8,8 +8,6 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/pressly/goose/v3"
-
 	"github.com/sleep-go/kratos-admin/migrations"
 )
 
@@ -40,7 +38,7 @@ func Migrate(ctx context.Context, dsn string) error {
 	if err != nil {
 		return fmt.Errorf("打开迁移数据库失败: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := db.PingContext(ctx); err != nil {
 		return fmt.Errorf("检查迁移数据库连接失败: %w", err)
 	}
@@ -48,17 +46,15 @@ func Migrate(ctx context.Context, dsn string) error {
 	if err != nil {
 		return fmt.Errorf("获取迁移专用连接失败: %w", err)
 	}
-	defer connection.Close()
+	defer func() { _ = connection.Close() }()
 	return runLockedMigration(ctx, sqlLockConnection{connection: connection}, func(ctx context.Context) error {
-		goose.SetBaseFS(migrations.Files)
-		if err := goose.SetDialect("mysql"); err != nil {
-			return fmt.Errorf("设置 Goose MySQL 方言失败: %w", err)
-		}
-		if err := goose.UpContext(ctx, db, "."); err != nil {
-			return fmt.Errorf("执行 Goose 迁移失败: %w", err)
-		}
-		return nil
+		return ApplyMigrations(ctx, db)
 	})
+}
+
+// ApplyMigrations 在指定数据库中执行所有尚未应用的 Goose 迁移。
+func ApplyMigrations(ctx context.Context, db *sql.DB) error {
+	return migrations.Apply(ctx, db)
 }
 
 func runLockedMigration(ctx context.Context, connection lockConnection, up func(context.Context) error) error {

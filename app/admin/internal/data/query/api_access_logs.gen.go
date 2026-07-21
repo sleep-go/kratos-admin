@@ -47,23 +47,24 @@ func newAPIAccessLog(db *gorm.DB, opts ...gen.DOOption) aPIAccessLog {
 	return _aPIAccessLog
 }
 
+// aPIAccessLog API访问与异常日志表
 type aPIAccessLog struct {
 	aPIAccessLogDo aPIAccessLogDo
 
 	ALL         field.Asterisk
-	ID          field.Uint64
-	TenantID    field.Uint64
-	UserID      field.Uint64
-	RequestID   field.String
-	Method      field.String
-	Route       field.String
-	StatusCode  field.Uint16
-	DurationMS  field.Uint32
-	IP          field.String
-	UserAgent   field.String
-	RequestData field.Field
-	ErrorReason field.String
-	CreatedAt   field.Time
+	ID          field.Uint64 // API访问日志主键
+	TenantID    field.Uint64 // 所属租户ID，0表示未认证或平台域
+	UserID      field.Uint64 // 用户ID，未认证为0
+	RequestID   field.String // 请求追踪ID
+	Method      field.String // HTTP方法
+	Route       field.String // HTTP路由模板
+	StatusCode  field.Uint16 // HTTP响应状态码
+	DurationMS  field.Uint32 // 请求耗时毫秒
+	IP          field.String // 客户端IP
+	UserAgent   field.String // 客户端User-Agent
+	RequestData field.Field  // 白名单脱敏请求数据
+	ErrorReason field.String // 业务错误原因
+	CreatedAt   field.Time   // 发生时间
 
 	fieldMap map[string]field.Expr
 }

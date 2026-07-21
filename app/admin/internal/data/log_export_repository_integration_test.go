@@ -9,6 +9,7 @@ import (
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/logexport"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider/storage"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 func TestLogExportRepositoryProcessesTenantCSVWithMySQL8(t *testing.T) {
@@ -29,7 +30,7 @@ func TestLogExportRepositoryProcessesTenantCSVWithMySQL8(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
-	repository := &LogExportRepository{db: tx}
+	repository := &LogExportRepository{q: query.Use(tx)}
 	provider, err := storage.NewLocalProvider(t.TempDir(), "/api/v1/files/local/content", []byte("01234567890123456789012345678901"), nil)
 	if err != nil {
 		t.Fatal(err)

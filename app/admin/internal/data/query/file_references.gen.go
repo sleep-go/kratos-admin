@@ -40,16 +40,17 @@ func newFileReference(db *gorm.DB, opts ...gen.DOOption) fileReference {
 	return _fileReference
 }
 
+// fileReference 文件业务引用表
 type fileReference struct {
 	fileReferenceDo fileReferenceDo
 
 	ALL          field.Asterisk
-	ID           field.Uint64
-	TenantID     field.Uint64
-	FileID       field.String
-	BusinessType field.String
-	BusinessID   field.String
-	CreatedAt    field.Time
+	ID           field.Uint64 // 文件引用主键
+	TenantID     field.Uint64 // 所属租户ID
+	FileID       field.String // 文件UUID
+	BusinessType field.String // 引用业务类型
+	BusinessID   field.String // 引用业务ID
+	CreatedAt    field.Time   // 创建时间
 
 	fieldMap map[string]field.Expr
 }

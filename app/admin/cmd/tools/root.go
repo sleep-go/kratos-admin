@@ -62,7 +62,11 @@ func newInitAdminCommand(run func(context.Context, string) error) *cobra.Command
 }
 
 func newGORMGenCommand(run func(context.Context, genOptions) error) *cobra.Command {
-	options := genOptions{OutPath: "app/admin/internal/data/query"}
+	options := genOptions{
+		ConfPath:     defaultConfigPath,
+		ModelOutPath: "app/admin/internal/data/model",
+		QueryOutPath: "app/admin/internal/data/query",
+	}
 	cmd := &cobra.Command{
 		Use:   "gorm-gen",
 		Short: "生成 GORM Gen 类型安全查询代码",
@@ -71,6 +75,8 @@ func newGORMGenCommand(run func(context.Context, genOptions) error) *cobra.Comma
 			return run(cmd.Context(), options)
 		},
 	}
-	cmd.Flags().StringVar(&options.OutPath, "out-path", options.OutPath, "查询代码输出目录")
+	cmd.Flags().StringVarP(&options.ConfPath, "conf", "c", options.ConfPath, "YAML 配置文件路径")
+	cmd.Flags().StringVar(&options.ModelOutPath, "model-out-path", options.ModelOutPath, "模型代码输出目录")
+	cmd.Flags().StringVar(&options.QueryOutPath, "query-out-path", options.QueryOutPath, "查询代码输出目录")
 	return cmd
 }

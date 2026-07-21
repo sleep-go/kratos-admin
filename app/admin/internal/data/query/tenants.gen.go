@@ -37,25 +37,32 @@ func newTenant(db *gorm.DB, opts ...gen.DOOption) tenant {
 	_tenant.CreatedAt = field.NewTime(tableName, "created_at")
 	_tenant.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_tenant.DeletedAt = field.NewField(tableName, "deleted_at")
+	_tenant.Members = tenantHasManyMembers{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Members", "model.TenantMember"),
+	}
 
 	_tenant.fillFieldMap()
 
 	return _tenant
 }
 
+// tenant 租户表
 type tenant struct {
 	tenantDo tenantDo
 
 	ALL               field.Asterisk
-	ID                field.Uint64
-	Code              field.String
-	Name              field.String
-	Status            field.Uint8
-	PermissionVersion field.Uint64
-	CreatedBy         field.Uint64
-	CreatedAt         field.Time
-	UpdatedAt         field.Time
-	DeletedAt         field.Field
+	ID                field.Uint64 // 租户主键
+	Code              field.String // 租户唯一编码
+	Name              field.String // 租户名称
+	Status            field.Uint8  // 租户状态：1启用，2冻结
+	PermissionVersion field.Uint64 // 权限版本号
+	CreatedBy         field.Uint64 // 创建用户ID，0表示系统初始化
+	CreatedAt         field.Time   // 创建时间
+	UpdatedAt         field.Time   // 更新时间
+	DeletedAt         field.Field  // 逻辑删除时间
+	Members           tenantHasManyMembers
 
 	fieldMap map[string]field.Expr
 }
@@ -105,7 +112,7 @@ func (t *tenant) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (t *tenant) fillFieldMap() {
-	t.fieldMap = make(map[string]field.Expr, 9)
+	t.fieldMap = make(map[string]field.Expr, 10)
 	t.fieldMap["id"] = t.ID
 	t.fieldMap["code"] = t.Code
 	t.fieldMap["name"] = t.Name
@@ -115,16 +122,101 @@ func (t *tenant) fillFieldMap() {
 	t.fieldMap["created_at"] = t.CreatedAt
 	t.fieldMap["updated_at"] = t.UpdatedAt
 	t.fieldMap["deleted_at"] = t.DeletedAt
+
 }
 
 func (t tenant) clone(db *gorm.DB) tenant {
 	t.tenantDo.ReplaceConnPool(db.Statement.ConnPool)
+	t.Members.db = db.Session(&gorm.Session{Initialized: true})
+	t.Members.db.Statement.ConnPool = db.Statement.ConnPool
 	return t
 }
 
 func (t tenant) replaceDB(db *gorm.DB) tenant {
 	t.tenantDo.ReplaceDB(db)
+	t.Members.db = db.Session(&gorm.Session{})
 	return t
+}
+
+type tenantHasManyMembers struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a tenantHasManyMembers) Where(conds ...field.Expr) *tenantHasManyMembers {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a tenantHasManyMembers) WithContext(ctx context.Context) *tenantHasManyMembers {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a tenantHasManyMembers) Session(session *gorm.Session) *tenantHasManyMembers {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a tenantHasManyMembers) Model(m *model.Tenant) *tenantHasManyMembersTx {
+	return &tenantHasManyMembersTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a tenantHasManyMembers) Unscoped() *tenantHasManyMembers {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type tenantHasManyMembersTx struct{ tx *gorm.Association }
+
+func (a tenantHasManyMembersTx) Find() (result []*model.TenantMember, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a tenantHasManyMembersTx) Append(values ...*model.TenantMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a tenantHasManyMembersTx) Replace(values ...*model.TenantMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a tenantHasManyMembersTx) Delete(values ...*model.TenantMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a tenantHasManyMembersTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a tenantHasManyMembersTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a tenantHasManyMembersTx) Unscoped() *tenantHasManyMembersTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type tenantDo struct{ gen.DO }

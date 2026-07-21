@@ -39,15 +39,16 @@ func newRoleScopeDepartment(db *gorm.DB, opts ...gen.DOOption) roleScopeDepartme
 	return _roleScopeDepartment
 }
 
+// roleScopeDepartment 角色自定义部门数据范围表
 type roleScopeDepartment struct {
 	roleScopeDepartmentDo roleScopeDepartmentDo
 
 	ALL          field.Asterisk
-	ID           field.Uint64
-	TenantID     field.Uint64
-	RoleID       field.Uint64
-	DepartmentID field.Uint64
-	CreatedAt    field.Time
+	ID           field.Uint64 // 角色自定义部门范围主键
+	TenantID     field.Uint64 // 所属租户ID
+	RoleID       field.Uint64 // 角色ID
+	DepartmentID field.Uint64 // 允许访问的部门ID
+	CreatedAt    field.Time   // 创建时间
 
 	fieldMap map[string]field.Expr
 }

@@ -11,31 +11,32 @@ import (
 	filebiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/file"
 	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 // FileRepository 使用 MySQL 持久化租户文件元数据和审计 Outbox。
 type FileRepository struct {
-	db *gorm.DB
+	q *query.Query
 }
 
 // NewFileRepository 创建文件仓储。
 func NewFileRepository(data *Data) *FileRepository {
-	return &FileRepository{db: data.DB}
+	return &FileRepository{q: data.Query}
 }
 
 // Create 在同一事务中预登记文件并写入审计 Outbox。
 func (r *FileRepository) Create(ctx context.Context, record filebiz.Record) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	return r.q.Transaction(func(tx *query.Query) error {
 		row := &model.File{
 			ID: record.ID, TenantID: record.TenantID, UploaderMemberID: record.UploaderMemberID,
 			ProviderName: record.ProviderName, ObjectKey: record.ObjectKey, OriginalName: record.OriginalName,
 			ContentType: record.ContentType, SizeBytes: uint64(record.Size), SHA256: record.SHA256,
 			Status: record.Status, CreatedAt: record.CreatedAt, UpdatedAt: record.CreatedAt,
 		}
-		if err := tx.Create(row).Error; err != nil {
+		if err := tx.File.WithContext(ctx).Create(row); err != nil {
 			return err
 		}
-		return writeAuditOutbox(tx, managementbiz.Scope{
+		return writeAuditOutboxGen(ctx, tx, managementbiz.Scope{
 			TenantID: record.TenantID, MemberID: record.UploaderMemberID,
 		}, "create-upload", "files", record.ID, map[string]any{
 			"provider_name": record.ProviderName, "object_key": record.ObjectKey,
@@ -46,8 +47,8 @@ func (r *FileRepository) Create(ctx context.Context, record filebiz.Record) erro
 
 // Find 按认证租户查询未逻辑删除的文件。
 func (r *FileRepository) Find(ctx context.Context, tenantID uint64, fileID string) (filebiz.Record, error) {
-	var row model.File
-	err := r.db.WithContext(ctx).Where("id = ? AND tenant_id = ? AND deleted_at IS NULL", fileID, tenantID).Take(&row).Error
+	f := r.q.File
+	row, err := f.WithContext(ctx).Where(f.ID.Eq(fileID), f.TenantID.Eq(tenantID), f.DeletedAt.IsNull()).Take()
 	if err != nil {
 		return filebiz.Record{}, err
 	}
@@ -61,64 +62,72 @@ func (r *FileRepository) Find(ctx context.Context, tenantID uint64, fileID strin
 
 // Confirm 将待确认文件标记为可用并记录对象 ETag。
 func (r *FileRepository) Confirm(ctx context.Context, tenantID uint64, fileID, etag string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		result := tx.Table("files").Where("id = ? AND tenant_id = ? AND status = ? AND deleted_at IS NULL", fileID, tenantID, filebiz.StatusPending).
-			Updates(map[string]any{"status": filebiz.StatusAvailable, "etag": etag, "updated_at": time.Now().UTC()})
-		if result.Error != nil {
-			return result.Error
+	return r.q.Transaction(func(tx *query.Query) error {
+		f := tx.File
+		result, err := f.WithContext(ctx).
+			Where(f.ID.Eq(fileID), f.TenantID.Eq(tenantID), f.Status.Eq(filebiz.StatusPending), f.DeletedAt.IsNull()).
+			UpdateSimple(f.Status.Value(filebiz.StatusAvailable), f.ETag.Value(etag), f.UpdatedAt.Value(time.Now().UTC()))
+		if err != nil {
+			return err
 		}
 		if result.RowsAffected != 1 {
 			return errors.New("待确认文件不存在")
 		}
-		return writeAuditOutbox(tx, managementbiz.Scope{TenantID: tenantID}, "confirm", "files", fileID, map[string]any{"status": filebiz.StatusAvailable})
+		return writeAuditOutboxGen(ctx, tx, managementbiz.Scope{TenantID: tenantID}, "confirm", "files", fileID, map[string]any{"status": filebiz.StatusAvailable})
 	})
 }
 
 // RequestDelete 检查业务引用后冻结文件，等待后台异步清理对象。
 func (r *FileRepository) RequestDelete(ctx context.Context, tenantID uint64, fileID string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var row model.File
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND tenant_id = ? AND status = ? AND deleted_at IS NULL", fileID, tenantID, filebiz.StatusAvailable).Take(&row).Error; err != nil {
+	return r.q.Transaction(func(tx *query.Query) error {
+		f := tx.File
+		_, err := f.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where(f.ID.Eq(fileID), f.TenantID.Eq(tenantID), f.Status.Eq(filebiz.StatusAvailable), f.DeletedAt.IsNull()).Take()
+		if err != nil {
 			return filebiz.ErrFileUnavailable
 		}
-		var referenceCount int64
-		if err := tx.Model(&model.FileReference{}).Where("tenant_id = ? AND file_id = ?", tenantID, fileID).Count(&referenceCount).Error; err != nil {
+		reference := tx.FileReference
+		referenceCount, err := reference.WithContext(ctx).Where(reference.TenantID.Eq(tenantID), reference.FileID.Eq(fileID)).Count()
+		if err != nil {
 			return err
 		}
 		if referenceCount > 0 {
 			return filebiz.ErrFileReferenced
 		}
-		result := tx.Table("files").Where("id = ? AND tenant_id = ? AND status = ?", fileID, tenantID, filebiz.StatusAvailable).
-			Updates(map[string]any{"status": filebiz.StatusDeletionPending, "updated_at": time.Now().UTC()})
-		if result.Error != nil {
-			return result.Error
+		result, err := f.WithContext(ctx).Where(f.ID.Eq(fileID), f.TenantID.Eq(tenantID), f.Status.Eq(filebiz.StatusAvailable)).
+			UpdateSimple(f.Status.Value(filebiz.StatusDeletionPending), f.UpdatedAt.Value(time.Now().UTC()))
+		if err != nil {
+			return err
 		}
 		if result.RowsAffected != 1 {
 			return filebiz.ErrFileUnavailable
 		}
-		return writeAuditOutbox(tx, managementbiz.Scope{TenantID: tenantID}, "request-delete", "files", fileID, nil)
+		return writeAuditOutboxGen(ctx, tx, managementbiz.Scope{TenantID: tenantID}, "request-delete", "files", fileID, nil)
 	})
 }
 
 // AddReference 在锁定可用文件后新增业务引用，避免与删除请求竞态。
 func (r *FileRepository) AddReference(ctx context.Context, tenantID uint64, fileID, businessType, businessID string) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var row model.File
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND tenant_id = ? AND status = ? AND deleted_at IS NULL", fileID, tenantID, filebiz.StatusAvailable).Take(&row).Error; err != nil {
+	return r.q.Transaction(func(tx *query.Query) error {
+		f := tx.File
+		if _, err := f.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where(f.ID.Eq(fileID), f.TenantID.Eq(tenantID), f.Status.Eq(filebiz.StatusAvailable), f.DeletedAt.IsNull()).Take(); err != nil {
 			return filebiz.ErrFileUnavailable
 		}
-		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.FileReference{
+		return tx.FileReference.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&model.FileReference{
 			TenantID: tenantID, FileID: fileID, BusinessType: businessType, BusinessID: businessID, CreatedAt: time.Now().UTC(),
-		}).Error
+		})
 	})
 }
 
 // RemoveReference 删除指定租户业务资源与文件的引用关系。
 func (r *FileRepository) RemoveReference(ctx context.Context, tenantID uint64, fileID, businessType, businessID string) error {
-	result := r.db.WithContext(ctx).Where("tenant_id = ? AND file_id = ? AND business_type = ? AND business_id = ?", tenantID, fileID, businessType, businessID).
-		Delete(&model.FileReference{})
-	if result.Error != nil {
-		return result.Error
+	reference := r.q.FileReference
+	result, err := reference.WithContext(ctx).
+		Where(reference.TenantID.Eq(tenantID), reference.FileID.Eq(fileID), reference.BusinessType.Eq(businessType), reference.BusinessID.Eq(businessID)).
+		Delete()
+	if err != nil {
+		return err
 	}
 	if result.RowsAffected == 0 {
 		return errors.New("文件引用不存在")
@@ -129,10 +138,12 @@ func (r *FileRepository) RemoveReference(ctx context.Context, tenantID uint64, f
 // CompleteCleanup 在对象删除成功后逻辑删除文件元数据。
 func (r *FileRepository) CompleteCleanup(ctx context.Context, tenantID uint64, fileID string) error {
 	now := time.Now().UTC()
-	result := r.db.WithContext(ctx).Table("files").Where("id = ? AND tenant_id = ? AND status = ? AND deleted_at IS NULL", fileID, tenantID, filebiz.StatusDeletionPending).
-		Updates(map[string]any{"status": filebiz.StatusDeleted, "deleted_at": now, "updated_at": now})
-	if result.Error != nil {
-		return result.Error
+	f := r.q.File
+	result, err := f.WithContext(ctx).
+		Where(f.ID.Eq(fileID), f.TenantID.Eq(tenantID), f.Status.Eq(filebiz.StatusDeletionPending), f.DeletedAt.IsNull()).
+		UpdateSimple(f.Status.Value(filebiz.StatusDeleted), f.DeletedAt.Value(gorm.DeletedAt{Time: now, Valid: true}), f.UpdatedAt.Value(now))
+	if err != nil {
+		return err
 	}
 	if result.RowsAffected == 0 {
 		return filebiz.ErrFileUnavailable

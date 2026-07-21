@@ -9,6 +9,7 @@ import (
 
 	filebiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/file"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 func TestFileRepositoryUsesTenantBoundaryAndAuditOutbox(t *testing.T) {
@@ -35,7 +36,7 @@ func TestFileRepositoryUsesTenantBoundaryAndAuditOutbox(t *testing.T) {
 	if err := tx.Create(member).Error; err != nil {
 		t.Fatal(err)
 	}
-	repository := &FileRepository{db: tx}
+	repository := &FileRepository{q: query.Use(tx)}
 	record := filebiz.Record{
 		ID: "550e8400-e29b-41d4-a716-446655440001", TenantID: tenant.ID, UploaderMemberID: member.ID,
 		ProviderName: "local", ObjectKey: "tenant/file.txt", OriginalName: "file.txt",
@@ -66,7 +67,7 @@ func TestFileRepositoryUsesTenantBoundaryAndAuditOutbox(t *testing.T) {
 	if err := repository.RequestDelete(context.Background(), tenant.ID, record.ID); err != nil {
 		t.Fatal(err)
 	}
-	pending, err := (&TaskRepository{db: tx}).Pending(context.Background(), 10, time.Now().UTC())
+	pending, err := (&TaskRepository{q: query.Use(tx)}).Pending(context.Background(), 10, time.Now().UTC())
 	foundCleanup := false
 	for _, task := range pending {
 		foundCleanup = foundCleanup || task.ID == record.ID && task.Kind == TaskKindFileCleanup

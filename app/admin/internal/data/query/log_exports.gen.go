@@ -48,36 +48,43 @@ func newLogExport(db *gorm.DB, opts ...gen.DOOption) logExport {
 	_logExport.StartedAt = field.NewTime(tableName, "started_at")
 	_logExport.FinishedAt = field.NewTime(tableName, "finished_at")
 	_logExport.UpdatedAt = field.NewTime(tableName, "updated_at")
+	_logExport.File = logExportBelongsToFile{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("File", "model.File"),
+	}
 
 	_logExport.fillFieldMap()
 
 	return _logExport
 }
 
+// logExport 异步日志导出任务表
 type logExport struct {
 	logExportDo logExportDo
 
 	ALL            field.Asterisk
-	ID             field.String
-	TenantID       field.Uint64
-	UserID         field.Uint64
-	MemberID       field.Uint64
-	LogType        field.String
-	Keyword        field.String
-	Filters        field.Field
-	PayloadVersion field.Uint16
-	IdempotencyKey field.String
-	Status         field.Uint8
-	RowCount       field.Uint32
-	FileID         field.String
-	RetryCount     field.Uint32
-	NextRetryAt    field.Time
-	DispatchedAt   field.Time
-	FailureReason  field.String
-	CreatedAt      field.Time
-	StartedAt      field.Time
-	FinishedAt     field.Time
-	UpdatedAt      field.Time
+	ID             field.String // 日志导出任务UUID
+	TenantID       field.Uint64 // 所属租户ID，0表示平台跨租户导出
+	UserID         field.Uint64 // 发起导出的用户ID
+	MemberID       field.Uint64 // 发起导出的租户成员ID，平台域为0
+	LogType        field.String // 日志类型：login登录日志，audit操作审计，api接口访问日志
+	Keyword        field.String // 导出查询关键词
+	Filters        field.Field  // 导出查询白名单筛选条件
+	PayloadVersion field.Uint16 // 异步任务载荷版本
+	IdempotencyKey field.String // 异步任务幂等键
+	Status         field.Uint8  // 导出状态：1待处理，2处理中，3已完成，4失败
+	RowCount       field.Uint32 // 实际导出行数，最多100000条
+	FileID         field.String // 完成后生成的受保护文件UUID
+	RetryCount     field.Uint32 // 已执行重试次数
+	NextRetryAt    field.Time   // 下次允许执行时间
+	DispatchedAt   field.Time   // 最近一次RabbitMQ确认投递时间
+	FailureReason  field.String // 最后失败原因
+	CreatedAt      field.Time   // 创建时间
+	StartedAt      field.Time   // 开始处理时间
+	FinishedAt     field.Time   // 处理完成或最终失败时间
+	UpdatedAt      field.Time   // 更新时间
+	File           logExportBelongsToFile
 
 	fieldMap map[string]field.Expr
 }
@@ -140,7 +147,7 @@ func (l *logExport) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (l *logExport) fillFieldMap() {
-	l.fieldMap = make(map[string]field.Expr, 20)
+	l.fieldMap = make(map[string]field.Expr, 21)
 	l.fieldMap["id"] = l.ID
 	l.fieldMap["tenant_id"] = l.TenantID
 	l.fieldMap["user_id"] = l.UserID
@@ -161,16 +168,101 @@ func (l *logExport) fillFieldMap() {
 	l.fieldMap["started_at"] = l.StartedAt
 	l.fieldMap["finished_at"] = l.FinishedAt
 	l.fieldMap["updated_at"] = l.UpdatedAt
+
 }
 
 func (l logExport) clone(db *gorm.DB) logExport {
 	l.logExportDo.ReplaceConnPool(db.Statement.ConnPool)
+	l.File.db = db.Session(&gorm.Session{Initialized: true})
+	l.File.db.Statement.ConnPool = db.Statement.ConnPool
 	return l
 }
 
 func (l logExport) replaceDB(db *gorm.DB) logExport {
 	l.logExportDo.ReplaceDB(db)
+	l.File.db = db.Session(&gorm.Session{})
 	return l
+}
+
+type logExportBelongsToFile struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a logExportBelongsToFile) Where(conds ...field.Expr) *logExportBelongsToFile {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a logExportBelongsToFile) WithContext(ctx context.Context) *logExportBelongsToFile {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a logExportBelongsToFile) Session(session *gorm.Session) *logExportBelongsToFile {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a logExportBelongsToFile) Model(m *model.LogExport) *logExportBelongsToFileTx {
+	return &logExportBelongsToFileTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a logExportBelongsToFile) Unscoped() *logExportBelongsToFile {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type logExportBelongsToFileTx struct{ tx *gorm.Association }
+
+func (a logExportBelongsToFileTx) Find() (result *model.File, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a logExportBelongsToFileTx) Append(values ...*model.File) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a logExportBelongsToFileTx) Replace(values ...*model.File) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a logExportBelongsToFileTx) Delete(values ...*model.File) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a logExportBelongsToFileTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a logExportBelongsToFileTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a logExportBelongsToFileTx) Unscoped() *logExportBelongsToFileTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type logExportDo struct{ gen.DO }

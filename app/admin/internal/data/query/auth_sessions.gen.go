@@ -47,23 +47,24 @@ func newAuthSession(db *gorm.DB, opts ...gen.DOOption) authSession {
 	return _authSession
 }
 
+// authSession 认证会话表
 type authSession struct {
 	authSessionDo authSessionDo
 
 	ALL               field.Asterisk
-	ID                field.String
-	UserID            field.Uint64
-	TenantID          field.Uint64
-	MemberID          field.Uint64
-	PermissionVersion field.Uint64
-	RefreshJTIHash    field.String
-	DeviceName        field.String
-	UserAgent         field.String
-	IP                field.String
-	ExpiresAt         field.Time
-	RevokedAt         field.Time
-	CreatedAt         field.Time
-	UpdatedAt         field.Time
+	ID                field.String // 会话UUID
+	UserID            field.Uint64 // 用户ID
+	TenantID          field.Uint64 // 当前租户ID，0表示平台域
+	MemberID          field.Uint64 // 当前租户成员ID，平台域为0
+	PermissionVersion field.Uint64 // 会话最近一次签发时的权限版本号
+	RefreshJTIHash    field.String // Refresh JWT jti的SHA256摘要
+	DeviceName        field.String // 设备名称
+	UserAgent         field.String // 登录User-Agent
+	IP                field.String // 登录IP地址
+	ExpiresAt         field.Time   // 会话过期时间
+	RevokedAt         field.Time   // 会话撤销时间
+	CreatedAt         field.Time   // 创建时间
+	UpdatedAt         field.Time   // 更新时间
 
 	fieldMap map[string]field.Expr
 }

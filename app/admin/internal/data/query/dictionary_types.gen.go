@@ -42,18 +42,19 @@ func newDictionaryType(db *gorm.DB, opts ...gen.DOOption) dictionaryType {
 	return _dictionaryType
 }
 
+// dictionaryType 参数字典类型表
 type dictionaryType struct {
 	dictionaryTypeDo dictionaryTypeDo
 
 	ALL       field.Asterisk
-	ID        field.Uint64
-	TenantID  field.Uint64
-	Code      field.String
-	Name      field.String
-	Status    field.Uint8
-	CreatedAt field.Time
-	UpdatedAt field.Time
-	DeletedAt field.Field
+	ID        field.Uint64 // 字典类型主键
+	TenantID  field.Uint64 // 所属租户ID，0表示平台字典
+	Code      field.String // 字典类型编码
+	Name      field.String // 字典类型名称
+	Status    field.Uint8  // 字典状态：1启用，2禁用
+	CreatedAt field.Time   // 创建时间
+	UpdatedAt field.Time   // 更新时间
+	DeletedAt field.Field  // 逻辑删除时间
 
 	fieldMap map[string]field.Expr
 }

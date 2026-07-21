@@ -4,19 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-
-	"gorm.io/gen"
+	"os"
 
 	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/setup"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/conf"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data"
-	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
 )
-
-type genOptions struct {
-	OutPath string
-}
 
 func runMigrate(ctx context.Context, confPath string) error {
 	cfg, err := conf.Load(confPath)
@@ -42,7 +36,7 @@ func runInitAdmin(ctx context.Context, confPath string) error {
 	if err != nil {
 		return fmt.Errorf("获取初始化数据库连接池失败: %w", err)
 	}
-	defer sqlDB.Close()
+	defer func() { _ = sqlDB.Close() }()
 
 	initializer := setup.NewAdminInitializer(
 		data.NewAdminRepository(db),
@@ -63,21 +57,16 @@ func runInitAdmin(ctx context.Context, confPath string) error {
 	return nil
 }
 
-func runGORMGen(_ context.Context, options genOptions) error {
-	generator := gen.NewGenerator(gen.Config{
-		OutPath:      options.OutPath,
-		ModelPkgPath: "github.com/sleep-go/kratos-admin/app/admin/internal/data/model",
-		Mode:         gen.WithDefaultQuery | gen.WithQueryInterface,
+func runGORMGen(ctx context.Context, options genOptions) error {
+	cfg, err := conf.Load(options.ConfPath)
+	if err != nil {
+		return fmt.Errorf("加载 GORM Gen 配置失败: %w", err)
+	}
+	generationDSN := os.Getenv("KRATOS_ADMIN_GORM_GEN_DSN")
+	if generationDSN == "" {
+		generationDSN = cfg.Data.MySQLDSN
+	}
+	return withTemporaryDatabase(ctx, generationDSN, func(dsn string) error {
+		return generateGORMArtifacts(ctx, dsn, options)
 	})
-	generator.ApplyBasic(
-		model.Tenant{}, model.User{}, model.Department{}, model.Position{},
-		model.TenantMember{}, model.MemberDepartment{}, model.Role{}, model.Resource{},
-		model.TenantResource{}, model.CasbinRule{}, model.RoleScopeDepartment{},
-		model.AuthSession{}, model.VerificationCode{}, model.LoginLog{}, model.AuditOutbox{},
-		model.AuditLog{}, model.APIAccessLog{}, model.SystemSetting{}, model.DictionaryType{},
-		model.DictionaryItem{}, model.ProviderConfig{}, model.File{}, model.FileReference{},
-		model.FailedTask{}, model.LogExport{},
-	)
-	generator.Execute()
-	return nil
 }

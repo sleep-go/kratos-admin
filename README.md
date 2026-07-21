@@ -122,7 +122,7 @@ make build
 ```text
 kratos-admin-tools migrate     使用 Goose 执行数据库迁移
 kratos-admin-tools init-admin  幂等初始化平台超级管理员
-kratos-admin-tools gorm-gen    生成 GORM Gen 查询代码
+kratos-admin-tools gorm-gen    从 Goose 临时数据库反向生成 Model 与 Query
 ```
 
 服务默认读取 `configs/config.yaml`，可用 `-conf` 指定配置；`migrate` 和 `init-admin` 可用 `-c/--conf` 指定另一份完整 YAML。
@@ -136,11 +136,25 @@ kratos-admin-tools gorm-gen    生成 GORM Gen 查询代码
 - Goose SQL 是唯一数据库迁移入口；Admin 启动时使用 MySQL `GET_LOCK` 串行执行，不使用 `AutoMigrate`。
 - `make migrate` 仅作为人工排障和受控运维入口，正常部署不依赖独立迁移容器。
 
+## 数据库模型与查询生成
+
+`migrations/*.sql` 是数据库结构的唯一真相源，`app/admin/internal/data/model/*.gen.go` 和 `query/*.gen.go` 均为派生代码，禁止手工修改。修改迁移后执行：
+
+```bash
+make gorm-gen
+make gorm-gen-check
+```
+
+生成工具只复用配置 DSN 的 MySQL 服务器和账号，创建随机临时数据库、执行全部 Goose 迁移、反向生成 Model 与 Query，最后删除临时数据库；不会迁移或清理配置指向的业务数据库。该 MySQL 账号需要临时 `CREATE DATABASE`、`DROP DATABASE` 权限。需要单独指定生成账号时，可设置 `KRATOS_ADMIN_GORM_GEN_DSN`，该变量只供代码生成工具使用。
+
+运行期业务数据访问统一使用 GORM Gen。完整关联对象优先 `Preload`，关联过滤或投影优先 `Join`；确需复杂 SQL 时应针对具体问题评审并封装为自定义 Gen 查询。
+
 ## 常用命令
 
 ```bash
 make help             # 查看全部目标
 make all              # 生成 API、配置、Wire 和 GORM Gen
+make gorm-gen-check   # 生成并检查 Model/Query 是否幂等
 make build            # 构建 bin/kratos-admin 与 bin/kratos-admin-tools
 make test             # 后端竞态测试
 make vet              # Go 静态检查

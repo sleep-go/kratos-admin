@@ -45,21 +45,22 @@ func newProviderConfig(db *gorm.DB, opts ...gen.DOOption) providerConfig {
 	return _providerConfig
 }
 
+// providerConfig 邮件短信与存储Provider配置表
 type providerConfig struct {
 	providerConfigDo providerConfigDo
 
 	ALL             field.Asterisk
-	ID              field.Uint64
-	TenantID        field.Uint64
-	ProviderType    field.String
-	ProviderName    field.String
-	DisplayName     field.String
-	EncryptedConfig field.String
-	Status          field.Uint8
-	IsDefault       field.Bool
-	UpdatedBy       field.Uint64
-	CreatedAt       field.Time
-	UpdatedAt       field.Time
+	ID              field.Uint64 // Provider配置主键
+	TenantID        field.Uint64 // 配置租户ID，0表示平台默认
+	ProviderType    field.String // Provider类型：email邮件，sms短信，storage对象存储
+	ProviderName    field.String // Provider实现名称
+	DisplayName     field.String // 配置显示名称
+	EncryptedConfig field.String // 主密钥加密后的Provider配置
+	Status          field.Uint8  // 配置状态：1启用，2禁用
+	IsDefault       field.Bool   // 是否作用域默认：0否，1是
+	UpdatedBy       field.Uint64 // 最后更新用户ID
+	CreatedAt       field.Time   // 创建时间
+	UpdatedAt       field.Time   // 更新时间
 
 	fieldMap map[string]field.Expr
 }

@@ -40,16 +40,17 @@ func newMemberDepartment(db *gorm.DB, opts ...gen.DOOption) memberDepartment {
 	return _memberDepartment
 }
 
+// memberDepartment 成员部门关系表
 type memberDepartment struct {
 	memberDepartmentDo memberDepartmentDo
 
 	ALL          field.Asterisk
-	ID           field.Uint64
-	TenantID     field.Uint64
-	MemberID     field.Uint64
-	DepartmentID field.Uint64
-	IsPrimary    field.Bool
-	CreatedAt    field.Time
+	ID           field.Uint64 // 成员部门关系主键
+	TenantID     field.Uint64 // 所属租户ID
+	MemberID     field.Uint64 // 租户成员ID
+	DepartmentID field.Uint64 // 部门ID
+	IsPrimary    field.Bool   // 是否主部门：0否，1是
+	CreatedAt    field.Time   // 创建时间
 
 	fieldMap map[string]field.Expr
 }

@@ -59,7 +59,7 @@ func TestInitAdminCommandUsesCustomConf(t *testing.T) {
 	}
 }
 
-func TestGORMGenCommandParsesOutputPath(t *testing.T) {
+func TestGORMGenCommandParsesOptions(t *testing.T) {
 	var got genOptions
 	cmd := newRootCommand(commandRunners{
 		gormGen: func(_ context.Context, options genOptions) error {
@@ -67,12 +67,12 @@ func TestGORMGenCommandParsesOutputPath(t *testing.T) {
 			return nil
 		},
 	})
-	cmd.SetArgs([]string{"gorm-gen", "--out-path", "./tmp/query"})
+	cmd.SetArgs([]string{"gorm-gen", "--conf", "./tmp/config.yaml", "--model-out-path", "./tmp/model", "--query-out-path", "./tmp/query"})
 	if err := cmd.ExecuteContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got.OutPath != "./tmp/query" {
-		t.Fatalf("OutPath = %q", got.OutPath)
+	if got.ConfPath != "./tmp/config.yaml" || got.ModelOutPath != "./tmp/model" || got.QueryOutPath != "./tmp/query" {
+		t.Fatalf("options = %+v", got)
 	}
 }
 

@@ -46,22 +46,23 @@ func newSystemSetting(db *gorm.DB, opts ...gen.DOOption) systemSetting {
 	return _systemSetting
 }
 
+// systemSetting 平台与租户系统配置表
 type systemSetting struct {
 	systemSettingDo systemSettingDo
 
 	ALL                 field.Asterisk
-	ID                  field.Uint64
-	TenantID            field.Uint64
-	Category            field.String
-	SettingKey          field.String
-	ValueType           field.String
-	SettingValue        field.Field
-	AllowTenantOverride field.Bool
-	IsSecret            field.Bool
-	Version             field.Uint64
-	UpdatedBy           field.Uint64
-	CreatedAt           field.Time
-	UpdatedAt           field.Time
+	ID                  field.Uint64 // 系统配置主键
+	TenantID            field.Uint64 // 配置租户ID，0表示平台默认
+	Category            field.String // 配置分类
+	SettingKey          field.String // 配置键
+	ValueType           field.String // 值类型：string字符串，number数字，boolean布尔，json对象
+	SettingValue        field.Field  // 配置值
+	AllowTenantOverride field.Bool   // 是否允许租户覆盖：0否，1是
+	IsSecret            field.Bool   // 是否敏感配置：0否，1是
+	Version             field.Uint64 // 配置版本号
+	UpdatedBy           field.Uint64 // 最后更新用户ID
+	CreatedAt           field.Time   // 创建时间
+	UpdatedAt           field.Time   // 更新时间
 
 	fieldMap map[string]field.Expr
 }

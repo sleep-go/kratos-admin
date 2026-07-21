@@ -33,7 +33,7 @@ func newDictionaryItem(db *gorm.DB, opts ...gen.DOOption) dictionaryItem {
 	_dictionaryItem.TypeID = field.NewUint64(tableName, "type_id")
 	_dictionaryItem.ItemValue = field.NewString(tableName, "item_value")
 	_dictionaryItem.Label = field.NewString(tableName, "label")
-	_dictionaryItem.SortOrder = field.NewInt(tableName, "sort_order")
+	_dictionaryItem.SortOrder = field.NewInt32(tableName, "sort_order")
 	_dictionaryItem.Status = field.NewUint8(tableName, "status")
 	_dictionaryItem.CreatedAt = field.NewTime(tableName, "created_at")
 	_dictionaryItem.UpdatedAt = field.NewTime(tableName, "updated_at")
@@ -44,20 +44,21 @@ func newDictionaryItem(db *gorm.DB, opts ...gen.DOOption) dictionaryItem {
 	return _dictionaryItem
 }
 
+// dictionaryItem 参数字典项表
 type dictionaryItem struct {
 	dictionaryItemDo dictionaryItemDo
 
 	ALL       field.Asterisk
-	ID        field.Uint64
-	TenantID  field.Uint64
-	TypeID    field.Uint64
-	ItemValue field.String
-	Label     field.String
-	SortOrder field.Int
-	Status    field.Uint8
-	CreatedAt field.Time
-	UpdatedAt field.Time
-	DeletedAt field.Field
+	ID        field.Uint64 // 字典项主键
+	TenantID  field.Uint64 // 所属租户ID，0表示平台字典
+	TypeID    field.Uint64 // 字典类型ID
+	ItemValue field.String // 字典项值
+	Label     field.String // 字典项显示名称
+	SortOrder field.Int32  // 显示排序值
+	Status    field.Uint8  // 字典项状态：1启用，2禁用
+	CreatedAt field.Time   // 创建时间
+	UpdatedAt field.Time   // 更新时间
+	DeletedAt field.Field  // 逻辑删除时间
 
 	fieldMap map[string]field.Expr
 }
@@ -79,7 +80,7 @@ func (d *dictionaryItem) updateTableName(table string) *dictionaryItem {
 	d.TypeID = field.NewUint64(table, "type_id")
 	d.ItemValue = field.NewString(table, "item_value")
 	d.Label = field.NewString(table, "label")
-	d.SortOrder = field.NewInt(table, "sort_order")
+	d.SortOrder = field.NewInt32(table, "sort_order")
 	d.Status = field.NewUint8(table, "status")
 	d.CreatedAt = field.NewTime(table, "created_at")
 	d.UpdatedAt = field.NewTime(table, "updated_at")
