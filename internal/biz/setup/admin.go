@@ -57,8 +57,11 @@ func NewAdminInitializer(repository AdminRepository, hasher *bizauth.PasswordHas
 func (i *AdminInitializer) Ensure(ctx context.Context, input AdminInput) (bool, error) {
 	input.Username = strings.TrimSpace(input.Username)
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
-	if input.Username == "" || len(input.Password) < 12 {
-		return false, errors.New("用户名不能为空且密码长度不能少于12位")
+	if input.Username == "" {
+		return false, errors.New("用户名不能为空")
+	}
+	if err := bizauth.ValidatePassword(input.Password); err != nil {
+		return false, fmt.Errorf("初始管理员密码无效: %w", err)
 	}
 	existing, err := i.repository.FindByUsername(ctx, input.Username)
 	if err == nil {

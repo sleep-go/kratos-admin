@@ -3,10 +3,30 @@ package setup
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	bizauth "github.com/sleep-go/kratos-admin/internal/biz/auth"
 )
+
+func TestInitializerRejectsWeakPassword(t *testing.T) {
+	t.Parallel()
+	tests := map[string]string{
+		"empty":              "",
+		"missing categories": "aaaaaaaaaaaa",
+		"too long":           strings.Repeat("Aa1!", 33),
+	}
+	for name, password := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			initializer := NewAdminInitializer(&fakeAdminRepository{}, bizauth.NewPasswordHasher(bizauth.DefaultPasswordParams()))
+			_, err := initializer.Ensure(context.Background(), AdminInput{Username: "root", Password: password})
+			if !errors.Is(err, bizauth.ErrWeakPassword) {
+				t.Fatalf("Ensure() error = %v, want ErrWeakPassword", err)
+			}
+		})
+	}
+}
 
 type fakeAdminRepository struct {
 	existing *Admin
