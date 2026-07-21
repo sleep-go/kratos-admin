@@ -119,6 +119,19 @@ func TestAuthRepositoryLoadsCasbinDomainPermissions(t *testing.T) {
 	if err := tx.Create(&model.CasbinRule{Ptype: "p", V0: fmt.Sprint(tenant.ID), V1: fmt.Sprint(role.ID), V2: "integration-menu", V3: "list"}).Error; err != nil {
 		t.Fatal(err)
 	}
+	platformMenu := &model.Resource{
+		Type: 2, ScopeMask: 1, Code: "integration-platform-menu", Name: "平台专属菜单",
+		RoutePath: "/integration-platform", ComponentKey: "integration-platform", Visible: true, Status: 1,
+	}
+	if err := tx.Create(platformMenu).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(&model.TenantResource{TenantID: tenant.ID, ResourceID: platformMenu.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Create(&model.CasbinRule{Ptype: "p", V0: fmt.Sprint(tenant.ID), V1: fmt.Sprint(role.ID), V2: platformMenu.Code, V3: "list"}).Error; err != nil {
+		t.Fatal(err)
+	}
 	repository := &AuthRepository{db: tx, q: query.Use(tx)}
 
 	permissions, err := repository.ListPermissions(context.Background(), tenant.ID, member.ID, false)

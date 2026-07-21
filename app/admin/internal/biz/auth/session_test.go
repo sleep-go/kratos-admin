@@ -10,21 +10,27 @@ import (
 )
 
 type fakeSessionManagerRepository struct {
-	session     SessionRecord
-	sessions    []DeviceSession
-	memberships map[uint64]Membership
-	user        User
-	permissions []string
-	rotated     bool
-	revoked     bool
-	profileName string
-	profileURL  string
-	profileMail string
-	profileTel  string
-	navigation  []NavigationItem
+	session                 SessionRecord
+	sessions                []DeviceSession
+	memberships             map[uint64]Membership
+	user                    User
+	permissions             []string
+	rotated                 bool
+	revoked                 bool
+	profileName             string
+	profileURL              string
+	profileMail             string
+	profileTel              string
+	navigation              []NavigationItem
+	navigationTenantID      uint64
+	navigationMemberID      uint64
+	navigationPlatformAdmin bool
 }
 
-func (r *fakeSessionManagerRepository) ListNavigation(_ context.Context, _, _ uint64, _ bool) ([]NavigationItem, error) {
+func (r *fakeSessionManagerRepository) ListNavigation(_ context.Context, tenantID, memberID uint64, platformAdmin bool) ([]NavigationItem, error) {
+	r.navigationTenantID = tenantID
+	r.navigationMemberID = memberID
+	r.navigationPlatformAdmin = platformAdmin
 	return r.navigation, nil
 }
 
@@ -245,5 +251,44 @@ func TestNavigationUsesTrustedTokenScope(t *testing.T) {
 	items, err := usecase.Navigation(context.Background(), 10, 20, false)
 	if err != nil || len(items) != 1 || items[0].ComponentKey != "files" {
 		t.Fatalf("Navigation() = %+v, err = %v", items, err)
+	}
+}
+
+func TestNavigationScopesPlatformAdministratorToSelectedTenant(t *testing.T) {
+	usecase, repository, _, _ := newSessionUsecaseFixture(t)
+	repository.navigation = []NavigationItem{{ID: 9, Code: "files", Name: "文件管理"}}
+
+	if _, err := usecase.Navigation(context.Background(), 10, 20, true); err != nil {
+		t.Fatal(err)
+	}
+	if repository.navigationTenantID != 10 || repository.navigationMemberID != 20 || repository.navigationPlatformAdmin {
+		t.Fatalf("tenant navigation scope = tenant %d, member %d, platform %v", repository.navigationTenantID, repository.navigationMemberID, repository.navigationPlatformAdmin)
+	}
+
+	if _, err := usecase.Navigation(context.Background(), 0, 0, true); err != nil {
+		t.Fatal(err)
+	}
+	if !repository.navigationPlatformAdmin {
+		t.Fatal("platform context must keep platform administrator navigation scope")
+	}
+}
+
+func TestIsPlatformContextRequiresPlatformTenantZero(t *testing.T) {
+	tests := []struct {
+		name   string
+		claims *TokenClaims
+		want   bool
+	}{
+		{name: "平台域", claims: &TokenClaims{PlatformAdmin: true}, want: true},
+		{name: "租户域", claims: &TokenClaims{PlatformAdmin: true, TenantID: 8}},
+		{name: "普通用户", claims: &TokenClaims{}},
+		{name: "空令牌"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsPlatformContext(test.claims); got != test.want {
+				t.Fatalf("IsPlatformContext() = %v, want %v", got, test.want)
+			}
+		})
 	}
 }

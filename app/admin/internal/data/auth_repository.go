@@ -312,13 +312,11 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, memberID 
 	resource := r.q.Resource.As("res")
 	navigationQuery := resource.WithContext(ctx).Unscoped().
 		Where(resource.Type.In(1, 2), resource.Visible.Is(true), resource.Status.Eq(1), resource.DeletedAt.IsNull())
-	if platformAdmin && tenantID == 0 {
-		navigationQuery = navigationQuery.Where(resource.Code.In(
-			"users", "tenants", "resources", "tenant-resources", "login-logs", "audit-logs",
-			"api-logs", "log-exports", "settings", "providers", "dictionary-types", "dictionary-items",
-		))
-	}
-	if !platformAdmin {
+	platformContext := platformAdmin && tenantID == 0
+	if platformContext {
+		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(1).Eq(1))
+	} else {
+		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(2).Eq(2))
 		tenantAdmin, err := r.isTenantAdmin(ctx, tenantID, memberID)
 		if err != nil {
 			return nil, fmt.Errorf("查询租户管理员状态失败: %w", err)

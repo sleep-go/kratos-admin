@@ -42,6 +42,11 @@ type DeviceSession struct {
 	Current    bool
 }
 
+// IsPlatformContext 判断令牌是否处于可信平台治理上下文。
+func IsPlatformContext(claims *TokenClaims) bool {
+	return claims != nil && claims.PlatformAdmin && claims.TenantID == 0
+}
+
 // NavigationItem 描述服务端授权后可下发的菜单资源。
 type NavigationItem struct {
 	ID           uint64
@@ -254,7 +259,8 @@ func (u *SessionUsecase) List(ctx context.Context, userID uint64, currentSession
 
 // Navigation 按令牌中的可信租户、成员身份返回可见菜单。
 func (u *SessionUsecase) Navigation(ctx context.Context, tenantID, memberID uint64, platformAdmin bool) ([]NavigationItem, error) {
-	return u.repository.ListNavigation(ctx, tenantID, memberID, platformAdmin)
+	// 平台管理员进入具体租户后也必须遵守该租户的功能授权与成员角色，只有平台上下文可查看平台治理菜单。
+	return u.repository.ListNavigation(ctx, tenantID, memberID, platformAdmin && tenantID == 0)
 }
 
 // Logout 根据签名有效的 refresh token 撤销对应服务端会话。

@@ -212,13 +212,22 @@ func managementScope(ctx context.Context, resource string) (managementbiz.Scope,
 	if !ok {
 		return managementbiz.Scope{}, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
-	platformAdmin := claims.PlatformAdmin
-	if (resource == "tenants" || resource == "resources" || resource == "tenant-resources") && !platformAdmin {
+	platformContext := bizauth.IsPlatformContext(claims)
+	if isPlatformResource(resource) && !platformContext {
 		return managementbiz.Scope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "该资源仅限平台管理员")
 	}
 	return managementbiz.Scope{
-		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID, PlatformAdmin: platformAdmin,
+		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID, PlatformAdmin: platformContext,
 	}, nil
+}
+
+func isPlatformResource(resource string) bool {
+	switch resource {
+	case "users", "tenants", "resources", "tenant-resources", "tenant-setup":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizePage(page, pageSize uint32) (uint32, uint32) {

@@ -94,7 +94,8 @@ func (s *LogService) access(ctx context.Context) (logexport.Access, error) {
 		return logexport.Access{}, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
 	return logexport.Access{
-		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID, PlatformAdmin: claims.PlatformAdmin,
+		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID,
+		PlatformAdmin: bizauth.IsPlatformContext(claims),
 	}, nil
 }
 
