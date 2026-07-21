@@ -18,7 +18,7 @@ ENTRYPOINT ["kratos-admin"]
 
 FROM runtime AS admin-server
 EXPOSE 8000 9000
-CMD ["server", "--conf", "/app/configs/admin.yaml"]
+CMD ["server", "--conf", "/app/configs/config.docker.yaml"]
 
 FROM runtime AS init-admin
-CMD ["init-admin", "--conf", "/app/configs/admin.yaml"]
+CMD ["init-admin", "--conf", "/app/configs/config.docker.yaml"]

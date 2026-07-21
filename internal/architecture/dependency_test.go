@@ -24,6 +24,24 @@ func TestMonorepoEntrypoints(t *testing.T) {
 	assertPathMissing(t, "../../configs/worker.yaml")
 	assertPathMissing(t, "../../.env.example")
 	assertFileNotContains(t, "../conf/config.go", "configenv.NewSource")
+	assertFileNotContains(t, "../../Makefile", "--env-file")
+	assertFileNotContains(t, "../../Makefile", "COMPOSE_ENV_FILE")
+	assertFileNotContains(t, "../../Makefile", "KRATOS_ADMIN_")
+	assertFileNotContains(t, "../../docker-compose.yml", "env_file:")
+	assertFileNotContains(t, "../../docker-compose.yml", "KRATOS_ADMIN_")
+	assertFileNotContains(t, "../../docker-compose.yml", "configs/admin.yaml")
+	assertFileContains(t, "../../docker-compose.yml", "configs/config.docker.yaml")
+}
+
+func assertFileContains(t *testing.T, path, expected string) {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("读取 %s 失败: %v", path, err)
+	}
+	if !strings.Contains(string(content), expected) {
+		t.Fatalf("%s 未包含 %q", path, expected)
+	}
 }
 
 func assertFileNotContains(t *testing.T, path, unexpected string) {

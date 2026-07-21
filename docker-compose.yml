@@ -9,7 +9,7 @@ services:
       TZ: Asia/Shanghai
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     ports:
-      - "${KRATOS_ADMIN_MYSQL_PORT:-3306}:3306"
+      - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -22,7 +22,7 @@ services:
     image: redis:7.4-alpine
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${KRATOS_ADMIN_REDIS_PORT:-6379}:6379"
+      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -34,13 +34,13 @@ services:
   rabbitmq:
     image: rabbitmq:4.3.2-management
     environment:
-      RABBITMQ_DEFAULT_USER: ${KRATOS_ADMIN_RABBITMQ_USER:-kratos}
-      RABBITMQ_DEFAULT_PASS: ${KRATOS_ADMIN_RABBITMQ_PASSWORD:-kratos}
-      RABBITMQ_DEFAULT_VHOST: ${KRATOS_ADMIN_RABBITMQ_VHOST:-kratos_admin}
+      RABBITMQ_DEFAULT_USER: kratos
+      RABBITMQ_DEFAULT_PASS: kratos
+      RABBITMQ_DEFAULT_VHOST: kratos_admin
       TZ: Asia/Shanghai
     ports:
-      - "${KRATOS_ADMIN_RABBITMQ_PORT:-5672}:5672"
-      - "${KRATOS_ADMIN_RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
@@ -52,7 +52,7 @@ services:
   mailpit:
     image: axllent/mailpit:v1.27
     ports:
-      - "${KRATOS_ADMIN_MAILPIT_PORT:-8025}:8025"
+      - "8025:8025"
 
   api:
     image: kratos-admin-api:latest
@@ -60,11 +60,10 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.backend
       target: admin-server
-    env_file: ${KRATOS_ADMIN_ENV_FILE:-.env.example}
-    command: ["server", "--conf", "/app/configs/admin.yaml"]
+    command: ["server", "--conf", "/app/configs/config.docker.yaml"]
     ports:
-      - "${KRATOS_ADMIN_HTTP_PORT:-8000}:8000"
-      - "${KRATOS_ADMIN_GRPC_PORT:-9000}:9000"
+      - "8000:8000"
+      - "9000:9000"
     volumes:
       - file-data:/data/files
     depends_on:
@@ -86,8 +85,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.backend
       target: init-admin
-    env_file: ${KRATOS_ADMIN_ENV_FILE:-.env.example}
-    command: ["init-admin", "--conf", "/app/configs/admin.yaml"]
+    command: ["init-admin", "--conf", "/app/configs/config.docker.yaml"]
     depends_on:
       api:
         condition: service_healthy
@@ -98,7 +96,7 @@ services:
       context: .
       dockerfile: app/frontend/Dockerfile
     ports:
-      - "${KRATOS_ADMIN_FRONTEND_PORT:-8080}:80"
+      - "8080:80"
     depends_on:
       init-admin:
         condition: service_completed_successfully

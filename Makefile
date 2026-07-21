@@ -4,7 +4,6 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unkn
 GOCACHE ?= /tmp/go-build
 GO_APP_PACKAGES := ./app/admin/...
 GO_PACKAGES := $(GO_APP_PACKAGES) ./internal/...
-COMPOSE_ENV_FILE ?= $(if $(wildcard .env),.env,.env.example)
 
 ifeq ($(GOHOSTOS),windows)
 	GIT_BASH := $(subst \,/,$(subst cmd\git.exe,bin\bash.exe,$(shell where git)))
@@ -12,14 +11,13 @@ ifeq ($(GOHOSTOS),windows)
 endif
 
 .PHONY: init
-init: ## 安装 Proto、Wire 与迁移工具
+init: ## 安装 Proto 与 Wire 工具
 	go install github.com/bufbuild/buf/cmd/buf@v1.66.0
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
 	go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@v2.9.2
 	go install github.com/go-kratos/kratos/cmd/protoc-gen-openapi/v2@v2.9.2
 	go install github.com/google/wire/cmd/wire@v0.7.0
-	go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
 
 .PHONY: config
 config: ## 生成 internal/conf 配置代码
@@ -57,15 +55,15 @@ gorm-gen: ## 生成 GORM Gen 类型安全查询代码
 
 .PHONY: migrate
 migrate: ## 使用 Goose 执行数据库迁移
-	goose -dir migrations mysql "$(KRATOS_ADMIN_MYSQL_DSN)" up
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin migrate --conf ./configs/config.yaml
 
 .PHONY: init-admin
 init-admin: ## 幂等初始化平台超级管理员
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/admin.yaml
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin init-admin --conf ./configs/config.yaml
 
 .PHONY: run-admin
 run-admin: ## 启动 Admin HTTP/gRPC 服务
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin server --conf ./configs/admin.yaml
+	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/kratos-admin server --conf ./configs/config.yaml
 
 .PHONY: test
 test: ## 运行后端测试
@@ -93,19 +91,19 @@ frontend-e2e: ## 运行前端端到端测试
 
 .PHONY: compose-config
 compose-config: ## 校验 Docker Compose 配置
-	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) config --quiet
+	docker compose config --quiet
 
 .PHONY: compose-deps-up
 compose-deps-up: ## 仅启动本地 MySQL、Redis、RabbitMQ 与 Mailpit 依赖
-	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) up -d mysql redis rabbitmq mailpit
+	docker compose up -d mysql redis rabbitmq mailpit
 
 .PHONY: compose-up
 compose-up: ## 构建并启动完整 Docker Compose 环境
-	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) up --build
+	docker compose up --build
 
 .PHONY: compose-down
 compose-down: ## 停止 Docker Compose 环境
-	KRATOS_ADMIN_ENV_FILE=$(COMPOSE_ENV_FILE) docker compose --env-file $(COMPOSE_ENV_FILE) down
+	docker compose down
 
 # 兼容原有命令名称。
 .PHONY: backend-test backend-vet backend-build
