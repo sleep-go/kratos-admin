@@ -39,6 +39,10 @@ func newFile(db *gorm.DB, opts ...gen.DOOption) file {
 	_file.SHA256 = field.NewString(tableName, "sha256")
 	_file.ETag = field.NewString(tableName, "etag")
 	_file.Status = field.NewUint8(tableName, "status")
+	_file.CleanupDispatchedAt = field.NewTime(tableName, "cleanup_dispatched_at")
+	_file.CleanupRetryCount = field.NewUint32(tableName, "cleanup_retry_count")
+	_file.CleanupNextRetryAt = field.NewTime(tableName, "cleanup_next_retry_at")
+	_file.CleanupFailureReason = field.NewString(tableName, "cleanup_failure_reason")
 	_file.CreatedAt = field.NewTime(tableName, "created_at")
 	_file.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_file.DeletedAt = field.NewField(tableName, "deleted_at")
@@ -51,21 +55,25 @@ func newFile(db *gorm.DB, opts ...gen.DOOption) file {
 type file struct {
 	fileDo fileDo
 
-	ALL              field.Asterisk
-	ID               field.String
-	TenantID         field.Uint64
-	UploaderMemberID field.Uint64
-	ProviderName     field.String
-	ObjectKey        field.String
-	OriginalName     field.String
-	ContentType      field.String
-	SizeBytes        field.Uint64
-	SHA256           field.String
-	ETag             field.String
-	Status           field.Uint8
-	CreatedAt        field.Time
-	UpdatedAt        field.Time
-	DeletedAt        field.Field
+	ALL                  field.Asterisk
+	ID                   field.String
+	TenantID             field.Uint64
+	UploaderMemberID     field.Uint64
+	ProviderName         field.String
+	ObjectKey            field.String
+	OriginalName         field.String
+	ContentType          field.String
+	SizeBytes            field.Uint64
+	SHA256               field.String
+	ETag                 field.String
+	Status               field.Uint8
+	CleanupDispatchedAt  field.Time
+	CleanupRetryCount    field.Uint32
+	CleanupNextRetryAt   field.Time
+	CleanupFailureReason field.String
+	CreatedAt            field.Time
+	UpdatedAt            field.Time
+	DeletedAt            field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -93,6 +101,10 @@ func (f *file) updateTableName(table string) *file {
 	f.SHA256 = field.NewString(table, "sha256")
 	f.ETag = field.NewString(table, "etag")
 	f.Status = field.NewUint8(table, "status")
+	f.CleanupDispatchedAt = field.NewTime(table, "cleanup_dispatched_at")
+	f.CleanupRetryCount = field.NewUint32(table, "cleanup_retry_count")
+	f.CleanupNextRetryAt = field.NewTime(table, "cleanup_next_retry_at")
+	f.CleanupFailureReason = field.NewString(table, "cleanup_failure_reason")
 	f.CreatedAt = field.NewTime(table, "created_at")
 	f.UpdatedAt = field.NewTime(table, "updated_at")
 	f.DeletedAt = field.NewField(table, "deleted_at")
@@ -120,7 +132,7 @@ func (f *file) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (f *file) fillFieldMap() {
-	f.fieldMap = make(map[string]field.Expr, 14)
+	f.fieldMap = make(map[string]field.Expr, 18)
 	f.fieldMap["id"] = f.ID
 	f.fieldMap["tenant_id"] = f.TenantID
 	f.fieldMap["uploader_member_id"] = f.UploaderMemberID
@@ -132,6 +144,10 @@ func (f *file) fillFieldMap() {
 	f.fieldMap["sha256"] = f.SHA256
 	f.fieldMap["etag"] = f.ETag
 	f.fieldMap["status"] = f.Status
+	f.fieldMap["cleanup_dispatched_at"] = f.CleanupDispatchedAt
+	f.fieldMap["cleanup_retry_count"] = f.CleanupRetryCount
+	f.fieldMap["cleanup_next_retry_at"] = f.CleanupNextRetryAt
+	f.fieldMap["cleanup_failure_reason"] = f.CleanupFailureReason
 	f.fieldMap["created_at"] = f.CreatedAt
 	f.fieldMap["updated_at"] = f.UpdatedAt
 	f.fieldMap["deleted_at"] = f.DeletedAt

@@ -42,6 +42,7 @@ func newLogExport(db *gorm.DB, opts ...gen.DOOption) logExport {
 	_logExport.FileID = field.NewString(tableName, "file_id")
 	_logExport.RetryCount = field.NewUint32(tableName, "retry_count")
 	_logExport.NextRetryAt = field.NewTime(tableName, "next_retry_at")
+	_logExport.DispatchedAt = field.NewTime(tableName, "dispatched_at")
 	_logExport.FailureReason = field.NewString(tableName, "failure_reason")
 	_logExport.CreatedAt = field.NewTime(tableName, "created_at")
 	_logExport.StartedAt = field.NewTime(tableName, "started_at")
@@ -71,6 +72,7 @@ type logExport struct {
 	FileID         field.String
 	RetryCount     field.Uint32
 	NextRetryAt    field.Time
+	DispatchedAt   field.Time
 	FailureReason  field.String
 	CreatedAt      field.Time
 	StartedAt      field.Time
@@ -106,6 +108,7 @@ func (l *logExport) updateTableName(table string) *logExport {
 	l.FileID = field.NewString(table, "file_id")
 	l.RetryCount = field.NewUint32(table, "retry_count")
 	l.NextRetryAt = field.NewTime(table, "next_retry_at")
+	l.DispatchedAt = field.NewTime(table, "dispatched_at")
 	l.FailureReason = field.NewString(table, "failure_reason")
 	l.CreatedAt = field.NewTime(table, "created_at")
 	l.StartedAt = field.NewTime(table, "started_at")
@@ -137,7 +140,7 @@ func (l *logExport) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (l *logExport) fillFieldMap() {
-	l.fieldMap = make(map[string]field.Expr, 19)
+	l.fieldMap = make(map[string]field.Expr, 20)
 	l.fieldMap["id"] = l.ID
 	l.fieldMap["tenant_id"] = l.TenantID
 	l.fieldMap["user_id"] = l.UserID
@@ -152,6 +155,7 @@ func (l *logExport) fillFieldMap() {
 	l.fieldMap["file_id"] = l.FileID
 	l.fieldMap["retry_count"] = l.RetryCount
 	l.fieldMap["next_retry_at"] = l.NextRetryAt
+	l.fieldMap["dispatched_at"] = l.DispatchedAt
 	l.fieldMap["failure_reason"] = l.FailureReason
 	l.fieldMap["created_at"] = l.CreatedAt
 	l.fieldMap["started_at"] = l.StartedAt

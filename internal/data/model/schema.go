@@ -261,6 +261,8 @@ type AuditOutbox struct {
 	Status        uint8          `gorm:"not null"`
 	RetryCount    uint32         `gorm:"not null"`
 	NextRetryAt   *time.Time
+	DispatchedAt  *time.Time
+	LastError     string `gorm:"size:1024;not null"`
 	PublishedAt   *time.Time
 	CreatedAt     time.Time `gorm:"not null"`
 }
@@ -381,20 +383,24 @@ func (ProviderConfig) TableName() string { return "provider_configs" }
 
 // File 表示租户文件的元数据。
 type File struct {
-	ID               string         `gorm:"type:char(36);primaryKey"`
-	TenantID         uint64         `gorm:"not null"`
-	UploaderMemberID uint64         `gorm:"not null"`
-	ProviderName     string         `gorm:"size:64;not null"`
-	ObjectKey        string         `gorm:"size:512;not null"`
-	OriginalName     string         `gorm:"size:255;not null"`
-	ContentType      string         `gorm:"size:128;not null"`
-	SizeBytes        uint64         `gorm:"not null"`
-	SHA256           string         `gorm:"type:char(64);not null"`
-	ETag             string         `gorm:"column:etag;size:191;not null"`
-	Status           uint8          `gorm:"not null"`
-	CreatedAt        time.Time      `gorm:"not null"`
-	UpdatedAt        time.Time      `gorm:"not null"`
-	DeletedAt        gorm.DeletedAt `gorm:"index"`
+	ID                   string `gorm:"type:char(36);primaryKey"`
+	TenantID             uint64 `gorm:"not null"`
+	UploaderMemberID     uint64 `gorm:"not null"`
+	ProviderName         string `gorm:"size:64;not null"`
+	ObjectKey            string `gorm:"size:512;not null"`
+	OriginalName         string `gorm:"size:255;not null"`
+	ContentType          string `gorm:"size:128;not null"`
+	SizeBytes            uint64 `gorm:"not null"`
+	SHA256               string `gorm:"type:char(64);not null"`
+	ETag                 string `gorm:"column:etag;size:191;not null"`
+	Status               uint8  `gorm:"not null"`
+	CleanupDispatchedAt  *time.Time
+	CleanupRetryCount    uint32 `gorm:"not null"`
+	CleanupNextRetryAt   *time.Time
+	CleanupFailureReason string         `gorm:"size:1024;not null"`
+	CreatedAt            time.Time      `gorm:"not null"`
+	UpdatedAt            time.Time      `gorm:"not null"`
+	DeletedAt            gorm.DeletedAt `gorm:"index"`
 }
 
 // TableName 返回文件元数据表名。
@@ -448,6 +454,7 @@ type LogExport struct {
 	FileID         string         `gorm:"type:char(36);not null"`
 	RetryCount     uint32         `gorm:"not null"`
 	NextRetryAt    *time.Time
+	DispatchedAt   *time.Time
 	FailureReason  string    `gorm:"size:1024;not null"`
 	CreatedAt      time.Time `gorm:"not null"`
 	StartedAt      *time.Time

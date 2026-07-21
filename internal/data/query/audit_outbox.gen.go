@@ -37,6 +37,8 @@ func newAuditOutbox(db *gorm.DB, opts ...gen.DOOption) auditOutbox {
 	_auditOutbox.Status = field.NewUint8(tableName, "status")
 	_auditOutbox.RetryCount = field.NewUint32(tableName, "retry_count")
 	_auditOutbox.NextRetryAt = field.NewTime(tableName, "next_retry_at")
+	_auditOutbox.DispatchedAt = field.NewTime(tableName, "dispatched_at")
+	_auditOutbox.LastError = field.NewString(tableName, "last_error")
 	_auditOutbox.PublishedAt = field.NewTime(tableName, "published_at")
 	_auditOutbox.CreatedAt = field.NewTime(tableName, "created_at")
 
@@ -58,6 +60,8 @@ type auditOutbox struct {
 	Status        field.Uint8
 	RetryCount    field.Uint32
 	NextRetryAt   field.Time
+	DispatchedAt  field.Time
+	LastError     field.String
 	PublishedAt   field.Time
 	CreatedAt     field.Time
 
@@ -85,6 +89,8 @@ func (a *auditOutbox) updateTableName(table string) *auditOutbox {
 	a.Status = field.NewUint8(table, "status")
 	a.RetryCount = field.NewUint32(table, "retry_count")
 	a.NextRetryAt = field.NewTime(table, "next_retry_at")
+	a.DispatchedAt = field.NewTime(table, "dispatched_at")
+	a.LastError = field.NewString(table, "last_error")
 	a.PublishedAt = field.NewTime(table, "published_at")
 	a.CreatedAt = field.NewTime(table, "created_at")
 
@@ -113,7 +119,7 @@ func (a *auditOutbox) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *auditOutbox) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 11)
+	a.fieldMap = make(map[string]field.Expr, 13)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["tenant_id"] = a.TenantID
 	a.fieldMap["event_type"] = a.EventType
@@ -123,6 +129,8 @@ func (a *auditOutbox) fillFieldMap() {
 	a.fieldMap["status"] = a.Status
 	a.fieldMap["retry_count"] = a.RetryCount
 	a.fieldMap["next_retry_at"] = a.NextRetryAt
+	a.fieldMap["dispatched_at"] = a.DispatchedAt
+	a.fieldMap["last_error"] = a.LastError
 	a.fieldMap["published_at"] = a.PublishedAt
 	a.fieldMap["created_at"] = a.CreatedAt
 }
