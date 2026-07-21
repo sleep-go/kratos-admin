@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/pressly/goose/v3"
@@ -66,18 +67,30 @@ func Migrate(ctx context.Context, dsn string) error {
 }
 
 func runLockedMigration(ctx context.Context, connection lockConnection, up func(context.Context) error) error {
-	var acquired int64
-	if err := connection.QueryRowContext(ctx, "SELECT GET_LOCK(?, ?)", migrationLockName, migrationLockTimeout).Scan(&acquired); err != nil {
-		return fmt.Errorf("获取数据库迁移锁失败: %w", err)
+	acquired, err := runWithNamedLock(ctx, connection, migrationLockName, migrationLockTimeout, up)
+	if err != nil {
+		return err
 	}
-	if acquired != 1 {
+	if !acquired {
 		return fmt.Errorf("等待数据库迁移锁超过 %d 秒", migrationLockTimeout)
 	}
+	return nil
+}
 
-	migrationErr := up(ctx)
-	_, releaseErr := connection.ExecContext(context.WithoutCancel(ctx), "SELECT RELEASE_LOCK(?)", migrationLockName)
-	if releaseErr != nil {
-		releaseErr = fmt.Errorf("释放数据库迁移锁失败: %w", releaseErr)
+func runWithNamedLock(ctx context.Context, connection lockConnection, name string, timeout int, operation func(context.Context) error) (bool, error) {
+	var acquired int64
+	if err := connection.QueryRowContext(ctx, "SELECT GET_LOCK(?, ?)", name, timeout).Scan(&acquired); err != nil {
+		return false, fmt.Errorf("获取数据库命名锁 %s 失败: %w", name, err)
 	}
-	return errors.Join(migrationErr, releaseErr)
+	if acquired != 1 {
+		return false, nil
+	}
+	operationErr := operation(ctx)
+	releaseContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	_, releaseErr := connection.ExecContext(releaseContext, "SELECT RELEASE_LOCK(?)", name)
+	if releaseErr != nil {
+		releaseErr = fmt.Errorf("释放数据库命名锁 %s 失败: %w", name, releaseErr)
+	}
+	return true, errors.Join(operationErr, releaseErr)
 }
