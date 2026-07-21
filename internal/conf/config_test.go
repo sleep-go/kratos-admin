@@ -107,13 +107,12 @@ func TestLoadUsesRabbitMQDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadReadsSetupAndMigrationFromYAML(t *testing.T) {
+func TestLoadReadsSetupFromYAML(t *testing.T) {
 	t.Setenv("KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD", "EnvironmentPassword!2026")
 	path := writeConfig(t, `
 data:
   database:
     source: user:password@tcp(127.0.0.1:3306)/admin
-    migrations_dir: migrations
 setup:
   admin:
     username: admin
@@ -126,9 +125,6 @@ setup:
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.Data.MigrationsDir != "migrations" {
-		t.Fatalf("MigrationsDir = %q", cfg.Data.MigrationsDir)
 	}
 	if cfg.Setup.Admin.InitialPassword != "YAMLPassword!2026" {
 		t.Fatalf("InitialPassword = %q", cfg.Setup.Admin.InitialPassword)

@@ -9,6 +9,7 @@ func TestRootCommandProvidesAllSubcommands(t *testing.T) {
 	cmd := newRootCommand(commandRunners{})
 	want := map[string]bool{
 		"server":     false,
+		"migrate":    false,
 		"init-admin": false,
 		"gorm-gen":   false,
 	}
@@ -37,32 +38,42 @@ func TestServerCommandUsesDefaultConf(t *testing.T) {
 	if err := cmd.ExecuteContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got != "./configs/admin.yaml" {
-		t.Fatalf("conf = %q, want ./configs/admin.yaml", got)
+	if got != "./configs/config.yaml" {
+		t.Fatalf("conf = %q, want ./configs/config.yaml", got)
 	}
 }
 
-func TestInitAdminCommandParsesOptions(t *testing.T) {
-	var got initAdminOptions
+func TestMigrateCommandUsesDefaultConf(t *testing.T) {
+	var got string
 	cmd := newRootCommand(commandRunners{
-		initAdmin: func(_ context.Context, options initAdminOptions) error {
-			got = options
+		migrate: func(_ context.Context, confPath string) error {
+			got = confPath
 			return nil
 		},
 	})
-	cmd.SetArgs([]string{
-		"init-admin",
-		"--conf", "/etc/kratos-admin/admin.yaml",
-		"--username", "root",
-		"--display-name", "平台管理员",
-		"--email", "root@example.com",
-		"--phone", "13800000000",
-	})
+	cmd.SetArgs([]string{"migrate"})
 	if err := cmd.ExecuteContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got.Conf != "/etc/kratos-admin/admin.yaml" || got.Username != "root" || got.DisplayName != "平台管理员" || got.Email != "root@example.com" || got.Phone != "13800000000" {
-		t.Fatalf("options = %+v", got)
+	if got != "./configs/config.yaml" {
+		t.Fatalf("conf = %q, want ./configs/config.yaml", got)
+	}
+}
+
+func TestInitAdminCommandUsesCustomConf(t *testing.T) {
+	var got string
+	cmd := newRootCommand(commandRunners{
+		initAdmin: func(_ context.Context, confPath string) error {
+			got = confPath
+			return nil
+		},
+	})
+	cmd.SetArgs([]string{"init-admin", "--conf", "/etc/kratos-admin/config.yaml"})
+	if err := cmd.ExecuteContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got != "/etc/kratos-admin/config.yaml" {
+		t.Fatalf("conf = %q", got)
 	}
 }
 

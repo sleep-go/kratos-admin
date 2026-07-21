@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 
 	"gorm.io/gen"
 
@@ -16,16 +15,19 @@ import (
 	"github.com/sleep-go/kratos-admin/internal/data/model"
 )
 
-type initAdminOptions struct {
-	Conf        string
-	Username    string
-	DisplayName string
-	Email       string
-	Phone       string
-}
-
 type genOptions struct {
 	OutPath string
+}
+
+func runMigrate(ctx context.Context, confPath string) error {
+	cfg, err := conf.Load(confPath)
+	if err != nil {
+		return fmt.Errorf("加载迁移配置失败: %w", err)
+	}
+	if err := data.Migrate(ctx, cfg.Data.MySQLDSN); err != nil {
+		return fmt.Errorf("执行 Goose 迁移失败: %w", err)
+	}
+	return nil
 }
 
 type runnableApplication interface {
@@ -67,12 +69,8 @@ func runServerWith(ctx context.Context, confPath string, dependencies serverDepe
 	return nil
 }
 
-func runInitAdmin(ctx context.Context, options initAdminOptions) error {
-	password := os.Getenv("KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD")
-	if password == "" {
-		return fmt.Errorf("必须通过 KRATOS_ADMIN_INITIAL_ADMIN_PASSWORD 提供初始密码")
-	}
-	cfg, err := conf.Load(options.Conf)
+func runInitAdmin(ctx context.Context, confPath string) error {
+	cfg, err := conf.Load(confPath)
 	if err != nil {
 		return fmt.Errorf("加载初始化配置失败: %w", err)
 	}
@@ -91,16 +89,16 @@ func runInitAdmin(ctx context.Context, options initAdminOptions) error {
 		bizauth.NewPasswordHasher(bizauth.DefaultPasswordParams()),
 	)
 	created, err := initializer.Ensure(ctx, setup.AdminInput{
-		Username: options.Username, DisplayName: options.DisplayName,
-		Email: options.Email, Phone: options.Phone, Password: password,
+		Username: cfg.Setup.Admin.Username, DisplayName: cfg.Setup.Admin.DisplayName,
+		Email: cfg.Setup.Admin.Email, Phone: cfg.Setup.Admin.Phone, Password: cfg.Setup.Admin.InitialPassword,
 	})
 	if err != nil {
 		return fmt.Errorf("初始化平台管理员失败: %w", err)
 	}
 	if created {
-		log.Printf("平台管理员 %s 创建成功", options.Username)
+		log.Printf("平台管理员 %s 创建成功", cfg.Setup.Admin.Username)
 	} else {
-		log.Printf("平台管理员 %s 已存在，无需重复创建", options.Username)
+		log.Printf("平台管理员 %s 已存在，无需重复创建", cfg.Setup.Admin.Username)
 	}
 	return nil
 }

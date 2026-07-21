@@ -7,9 +7,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const defaultConfigPath = "./configs/config.yaml"
+
 type commandRunners struct {
 	server    func(context.Context, string) error
-	initAdmin func(context.Context, initAdminOptions) error
+	migrate   func(context.Context, string) error
+	initAdmin func(context.Context, string) error
 	gormGen   func(context.Context, genOptions) error
 }
 
@@ -22,6 +25,7 @@ func newRootCommand(runners commandRunners) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newServerCommand(runners.server),
+		newMigrateCommand(runners.migrate),
 		newInitAdminCommand(runners.initAdmin),
 		newGORMGenCommand(runners.gormGen),
 	)
@@ -29,7 +33,7 @@ func newRootCommand(runners commandRunners) *cobra.Command {
 }
 
 func newServerCommand(run func(context.Context, string) error) *cobra.Command {
-	confPath := "./configs/admin.yaml"
+	confPath := defaultConfigPath
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "启动 Admin HTTP/gRPC 服务",
@@ -45,21 +49,34 @@ func newServerCommand(run func(context.Context, string) error) *cobra.Command {
 	return cmd
 }
 
-func newInitAdminCommand(run func(context.Context, initAdminOptions) error) *cobra.Command {
-	options := initAdminOptions{Conf: "./configs/admin.yaml", Username: "admin", DisplayName: "超级管理员"}
+func newMigrateCommand(run func(context.Context, string) error) *cobra.Command {
+	confPath := defaultConfigPath
+	cmd := &cobra.Command{
+		Use:   "migrate",
+		Short: "使用 Goose 执行数据库迁移",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := run(cmd.Context(), confPath); err != nil {
+				return fmt.Errorf("数据库迁移失败: %w", err)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVarP(&confPath, "conf", "c", confPath, "YAML 配置文件路径")
+	return cmd
+}
+
+func newInitAdminCommand(run func(context.Context, string) error) *cobra.Command {
+	confPath := defaultConfigPath
 	cmd := &cobra.Command{
 		Use:   "init-admin",
 		Short: "幂等初始化平台超级管理员",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return run(cmd.Context(), options)
+			return run(cmd.Context(), confPath)
 		},
 	}
-	cmd.Flags().StringVarP(&options.Conf, "conf", "c", options.Conf, "Admin YAML 配置文件路径")
-	cmd.Flags().StringVar(&options.Username, "username", options.Username, "平台管理员用户名")
-	cmd.Flags().StringVar(&options.DisplayName, "display-name", options.DisplayName, "平台管理员显示名称")
-	cmd.Flags().StringVar(&options.Email, "email", "", "平台管理员邮箱")
-	cmd.Flags().StringVar(&options.Phone, "phone", "", "平台管理员手机号")
+	cmd.Flags().StringVarP(&confPath, "conf", "c", confPath, "YAML 配置文件路径")
 	return cmd
 }
 

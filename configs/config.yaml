@@ -14,7 +14,6 @@ data:
   database:
     driver: mysql
     source: kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local
-    migrations_dir: migrations
   redis:
     network: tcp
     addr: 127.0.0.1:6379

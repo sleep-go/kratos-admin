@@ -12,10 +12,9 @@ import (
 )
 
 const (
-	defaultMySQLDSN      = "kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local"
-	defaultRedis         = "127.0.0.1:6379"
-	defaultRabbitMQ      = "amqp://kratos:kratos@127.0.0.1:5672/kratos_admin"
-	defaultMigrationsDir = "migrations"
+	defaultMySQLDSN = "kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local"
+	defaultRedis    = "127.0.0.1:6379"
+	defaultRabbitMQ = "amqp://kratos:kratos@127.0.0.1:5672/kratos_admin"
 )
 
 // Config 描述 Admin API 与后台任务共享的完整运行配置。
@@ -73,7 +72,6 @@ type Data struct {
 	RabbitMQURL         string
 	RabbitMQPrefetch    int
 	RabbitMQConcurrency int
-	MigrationsDir       string
 }
 
 // Auth 描述令牌生命周期及敏感数据保护配置。
@@ -137,7 +135,6 @@ func fromBootstrap(bootstrap *Bootstrap) Config {
 		},
 		Data: Data{
 			MySQLDSN:            stringOrDefault(data.GetDatabase().GetSource(), defaultMySQLDSN),
-			MigrationsDir:       stringOrDefault(data.GetDatabase().GetMigrationsDir(), defaultMigrationsDir),
 			RedisAddr:           stringOrDefault(data.GetRedis().GetAddr(), defaultRedis),
 			RedisDB:             int(data.GetRedis().GetDb()),
 			RabbitMQURL:         stringOrDefault(rabbitMQ.GetUrl(), defaultRabbitMQ),

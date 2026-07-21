@@ -702,7 +702,6 @@ type DataConfig_Database struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Driver        string                 `protobuf:"bytes,1,opt,name=driver,proto3" json:"driver,omitempty"`
 	Source        string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
-	MigrationsDir string                 `protobuf:"bytes,3,opt,name=migrations_dir,json=migrationsDir,proto3" json:"migrations_dir,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -747,13 +746,6 @@ func (x *DataConfig_Database) GetDriver() string {
 func (x *DataConfig_Database) GetSource() string {
 	if x != nil {
 		return x.Source
-	}
-	return ""
-}
-
-func (x *DataConfig_Database) GetMigrationsDir() string {
-	if x != nil {
-		return x.MigrationsDir
 	}
 	return ""
 }
@@ -993,16 +985,15 @@ const file_conf_conf_proto_rawDesc = "" +
 	"\x04GRPC\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x123\n" +
-	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\xd4\x04\n" +
+	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\atimeout\"\xad\x04\n" +
 	"\n" +
 	"DataConfig\x12B\n" +
 	"\bdatabase\x18\x01 \x01(\v2&.kratos.admin.conf.DataConfig.DatabaseR\bdatabase\x129\n" +
 	"\x05redis\x18\x02 \x01(\v2#.kratos.admin.conf.DataConfig.RedisR\x05redis\x12B\n" +
-	"\brabbitmq\x18\x03 \x01(\v2&.kratos.admin.conf.DataConfig.RabbitMQR\brabbitmq\x1aa\n" +
+	"\brabbitmq\x18\x03 \x01(\v2&.kratos.admin.conf.DataConfig.RabbitMQR\brabbitmq\x1a:\n" +
 	"\bDatabase\x12\x16\n" +
 	"\x06driver\x18\x01 \x01(\tR\x06driver\x12\x16\n" +
-	"\x06source\x18\x02 \x01(\tR\x06source\x12%\n" +
-	"\x0emigrations_dir\x18\x03 \x01(\tR\rmigrationsDir\x1a\xc3\x01\n" +
+	"\x06source\x18\x02 \x01(\tR\x06source\x1a\xc3\x01\n" +
 	"\x05Redis\x12\x18\n" +
 	"\anetwork\x18\x01 \x01(\tR\anetwork\x12\x12\n" +
 	"\x04addr\x18\x02 \x01(\tR\x04addr\x12\x0e\n" +
