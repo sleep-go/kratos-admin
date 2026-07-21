@@ -239,13 +239,20 @@ generator := gen.NewGenerator(gen.Config{
 generator.UseDB(db)
 ```
 
-按排序后的迁移业务表逐一调用 `GenerateModelAs`，而不是无条件 `GenerateAllTable`；每个返回的 `QueryStructMeta.ModelPkg` 固定改为 `github.com/sleep-go/kratos-admin/app/admin/internal/data/model`，保证暂存目录提升后 Query import 不漂移。
+按排序后的迁移业务表执行两阶段生成，而不是无条件 `GenerateAllTable`。第一阶段不带关系生成全部基础元数据，保证关系目标一定存在；第二阶段只重新生成声明了关系的源表，并用新元数据覆盖第一阶段结果。每个最终 `QueryStructMeta.ModelPkg` 固定改为 `github.com/sleep-go/kratos-admin/app/admin/internal/data/model`，保证暂存目录提升后 Query import 不漂移。
 
 ```go
-meta := generator.GenerateModelAs(table, modelNameForTable(table), modelOptionsForTable(table, metas)...)
+meta := generator.GenerateModelAs(table, modelNameForTable(table), scalarModelOptionsForTable(table)...)
 meta.ModelPkg = modelImportPath
 metas[table] = meta
-models = append(models, meta)
+
+for _, table := range tablesWithRelations(metas) {
+	meta = generator.GenerateModelAs(table, modelNameForTable(table), relationModelOptionsForTable(table, metas)...)
+	meta.ModelPkg = modelImportPath
+	metas[table] = meta
+}
+
+models = orderedModelMetas(tables, metas)
 ```
 
 最后执行 `generator.ApplyBasic(models...)` 和 `generator.Execute()`。
@@ -515,9 +522,8 @@ git commit -m "后端：任务与日志数据访问统一到GORM Gen"
 - Modify: `app/admin/internal/data/management_repository.go`
 
 **Interfaces:**
-- Produces: `type managementDAOFactory func(*query.Query) managementDAO`
-- Produces: `type managementDAO struct { Dao gen.Dao; Fields map[string]field.Expr; NewModel func() any; NewSlice func() any; Rows func(any) []map[string]any }`
-- Produces: `func managementDAOFor(*query.Query, string) (managementDAO, bool)`
+- Produces: `type managementResourceAdapter struct { List, Create, Update, Delete and Validate operation closures }`
+- Produces: `func managementAdapterFor(string) (managementResourceAdapter, bool)`
 
 - [ ] **Step 1: 写注册表覆盖失败测试**
 
@@ -525,14 +531,13 @@ git commit -m "后端：任务与日志数据访问统一到GORM Gen"
 
 ```go
 func TestManagementGenRegistryCoversResources(t *testing.T) {
-	q := query.Use(&gorm.DB{})
 	for resource, definition := range managementResources {
-		registered, ok := managementDAOFor(q, resource)
+		registered, ok := managementAdapterFor(resource)
 		if !ok {
-			t.Fatalf("资源 %s 未注册 Gen DAO", resource)
+			t.Fatalf("资源 %s 未注册 Gen 适配器", resource)
 		}
 		for _, column := range definition.columns {
-			if registered.Fields[column] == nil {
+			if !registered.SupportsField(column) {
 				t.Fatalf("资源 %s 缺少字段 %s", resource, column)
 			}
 		}
@@ -548,27 +553,29 @@ Expected: FAIL，提示注册表函数未定义。
 
 - [ ] **Step 3: 实现白名单注册表**
 
-每个资源显式绑定生成对象，例如：
+GORM Gen 的生成接口（如 `IUserDo`、`ITenantDo`）具有不同的链式返回类型，不能强制转换为统一 `gen.Dao`。每个资源改为注册高阶操作闭包，闭包内部使用对应的类型安全 DAO，例如：
 
 ```go
-"users": func(q *query.Query) managementDAO {
-	u := q.User
-	return newManagementDAO(
-		u,
-		func() any { return &model.User{} },
-		func() any { return &[]*model.User{} },
-		userRows,
-		map[string]field.Expr{
-			"id": u.ID,
-			"username": u.Username,
-			"status": u.Status,
-			"deleted_at": u.DeletedAt,
-		},
-	)
+"users": {
+	Fields: fieldSet("id", "username", "email", "phone", "display_name", "status", "deleted_at"),
+	List: func(ctx context.Context, q *query.Query, request managementListRequest) ([]map[string]any, uint64, error) {
+		u := q.User.WithContext(ctx)
+		return listUsers(u, request)
+	},
+	Create: func(ctx context.Context, q *query.Query, values map[string]any) (uint64, error) {
+		row, err := userFromManagementValues(values)
+		if err != nil {
+			return 0, err
+		}
+		if err := q.User.WithContext(ctx).Create(row); err != nil {
+			return 0, err
+		}
+		return row.ID, nil
+	},
 },
 ```
 
-字段映射必须来自生成 Query，不使用 `field.NewField` 接受外部字符串。
+各闭包内部的条件、排序和赋值字段必须来自对应生成 Query。外部字段字符串只能先通过适配器的固定白名单映射为闭包分支，不能传入 `field.NewField` 或原生 GORM。
 
 - [ ] **Step 4: 运行注册表测试确认 GREEN**
 
@@ -606,7 +613,7 @@ Expected: PASS 或 MySQL 集成测试 SKIP。
 
 - [ ] **Step 3: 转换 List、Create、Update、Delete**
 
-- `List` 从注册表取得 DAO 和字段表达式，组合 `Where`、`Order`、`Offset`、`Limit`、`Find` 和 `Count`。
+- `List` 从注册表取得对应资源的操作闭包；闭包使用具体生成 DAO 组合 `Where`、`Order`、`Offset`、`Limit`、`Find` 和 `Count`。
 - `Create` 使用 `Dao.Create(model)`；自增 ID 从创建后的生成 Model 读取，不再执行 `SELECT LAST_INSERT_ID()`。
 - `Update` 使用字段赋值表达式或经过白名单清洗的生成 Model；不得把未知 map key 交给 GORM。
 - `Delete` 使用生成 DAO 的软删除或明确更新 `deleted_at`。
