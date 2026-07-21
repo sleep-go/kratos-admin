@@ -1,0 +1,83 @@
+package data
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/pressly/goose/v3"
+
+	"github.com/sleep-go/kratos-admin/migrations"
+)
+
+const (
+	migrationLockName    = "kratos_admin_schema_migration"
+	migrationLockTimeout = 300
+)
+
+type lockRow interface {
+	Scan(...any) error
+}
+
+type lockConnection interface {
+	QueryRowContext(context.Context, string, ...any) lockRow
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+type sqlLockConnection struct {
+	connection *sql.Conn
+}
+
+func (c sqlLockConnection) QueryRowContext(ctx context.Context, query string, args ...any) lockRow {
+	return c.connection.QueryRowContext(ctx, query, args...)
+}
+
+func (c sqlLockConnection) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return c.connection.ExecContext(ctx, query, args...)
+}
+
+// Migrate 使用 MySQL 命名锁串行执行所有尚未应用的 Goose 迁移。
+func Migrate(ctx context.Context, dsn string) error {
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return fmt.Errorf("打开迁移数据库失败: %w", err)
+	}
+	defer db.Close()
+	if err := db.PingContext(ctx); err != nil {
+		return fmt.Errorf("检查迁移数据库连接失败: %w", err)
+	}
+	connection, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("获取迁移专用连接失败: %w", err)
+	}
+	defer connection.Close()
+	return runLockedMigration(ctx, sqlLockConnection{connection: connection}, func(ctx context.Context) error {
+		goose.SetBaseFS(migrations.Files)
+		if err := goose.SetDialect("mysql"); err != nil {
+			return fmt.Errorf("设置 Goose MySQL 方言失败: %w", err)
+		}
+		if err := goose.UpContext(ctx, db, "."); err != nil {
+			return fmt.Errorf("执行 Goose 迁移失败: %w", err)
+		}
+		return nil
+	})
+}
+
+func runLockedMigration(ctx context.Context, connection lockConnection, up func(context.Context) error) error {
+	var acquired int64
+	if err := connection.QueryRowContext(ctx, "SELECT GET_LOCK(?, ?)", migrationLockName, migrationLockTimeout).Scan(&acquired); err != nil {
+		return fmt.Errorf("获取数据库迁移锁失败: %w", err)
+	}
+	if acquired != 1 {
+		return fmt.Errorf("等待数据库迁移锁超过 %d 秒", migrationLockTimeout)
+	}
+
+	migrationErr := up(ctx)
+	_, releaseErr := connection.ExecContext(context.WithoutCancel(ctx), "SELECT RELEASE_LOCK(?)", migrationLockName)
+	if releaseErr != nil {
+		releaseErr = fmt.Errorf("释放数据库迁移锁失败: %w", releaseErr)
+	}
+	return errors.Join(migrationErr, releaseErr)
+}

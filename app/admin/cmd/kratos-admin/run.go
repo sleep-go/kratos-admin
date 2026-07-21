@@ -29,12 +29,35 @@ type genOptions struct {
 	OutPath string
 }
 
+type runnableApplication interface {
+	Run() error
+}
+
+type serverDependencies struct {
+	load           func(string) (conf.Config, error)
+	migrate        func(context.Context, string) error
+	newApplication func(context.Context, conf.Config) (runnableApplication, func(), error)
+}
+
 func runServer(ctx context.Context, confPath string) error {
-	cfg, err := conf.Load(confPath)
+	return runServerWith(ctx, confPath, serverDependencies{
+		load:    conf.Load,
+		migrate: data.Migrate,
+		newApplication: func(ctx context.Context, cfg conf.Config) (runnableApplication, func(), error) {
+			return adminapp.NewApplication(ctx, cfg)
+		},
+	})
+}
+
+func runServerWith(ctx context.Context, confPath string, dependencies serverDependencies) error {
+	cfg, err := dependencies.load(confPath)
 	if err != nil {
 		return fmt.Errorf("加载 Admin 配置失败: %w", err)
 	}
-	application, cleanup, err := adminapp.NewApplication(ctx, cfg)
+	if err := dependencies.migrate(ctx, cfg.Data.MySQLDSN); err != nil {
+		return fmt.Errorf("执行数据库启动迁移失败: %w", err)
+	}
+	application, cleanup, err := dependencies.newApplication(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("初始化 Admin 依赖失败: %w", err)
 	}
