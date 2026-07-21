@@ -47,23 +47,24 @@ func newAuditOutbox(db *gorm.DB, opts ...gen.DOOption) auditOutbox {
 	return _auditOutbox
 }
 
+// auditOutbox 事务审计Outbox表
 type auditOutbox struct {
 	auditOutboxDo auditOutboxDo
 
 	ALL           field.Asterisk
-	ID            field.String
-	TenantID      field.Uint64
-	EventType     field.String
-	AggregateType field.String
-	AggregateID   field.String
-	Payload       field.Field
-	Status        field.Uint8
-	RetryCount    field.Uint32
-	NextRetryAt   field.Time
-	DispatchedAt  field.Time
-	LastError     field.String
-	PublishedAt   field.Time
-	CreatedAt     field.Time
+	ID            field.String // Outbox事件UUID
+	TenantID      field.Uint64 // 所属租户ID，0表示平台域
+	EventType     field.String // 审计事件类型
+	AggregateType field.String // 业务聚合类型
+	AggregateID   field.String // 业务聚合ID
+	Payload       field.Field  // 审计事件载荷
+	Status        field.Uint8  // 处理状态：1待处理，2已完成，3等待重试，4最终失败
+	RetryCount    field.Uint32 // 重试次数
+	NextRetryAt   field.Time   // 下次重试时间
+	DispatchedAt  field.Time   // 最近一次RabbitMQ确认投递时间
+	LastError     field.String // 最后一次处理失败原因
+	PublishedAt   field.Time   // 成功发布时间
+	CreatedAt     field.Time   // 创建时间
 
 	fieldMap map[string]field.Expr
 }

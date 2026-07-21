@@ -46,22 +46,23 @@ func newFailedTask(db *gorm.DB, opts ...gen.DOOption) failedTask {
 	return _failedTask
 }
 
+// failedTask 异步失败任务记录表
 type failedTask struct {
 	failedTaskDo failedTaskDo
 
 	ALL            field.Asterisk
-	ID             field.String
-	TenantID       field.Uint64
-	TaskType       field.String
-	PayloadVersion field.Uint16
-	IdempotencyKey field.String
-	Payload        field.Field
-	RetryCount     field.Uint32
-	LastError      field.String
-	NextRetryAt    field.Time
-	Status         field.Uint8
-	CreatedAt      field.Time
-	UpdatedAt      field.Time
+	ID             field.String // 失败任务UUID
+	TenantID       field.Uint64 // 所属租户ID，0表示平台任务
+	TaskType       field.String // 异步任务类型
+	PayloadVersion field.Uint16 // 任务载荷版本
+	IdempotencyKey field.String // 任务幂等键
+	Payload        field.Field  // 脱敏后的任务载荷
+	RetryCount     field.Uint32 // 已重试次数
+	LastError      field.String // 最后失败原因
+	NextRetryAt    field.Time   // 人工重试后的计划时间
+	Status         field.Uint8  // 任务状态：1失败待处理，2已重新入队，3已忽略
+	CreatedAt      field.Time   // 创建时间
+	UpdatedAt      field.Time   // 更新时间
 
 	fieldMap map[string]field.Expr
 }

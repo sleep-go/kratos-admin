@@ -38,26 +38,33 @@ func newRole(db *gorm.DB, opts ...gen.DOOption) role {
 	_role.CreatedAt = field.NewTime(tableName, "created_at")
 	_role.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_role.DeletedAt = field.NewField(tableName, "deleted_at")
+	_role.Tenant = roleBelongsToTenant{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Tenant", "model.Tenant"),
+	}
 
 	_role.fillFieldMap()
 
 	return _role
 }
 
+// role 角色表
 type role struct {
 	roleDo roleDo
 
 	ALL       field.Asterisk
-	ID        field.Uint64
-	TenantID  field.Uint64
-	Code      field.String
-	Name      field.String
-	DataScope field.Uint8
-	IsBuiltin field.Bool
-	Status    field.Uint8
-	CreatedAt field.Time
-	UpdatedAt field.Time
-	DeletedAt field.Field
+	ID        field.Uint64 // 角色主键
+	TenantID  field.Uint64 // 所属租户ID，0表示平台角色
+	Code      field.String // 作用域内唯一角色编码
+	Name      field.String // 角色名称
+	DataScope field.Uint8  // 数据范围：1全部，2本部门及下级，3本部门，4仅本人，5自定义部门
+	IsBuiltin field.Bool   // 是否系统内置：0否，1是
+	Status    field.Uint8  // 角色状态：1启用，2禁用
+	CreatedAt field.Time   // 创建时间
+	UpdatedAt field.Time   // 更新时间
+	DeletedAt field.Field  // 逻辑删除时间
+	Tenant    roleBelongsToTenant
 
 	fieldMap map[string]field.Expr
 }
@@ -108,7 +115,7 @@ func (r *role) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (r *role) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 10)
+	r.fieldMap = make(map[string]field.Expr, 11)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["tenant_id"] = r.TenantID
 	r.fieldMap["code"] = r.Code
@@ -119,16 +126,101 @@ func (r *role) fillFieldMap() {
 	r.fieldMap["created_at"] = r.CreatedAt
 	r.fieldMap["updated_at"] = r.UpdatedAt
 	r.fieldMap["deleted_at"] = r.DeletedAt
+
 }
 
 func (r role) clone(db *gorm.DB) role {
 	r.roleDo.ReplaceConnPool(db.Statement.ConnPool)
+	r.Tenant.db = db.Session(&gorm.Session{Initialized: true})
+	r.Tenant.db.Statement.ConnPool = db.Statement.ConnPool
 	return r
 }
 
 func (r role) replaceDB(db *gorm.DB) role {
 	r.roleDo.ReplaceDB(db)
+	r.Tenant.db = db.Session(&gorm.Session{})
 	return r
+}
+
+type roleBelongsToTenant struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a roleBelongsToTenant) Where(conds ...field.Expr) *roleBelongsToTenant {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a roleBelongsToTenant) WithContext(ctx context.Context) *roleBelongsToTenant {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a roleBelongsToTenant) Session(session *gorm.Session) *roleBelongsToTenant {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a roleBelongsToTenant) Model(m *model.Role) *roleBelongsToTenantTx {
+	return &roleBelongsToTenantTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a roleBelongsToTenant) Unscoped() *roleBelongsToTenant {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type roleBelongsToTenantTx struct{ tx *gorm.Association }
+
+func (a roleBelongsToTenantTx) Find() (result *model.Tenant, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a roleBelongsToTenantTx) Append(values ...*model.Tenant) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a roleBelongsToTenantTx) Replace(values ...*model.Tenant) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a roleBelongsToTenantTx) Delete(values ...*model.Tenant) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a roleBelongsToTenantTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a roleBelongsToTenantTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a roleBelongsToTenantTx) Unscoped() *roleBelongsToTenantTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type roleDo struct{ gen.DO }

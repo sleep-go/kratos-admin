@@ -45,21 +45,22 @@ func newVerificationCode(db *gorm.DB, opts ...gen.DOOption) verificationCode {
 	return _verificationCode
 }
 
+// verificationCode 邮件短信验证码表
 type verificationCode struct {
 	verificationCodeDo verificationCodeDo
 
 	ALL          field.Asterisk
-	ID           field.Uint64
-	UserID       field.Uint64
-	Target       field.String
-	Scene        field.String
-	Channel      field.String
-	CodeHash     field.String
-	AttemptCount field.Uint32
-	ExpiresAt    field.Time
-	ConsumedAt   field.Time
-	ContextData  field.Field
-	CreatedAt    field.Time
+	ID           field.Uint64 // 验证码主键
+	UserID       field.Uint64 // 关联用户ID，未知用户为0
+	Target       field.String // 邮箱或手机号
+	Scene        field.String // 验证码场景：mfa登录，password_reset重置密码
+	Channel      field.String // 发送渠道：email邮件，sms短信
+	CodeHash     field.String // 验证码SHA256摘要
+	AttemptCount field.Uint32 // 已验证失败次数
+	ExpiresAt    field.Time   // 过期时间
+	ConsumedAt   field.Time   // 消费时间
+	ContextData  field.Field  // MFA设备上下文等非敏感挑战数据
+	CreatedAt    field.Time   // 创建时间
 
 	fieldMap map[string]field.Expr
 }

@@ -38,7 +38,7 @@ func newResource(db *gorm.DB, opts ...gen.DOOption) resource {
 	_resource.HTTPMethod = field.NewString(tableName, "http_method")
 	_resource.APIPath = field.NewString(tableName, "api_path")
 	_resource.Icon = field.NewString(tableName, "icon")
-	_resource.SortOrder = field.NewInt(tableName, "sort_order")
+	_resource.SortOrder = field.NewInt32(tableName, "sort_order")
 	_resource.Visible = field.NewBool(tableName, "visible")
 	_resource.Status = field.NewUint8(tableName, "status")
 	_resource.CreatedAt = field.NewTime(tableName, "created_at")
@@ -50,26 +50,27 @@ func newResource(db *gorm.DB, opts ...gen.DOOption) resource {
 	return _resource
 }
 
+// resource 菜单与权限资源表
 type resource struct {
 	resourceDo resourceDo
 
 	ALL          field.Asterisk
-	ID           field.Uint64
-	ParentID     field.Uint64
-	Type         field.Uint8
-	Code         field.String
-	Name         field.String
-	RoutePath    field.String
-	ComponentKey field.String
-	HTTPMethod   field.String
-	APIPath      field.String
-	Icon         field.String
-	SortOrder    field.Int
-	Visible      field.Bool
-	Status       field.Uint8
-	CreatedAt    field.Time
-	UpdatedAt    field.Time
-	DeletedAt    field.Field
+	ID           field.Uint64 // 权限资源主键
+	ParentID     field.Uint64 // 父资源ID，0表示根资源
+	Type         field.Uint8  // 资源类型：1目录，2菜单，3按钮，4API
+	Code         field.String // 全局唯一资源编码
+	Name         field.String // 资源名称
+	RoutePath    field.String // 前端路由路径
+	ComponentKey field.String // 前端预注册组件键
+	HTTPMethod   field.String // API资源HTTP方法
+	APIPath      field.String // API资源路由模板
+	Icon         field.String // 前端图标名称
+	SortOrder    field.Int32  // 显示排序值
+	Visible      field.Bool   // 是否显示：0隐藏，1显示
+	Status       field.Uint8  // 资源状态：1启用，2禁用
+	CreatedAt    field.Time   // 创建时间
+	UpdatedAt    field.Time   // 更新时间
+	DeletedAt    field.Field  // 逻辑删除时间
 
 	fieldMap map[string]field.Expr
 }
@@ -96,7 +97,7 @@ func (r *resource) updateTableName(table string) *resource {
 	r.HTTPMethod = field.NewString(table, "http_method")
 	r.APIPath = field.NewString(table, "api_path")
 	r.Icon = field.NewString(table, "icon")
-	r.SortOrder = field.NewInt(table, "sort_order")
+	r.SortOrder = field.NewInt32(table, "sort_order")
 	r.Visible = field.NewBool(table, "visible")
 	r.Status = field.NewUint8(table, "status")
 	r.CreatedAt = field.NewTime(table, "created_at")

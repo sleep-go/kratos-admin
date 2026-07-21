@@ -39,15 +39,16 @@ func newTenantResource(db *gorm.DB, opts ...gen.DOOption) tenantResource {
 	return _tenantResource
 }
 
+// tenantResource 租户功能授权表
 type tenantResource struct {
 	tenantResourceDo tenantResourceDo
 
 	ALL        field.Asterisk
-	ID         field.Uint64
-	TenantID   field.Uint64
-	ResourceID field.Uint64
-	CreatedBy  field.Uint64
-	CreatedAt  field.Time
+	ID         field.Uint64 // 租户资源授权主键
+	TenantID   field.Uint64 // 所属租户ID
+	ResourceID field.Uint64 // 权限资源ID
+	CreatedBy  field.Uint64 // 授权用户ID
+	CreatedAt  field.Time   // 授权时间
 
 	fieldMap map[string]field.Expr
 }

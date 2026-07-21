@@ -42,18 +42,19 @@ func newCasbinRule(db *gorm.DB, opts ...gen.DOOption) casbinRule {
 	return _casbinRule
 }
 
+// casbinRule Casbin权限策略表
 type casbinRule struct {
 	casbinRuleDo casbinRuleDo
 
 	ALL   field.Asterisk
-	ID    field.Uint64
-	Ptype field.String
-	V0    field.String
-	V1    field.String
-	V2    field.String
-	V3    field.String
-	V4    field.String
-	V5    field.String
+	ID    field.Uint64 // Casbin策略主键
+	Ptype field.String // 策略类型：p资源策略，g角色继承策略
+	V0    field.String // 策略值0：租户域ID
+	V1    field.String // 策略值1：角色或成员ID
+	V2    field.String // 策略值2：资源编码或角色ID
+	V3    field.String // 策略值3：资源动作
+	V4    field.String // 策略值4：预留
+	V5    field.String // 策略值5：预留
 
 	fieldMap map[string]field.Expr
 }

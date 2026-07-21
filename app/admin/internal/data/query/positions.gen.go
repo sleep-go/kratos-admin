@@ -32,7 +32,7 @@ func newPosition(db *gorm.DB, opts ...gen.DOOption) position {
 	_position.TenantID = field.NewUint64(tableName, "tenant_id")
 	_position.Code = field.NewString(tableName, "code")
 	_position.Name = field.NewString(tableName, "name")
-	_position.SortOrder = field.NewInt(tableName, "sort_order")
+	_position.SortOrder = field.NewInt32(tableName, "sort_order")
 	_position.Status = field.NewUint8(tableName, "status")
 	_position.CreatedAt = field.NewTime(tableName, "created_at")
 	_position.UpdatedAt = field.NewTime(tableName, "updated_at")
@@ -43,19 +43,20 @@ func newPosition(db *gorm.DB, opts ...gen.DOOption) position {
 	return _position
 }
 
+// position 岗位表
 type position struct {
 	positionDo positionDo
 
 	ALL       field.Asterisk
-	ID        field.Uint64
-	TenantID  field.Uint64
-	Code      field.String
-	Name      field.String
-	SortOrder field.Int
-	Status    field.Uint8
-	CreatedAt field.Time
-	UpdatedAt field.Time
-	DeletedAt field.Field
+	ID        field.Uint64 // 岗位主键
+	TenantID  field.Uint64 // 所属租户ID
+	Code      field.String // 租户内唯一岗位编码
+	Name      field.String // 岗位名称
+	SortOrder field.Int32  // 显示排序值
+	Status    field.Uint8  // 岗位状态：1启用，2禁用
+	CreatedAt field.Time   // 创建时间
+	UpdatedAt field.Time   // 更新时间
+	DeletedAt field.Field  // 逻辑删除时间
 
 	fieldMap map[string]field.Expr
 }
@@ -76,7 +77,7 @@ func (p *position) updateTableName(table string) *position {
 	p.TenantID = field.NewUint64(table, "tenant_id")
 	p.Code = field.NewString(table, "code")
 	p.Name = field.NewString(table, "name")
-	p.SortOrder = field.NewInt(table, "sort_order")
+	p.SortOrder = field.NewInt32(table, "sort_order")
 	p.Status = field.NewUint8(table, "status")
 	p.CreatedAt = field.NewTime(table, "created_at")
 	p.UpdatedAt = field.NewTime(table, "updated_at")

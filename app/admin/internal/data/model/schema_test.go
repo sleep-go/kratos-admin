@@ -8,16 +8,21 @@ import (
 )
 
 func Test核心模型映射固定表名(t *testing.T) {
+	tenant := Tenant{}
+	user := User{}
+	member := TenantMember{}
+	session := AuthSession{}
+	outbox := AuditOutbox{}
 	tests := []struct {
 		name string
 		got  string
 		want string
 	}{
-		{"租户", (Tenant{}).TableName(), "tenants"},
-		{"用户", (User{}).TableName(), "users"},
-		{"成员", (TenantMember{}).TableName(), "tenant_members"},
-		{"会话", (AuthSession{}).TableName(), "auth_sessions"},
-		{"审计Outbox", (AuditOutbox{}).TableName(), "audit_outbox"},
+		{"租户", tenant.TableName(), "tenants"},
+		{"用户", user.TableName(), "users"},
+		{"成员", member.TableName(), "tenant_members"},
+		{"会话", session.TableName(), "auth_sessions"},
+		{"审计Outbox", outbox.TableName(), "audit_outbox"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -25,6 +30,22 @@ func Test核心模型映射固定表名(t *testing.T) {
 				t.Fatalf("TableName() = %q, want %q", tt.got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGeneratedModelCoreTypes(t *testing.T) {
+	userType := reflect.TypeOf(User{})
+	id, ok := userType.FieldByName("ID")
+	if !ok || id.Type.Kind() != reflect.Uint64 {
+		t.Fatal("User.ID 必须为 uint64")
+	}
+	platformAdmin, ok := userType.FieldByName("IsPlatformAdmin")
+	if !ok || platformAdmin.Type.Kind() != reflect.Bool {
+		t.Fatal("User.IsPlatformAdmin 必须为 bool")
+	}
+	status, ok := userType.FieldByName("Status")
+	if !ok || status.Type.Kind() != reflect.Uint8 {
+		t.Fatal("User.Status 必须为 uint8")
 	}
 }
 
