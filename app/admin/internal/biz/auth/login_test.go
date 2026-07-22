@@ -82,7 +82,7 @@ func TestLoginCreatesTenantBoundSession(t *testing.T) {
 		permissions: []string{"roles:list", "roles:update"},
 	}
 	sessions := &fakeSessionRepository{}
-	usecase := NewLoginUsecase(users, sessions, hasher, NewTokenManager(privateKey, 15*time.Minute, 7*24*time.Hour, func() time.Time { return now }), func() time.Time { return now })
+	usecase := NewLoginUsecase(users, sessions, hasher, NewTokenManager(privateKey, 15*time.Minute, 7*24*time.Hour, func() time.Time { return now }), nil, func() time.Time { return now })
 
 	result, err := usecase.Login(context.Background(), LoginInput{Identifier: "admin", Password: "StrongPassword!2026", DeviceName: "Chrome"})
 	if err != nil {
@@ -120,7 +120,7 @@ func TestLoginLocksAccountOnFifthFailure(t *testing.T) {
 		t.Fatalf("GenerateKey() error = %v", err)
 	}
 	users := &fakeUserRepository{user: &User{ID: 100, PasswordHash: passwordHash, Status: UserStatusEnabled, FailedLoginCount: 4}}
-	usecase := NewLoginUsecase(users, &fakeSessionRepository{}, hasher, NewTokenManager(privateKey, time.Minute, time.Hour, func() time.Time { return now }), func() time.Time { return now })
+	usecase := NewLoginUsecase(users, &fakeSessionRepository{}, hasher, NewTokenManager(privateKey, time.Minute, time.Hour, func() time.Time { return now }), nil, func() time.Time { return now })
 
 	_, err = usecase.Login(context.Background(), LoginInput{Identifier: "admin", Password: "wrong"})
 	if !errors.Is(err, ErrInvalidCredentials) {
@@ -204,7 +204,7 @@ func TestLoginRejectsFrozenTenantBeforePasswordVerify(t *testing.T) {
 		tenantErr:   ErrTenantFrozen,
 		permissions: []string{"roles:list"},
 	}
-	usecase := NewLoginUsecase(users, &fakeSessionRepository{}, hasher, NewTokenManager(privateKey, time.Minute, time.Hour, func() time.Time { return now }), func() time.Time { return now })
+	usecase := NewLoginUsecase(users, &fakeSessionRepository{}, hasher, NewTokenManager(privateKey, time.Minute, time.Hour, func() time.Time { return now }), nil, func() time.Time { return now })
 
 	_, err = usecase.Login(context.Background(), LoginInput{Identifier: "admin", Password: "StrongPassword!2026"})
 	if !errors.Is(err, ErrTenantFrozen) {

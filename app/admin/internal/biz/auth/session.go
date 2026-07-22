@@ -104,17 +104,12 @@ type SessionUsecase struct {
 	now            func() time.Time
 }
 
-// NewSessionUsecase 创建会话用例。
-func NewSessionUsecase(repository SessionManagerRepository, tokens *TokenManager, now func() time.Time) *SessionUsecase {
+// NewSessionUsecase 创建会话用例，platformAdmins 用于平台域会话校验。
+func NewSessionUsecase(repository SessionManagerRepository, tokens *TokenManager, platformAdmins PlatformAdminRepository, now func() time.Time) *SessionUsecase {
 	if now == nil {
 		now = time.Now
 	}
-	return &SessionUsecase{repository: repository, tokens: tokens, now: now}
-}
-
-// ConfigurePlatformAdmins 配置平台管理员仓储，用于平台域会话校验。
-func (u *SessionUsecase) ConfigurePlatformAdmins(repo PlatformAdminRepository) {
-	u.platformAdmins = repo
+	return &SessionUsecase{repository: repository, tokens: tokens, platformAdmins: platformAdmins, now: now}
 }
 
 // Refresh 校验 refresh token 并执行原子 jti 轮换。

@@ -98,8 +98,7 @@ func (h *fakeLoginHandler) Login(_ context.Context, input bizauth.LoginInput) (b
 
 func TestAuthServiceRecordsMaskedLoginResult(t *testing.T) {
 	recorder := &fakeLoginRecorder{}
-	service := NewAuthService(&fakeLoginHandler{err: bizauth.ErrInvalidCredentials}, false)
-	service.ConfigureLoginLog(recorder)
+	service := NewAuthService(&fakeLoginHandler{err: bizauth.ErrInvalidCredentials}, nil, nil, nil, nil, recorder, nil, nil, false)
 
 	_, err := service.Login(context.Background(), &v1.LoginRequest{Identifier: "admin@example.com", Password: "wrong-password"})
 	if err == nil {
@@ -125,7 +124,7 @@ func TestAuthServiceLoginMapsUserAndTenant(t *testing.T) {
 		CurrentTenant: bizauth.TenantOption{ID: 0, Name: "平台管理"},
 		Tenants:       []bizauth.TenantOption{{ID: 8, Name: "示例租户"}},
 	}}
-	service := NewAuthService(handler, false)
+	service := NewAuthService(handler, nil, nil, nil, nil, nil, nil, nil, false)
 
 	reply, err := service.Login(context.Background(), &v1.LoginRequest{Identifier: "root", Password: "secret", DeviceName: "Chrome"})
 	if err != nil {
@@ -151,8 +150,7 @@ func TestAuthServiceRequiresConfiguredCaptcha(t *testing.T) {
 		User:   bizauth.UserProfile{ID: 1},
 	}}
 	captcha := &fakeCaptchaHandler{}
-	service := NewAuthService(handler, false)
-	service.ConfigureCaptcha(captcha)
+	service := NewAuthService(handler, nil, nil, nil, nil, nil, captcha, nil, false)
 	if _, err := service.Login(context.Background(), &v1.LoginRequest{Identifier: "root", Password: "secret"}); err == nil {
 		t.Fatal("Login() without captcha must fail")
 	}
@@ -168,7 +166,7 @@ func TestAuthServiceLoginReturnsMFAChallengeWithoutTokens(t *testing.T) {
 	handler := &fakeLoginHandler{result: bizauth.LoginResult{
 		MFARequired: true, MFAChallenge: bizauth.VerificationChallenge{ID: 19, ExpiresAt: time.Now().Add(5 * time.Minute)},
 	}}
-	service := NewAuthService(handler, false)
+	service := NewAuthService(handler, nil, nil, nil, nil, nil, nil, nil, false)
 	reply, err := service.Login(context.Background(), &v1.LoginRequest{Identifier: "root", Password: "secret"})
 	if err != nil || !reply.MfaRequired || reply.MfaChallengeId != "19" || reply.AccessToken != "" {
 		t.Fatalf("Login() = %+v, %v", reply, err)
@@ -186,7 +184,7 @@ func TestRefreshCookieIsHttpOnlyAndScoped(t *testing.T) {
 
 func TestListAndRevokeSessionUseAuthenticatedUser(t *testing.T) {
 	handler := &fakeSessionHandler{sessions: []bizauth.DeviceSession{{ID: "device-1", DeviceName: "Chrome", Current: true}}}
-	service := NewAuthService(&fakeLoginHandler{}, false, handler)
+	service := NewAuthService(&fakeLoginHandler{}, handler, nil, nil, nil, nil, nil, nil, false)
 	claims := &bizauth.TokenClaims{UserID: 8, SessionID: "device-1"}
 	ctx := bizauth.NewClaimsContext(context.Background(), claims)
 
@@ -204,7 +202,7 @@ func TestListAndRevokeSessionUseAuthenticatedUser(t *testing.T) {
 
 func TestUpdateProfileUsesAuthenticatedUser(t *testing.T) {
 	handler := &fakeSessionHandler{}
-	service := NewAuthService(&fakeLoginHandler{}, false, handler)
+	service := NewAuthService(&fakeLoginHandler{}, handler, nil, nil, nil, nil, nil, nil, false)
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 8})
 
 	reply, err := service.UpdateProfile(ctx, &v1.UpdateProfileRequest{DisplayName: "新名称", Email: "new@example.com"})
@@ -215,7 +213,7 @@ func TestUpdateProfileUsesAuthenticatedUser(t *testing.T) {
 
 func TestListNavigationUsesAuthenticatedTenantAndMember(t *testing.T) {
 	handler := &fakeSessionHandler{navigation: []bizauth.NavigationItem{{ID: 9, Code: "files", Name: "文件管理", ComponentKey: "files"}}}
-	service := NewAuthService(&fakeLoginHandler{}, false, handler)
+	service := NewAuthService(&fakeLoginHandler{}, handler, nil, nil, nil, nil, nil, nil, false)
 	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 8, TenantID: 10, MemberID: 20, Realm: bizauth.RealmTenant})
 
 	reply, err := service.ListNavigation(ctx, &v1.ListNavigationRequest{})

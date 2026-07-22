@@ -64,9 +64,7 @@ func TestAccessMiddlewareValidatesTokenAndStoresClaims(t *testing.T) {
 	pair, _ := manager.Issue(bizauth.TokenSubject{UserID: 1, TenantID: 2, MemberID: 3, SessionID: "session"})
 	validator := &fakeAccessValidator{}
 	recorder := &fakeAccessRecorder{}
-	service := NewAuthService(&fakeLoginHandler{}, false)
-	service.ConfigureAccessSecurity(manager, validator)
-	service.ConfigureAccessLog(recorder)
+	service := NewAuthService(&fakeLoginHandler{}, nil, manager, validator, recorder, nil, nil, nil, false)
 	ctx := transport.NewServerContext(context.Background(), &testTransport{
 		operation: v1.OperationAuthServiceListSessions,
 		request:   testHeader{"Authorization": {"Bearer " + pair.AccessToken}}, reply: testHeader{},
@@ -88,7 +86,7 @@ func TestAccessMiddlewareValidatesTokenAndStoresClaims(t *testing.T) {
 }
 
 func TestAccessMiddlewareAllowsPublicLoginWithoutToken(t *testing.T) {
-	service := NewAuthService(&fakeLoginHandler{}, false)
+	service := NewAuthService(&fakeLoginHandler{}, nil, nil, nil, nil, nil, nil, nil, false)
 	ctx := transport.NewServerContext(context.Background(), &testTransport{
 		operation: v1.OperationAuthServiceLogin, request: testHeader{}, reply: testHeader{},
 	})
@@ -100,7 +98,7 @@ func TestAccessMiddlewareAllowsPublicLoginWithoutToken(t *testing.T) {
 }
 
 func TestAccessMiddlewareAllowsPlatformLoginWithoutToken(t *testing.T) {
-	service := NewAuthService(&fakeLoginHandler{}, false)
+	service := NewAuthService(&fakeLoginHandler{}, nil, nil, nil, nil, nil, nil, nil, false)
 	ctx := transport.NewServerContext(context.Background(), &testTransport{
 		operation: v1.OperationPlatformAuthServiceLogin, request: testHeader{}, reply: testHeader{},
 	})
@@ -113,8 +111,7 @@ func TestAccessMiddlewareAllowsPlatformLoginWithoutToken(t *testing.T) {
 
 func TestAccessMiddlewareRecordsUnauthorizedRequest(t *testing.T) {
 	recorder := &fakeAccessRecorder{}
-	service := NewAuthService(&fakeLoginHandler{}, false)
-	service.ConfigureAccessLog(recorder)
+	service := NewAuthService(&fakeLoginHandler{}, nil, nil, nil, recorder, nil, nil, nil, false)
 	ctx := transport.NewServerContext(context.Background(), &testTransport{
 		operation: v1.OperationAuthServiceListSessions, request: testHeader{}, reply: testHeader{},
 	})

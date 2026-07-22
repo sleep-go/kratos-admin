@@ -28,13 +28,9 @@ type LogService struct {
 	permissions managementbiz.PermissionChecker
 }
 
-// NewLogService 创建日志导出服务。
-func NewLogService(handler LogExportHandler, checkers ...managementbiz.PermissionChecker) *LogService {
-	service := &LogService{handler: handler}
-	if len(checkers) > 0 {
-		service.permissions = checkers[0]
-	}
-	return service
+// NewLogService 创建日志导出服务，permissions 用于资源动作鉴权。
+func NewLogService(handler LogExportHandler, permissions managementbiz.PermissionChecker) *LogService {
+	return &LogService{handler: handler, permissions: permissions}
 }
 
 // CreateExport 创建最多包含十万条记录的异步导出任务。

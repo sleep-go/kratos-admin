@@ -32,17 +32,12 @@ type PlatformAuthService struct {
 	secureCookie       bool
 }
 
-// NewPlatformAuthService 创建平台认证服务。
-func NewPlatformAuthService(loginHandler PlatformLoginHandler, sessionHandler SessionHandler, impersonateHandler ImpersonateHandler, secureCookie bool) *PlatformAuthService {
+// NewPlatformAuthService 创建平台认证服务，captcha 支撑平台登录图形验证码校验。
+func NewPlatformAuthService(loginHandler PlatformLoginHandler, sessionHandler SessionHandler, impersonateHandler ImpersonateHandler, secureCookie bool, captcha CaptchaHandler) *PlatformAuthService {
 	return &PlatformAuthService{
 		loginHandler: loginHandler, sessionHandler: sessionHandler,
-		impersonateHandler: impersonateHandler, secureCookie: secureCookie,
+		impersonateHandler: impersonateHandler, secureCookie: secureCookie, captcha: captcha,
 	}
-}
-
-// ConfigureCaptcha 启用平台登录图形验证码校验。
-func (s *PlatformAuthService) ConfigureCaptcha(handler CaptchaHandler) {
-	s.captcha = handler
 }
 
 // Login 平台管理员登录。

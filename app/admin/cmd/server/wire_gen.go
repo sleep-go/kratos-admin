@@ -10,31 +10,73 @@ import (
 	"context"
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/file"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/logexport"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/providerconfig"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/setup"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/conf"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/server"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/server/task"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/service"
 )
 
 // Injectors from wire.go:
 
 // wireApp 初始化 Kratos Admin 应用。
 func wireApp(contextContext context.Context, config conf.Config, logger log.Logger) (*kratos.App, func(), error) {
+	string2 := ProvideServiceName()
+	healthService := service.NewHealthService(string2)
 	dataData, cleanup, err := data.NewData(contextContext, config)
 	if err != nil {
 		return nil, nil, err
 	}
+	authRepository := data.NewAuthRepository(dataData)
+	passwordParams := ProvidePasswordParams()
+	passwordHasher := auth.NewPasswordHasher(passwordParams)
 	adminSet, err := provider.NewAdminSet(config)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	services, err := provideServices(config, dataData, adminSet)
+	privateKey := adminSet.PrivateKey
+	v := NewClock()
+	tokenManager := ProvideTokenManager(privateKey, config, v)
+	v2 := ProvideVerificationKey(config)
+	v3 := adminSet.MessageSenders
+	verificationUsecase, err := auth.NewVerificationUsecase(authRepository, authRepository, passwordHasher, v2, v3, v)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
+	loginUsecase := auth.NewLoginUsecase(authRepository, authRepository, passwordHasher, tokenManager, verificationUsecase, v)
+	platformAdminRepository := data.NewPlatformAdminRepository(dataData)
+	sessionUsecase := auth.NewSessionUsecase(authRepository, tokenManager, platformAdminRepository, v)
+	captchaStore := data.NewCaptchaStore(dataData)
+	captchaUsecase := auth.NewCaptchaUsecase(captchaStore, v)
+	bool2 := ProvideSecureCookie(config)
+	authService := service.NewAuthService(loginUsecase, sessionUsecase, tokenManager, sessionUsecase, authRepository, authRepository, captchaUsecase, verificationUsecase, bool2)
+	platformLoginUsecase := auth.NewPlatformLoginUsecase(platformAdminRepository, authRepository, passwordHasher, tokenManager, v)
+	duration := ProvideImpersonateTTL()
+	impersonateUsecase := auth.NewImpersonateUsecase(platformAdminRepository, authRepository, authRepository, tokenManager, duration, v)
+	platformAuthService := service.NewPlatformAuthService(platformLoginUsecase, sessionUsecase, impersonateUsecase, bool2, captchaUsecase)
+	cipher := adminSet.ConfigCipher
+	codec := providerconfig.NewCodec(cipher)
+	tenantSetupRepository := data.NewTenantSetupRepository(dataData)
+	tenantProvisioner := setup.NewTenantProvisioner(tenantSetupRepository)
+	managementRepository := data.NewManagementRepository(dataData, codec, tenantProvisioner)
+	managementService := service.NewManagementService(managementRepository, managementRepository, platformAdminRepository)
+	fileRepository := data.NewFileRepository(dataData)
+	storageProvider := adminSet.Storage
+	int64_2 := ProvideMaxFileSize(config)
+	usecase := file.NewUsecase(fileRepository, storageProvider, int64_2, v)
+	fileService := service.NewFileService(usecase, managementRepository)
+	logExportRepository := data.NewLogExportRepository(dataData)
+	logexportUsecase := logexport.NewUsecase(logExportRepository, storageProvider, v)
+	logService := service.NewLogService(logexportUsecase, managementRepository)
+	services := service.NewServices(healthService, authService, platformAuthService, managementService, fileService, logService)
 	grpcServer := server.NewGRPCServer(config, services)
 	httpServer := server.NewHTTPServer(config, services, adminSet)
 	taskServer := task.NewServer(config, dataData, adminSet, logger)

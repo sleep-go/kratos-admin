@@ -14,8 +14,6 @@ import (
 )
 
 // ProviderSet 聚合所有 biz 子包的 Wire Provider。
-// TODO(sleep): provideServices 中的 setter 注入（ConfigureXxx）改为构造函数参数后，
-// 在 wire.go 的 wire.Build 中注入 biz.ProviderSet，逐步替换手工装配。
 var ProviderSet = wire.NewSet(
 	audit.ProviderSet,
 	auth.ProviderSet,

@@ -101,18 +101,9 @@ type ManagementService struct {
 	platformAdmins bizauth.PlatformAdminRepository
 }
 
-// NewManagementService 创建后台资源管理服务。
-func NewManagementService(repository managementbiz.Repository, checkers ...managementbiz.PermissionChecker) *ManagementService {
-	service := &ManagementService{repository: repository}
-	if len(checkers) > 0 {
-		service.permissions = checkers[0]
-	}
-	return service
-}
-
-// ConfigurePlatformAdmins 注入平台管理员仓储，用于解析超级管理员标记。
-func (s *ManagementService) ConfigurePlatformAdmins(repo bizauth.PlatformAdminRepository) {
-	s.platformAdmins = repo
+// NewManagementService 创建后台资源管理服务，permissions 用于资源动作鉴权，platformAdmins 用于解析超级管理员标记。
+func NewManagementService(repository managementbiz.Repository, permissions managementbiz.PermissionChecker, platformAdmins bizauth.PlatformAdminRepository) *ManagementService {
+	return &ManagementService{repository: repository, permissions: permissions, platformAdmins: platformAdmins}
 }
 
 // ListResources 按可信租户边界分页查询白名单资源。

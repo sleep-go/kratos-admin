@@ -11,6 +11,7 @@ import (
 	"github.com/google/wire"
 
 	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/providerconfig"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/conf"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider/message"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider/secret"
@@ -18,7 +19,13 @@ import (
 )
 
 // ProviderSet 是 Admin 外部基础设施适配器的 Wire Provider 集合。
-var ProviderSet = wire.NewSet(NewAdminSet)
+// wire.FieldsOf 将 AdminSet 解构为独立字段，供 Wire 按类型注入到各构造函数。
+var ProviderSet = wire.NewSet(
+	NewAdminSet,
+	wire.FieldsOf(new(*AdminSet), "PrivateKey", "MessageSenders", "Storage", "ConfigCipher"),
+	// *secret.Cipher 实现 providerconfig.Cipher 接口，供 NewCodec 注入。
+	wire.Bind(new(providerconfig.Cipher), new(*secret.Cipher)),
+)
 
 // AdminSet 汇集 Admin Server 运行时 Provider。
 type AdminSet struct {

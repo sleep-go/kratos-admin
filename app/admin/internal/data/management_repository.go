@@ -141,18 +141,9 @@ type ManagementRepository struct {
 	tenantProvisioner *setup.TenantProvisioner
 }
 
-// NewManagementRepository 创建统一后台资源仓储。
-func NewManagementRepository(data *Data, codecs ...*providerconfig.Codec) *ManagementRepository {
-	repository := &ManagementRepository{q: data.Query}
-	if len(codecs) > 0 {
-		repository.providerCodec = codecs[0]
-	}
-	return repository
-}
-
-// ConfigureTenantProvisioner 注入租户开户初始化器，用于创建租户后自动初始化默认角色。
-func (r *ManagementRepository) ConfigureTenantProvisioner(provisioner *setup.TenantProvisioner) {
-	r.tenantProvisioner = provisioner
+// NewManagementRepository 创建统一后台资源仓储，tenantProvisioner 用于创建租户后自动初始化默认角色。
+func NewManagementRepository(data *Data, codec *providerconfig.Codec, tenantProvisioner *setup.TenantProvisioner) *ManagementRepository {
+	return &ManagementRepository{q: data.Query, providerCodec: codec, tenantProvisioner: tenantProvisioner}
 }
 
 func (r *ManagementRepository) gen() *query.Query {

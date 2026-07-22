@@ -65,21 +65,6 @@ type AuthService struct {
 	secureCookie    bool
 }
 
-// ConfigureLoginLog 配置登录安全日志记录器。
-func (s *AuthService) ConfigureLoginLog(recorder auditbiz.LoginLogRecorder) {
-	s.loginRecorder = recorder
-}
-
-// ConfigureVerification 启用邮件短信验证码和密码重置流程。
-func (s *AuthService) ConfigureVerification(handler VerificationHandler) {
-	s.verification = handler
-}
-
-// ConfigureCaptcha 启用登录图形验证码。
-func (s *AuthService) ConfigureCaptcha(handler CaptchaHandler) {
-	s.captcha = handler
-}
-
 // GetCaptcha 生成五分钟有效的一次性图形验证码。
 func (s *AuthService) GetCaptcha(ctx context.Context, _ *v1.GetCaptchaRequest) (*v1.GetCaptchaResponse, error) {
 	if s.captcha == nil {
@@ -94,13 +79,29 @@ func (s *AuthService) GetCaptcha(ctx context.Context, _ *v1.GetCaptchaRequest) (
 	}, nil
 }
 
-// NewAuthService 创建认证服务。
-func NewAuthService(loginHandler LoginHandler, secureCookie bool, sessionHandlers ...SessionHandler) *AuthService {
-	service := &AuthService{loginHandler: loginHandler, secureCookie: secureCookie}
-	if len(sessionHandlers) > 0 {
-		service.sessionHandler = sessionHandlers[0]
+// NewAuthService 创建认证服务，注入会话、令牌、日志、验证码等全部依赖。
+func NewAuthService(
+	loginHandler LoginHandler,
+	sessionHandler SessionHandler,
+	tokens *bizauth.TokenManager,
+	accessValidator AccessValidator,
+	accessRecorder auditbiz.AccessLogRecorder,
+	loginRecorder auditbiz.LoginLogRecorder,
+	captcha CaptchaHandler,
+	verification VerificationHandler,
+	secureCookie bool,
+) *AuthService {
+	return &AuthService{
+		loginHandler:    loginHandler,
+		sessionHandler:  sessionHandler,
+		tokens:          tokens,
+		accessValidator: accessValidator,
+		accessRecorder:  accessRecorder,
+		loginRecorder:   loginRecorder,
+		captcha:         captcha,
+		verification:    verification,
+		secureCookie:    secureCookie,
 	}
-	return service
 }
 
 // Login 验证账号密码，返回 access token，并通过 HttpOnly Cookie 下发 refresh token。

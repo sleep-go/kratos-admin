@@ -10,12 +10,12 @@ import (
 )
 
 // ProviderSet 是认证 biz 层的 Wire Provider 集合。
+// NewTokenManager 因接收两个 time.Duration 参数（Wire 无法区分），改由 cmd/server 层包装注入。
 var ProviderSet = wire.NewSet(
 	NewLoginUsecase,
 	NewSessionUsecase,
 	NewPlatformLoginUsecase,
 	NewImpersonateUsecase,
-	NewTokenManager,
 	NewPasswordHasher,
 	NewCaptchaUsecase,
 	NewVerificationUsecase,
@@ -147,17 +147,12 @@ type LoginUsecase struct {
 	verification *VerificationUsecase
 }
 
-// ConfigureVerification 启用登录 MFA 挑战。
-func (u *LoginUsecase) ConfigureVerification(verification *VerificationUsecase) {
-	u.verification = verification
-}
-
-// NewLoginUsecase 创建租户管理员账号密码登录用例。
-func NewLoginUsecase(users UserRepository, sessions SessionRepository, hasher *PasswordHasher, tokens *TokenManager, now func() time.Time) *LoginUsecase {
+// NewLoginUsecase 创建租户管理员账号密码登录用例，verification 支撑登录 MFA 挑战。
+func NewLoginUsecase(users UserRepository, sessions SessionRepository, hasher *PasswordHasher, tokens *TokenManager, verification *VerificationUsecase, now func() time.Time) *LoginUsecase {
 	if now == nil {
 		now = time.Now
 	}
-	return &LoginUsecase{users: users, sessions: sessions, hasher: hasher, tokens: tokens, now: now}
+	return &LoginUsecase{users: users, sessions: sessions, hasher: hasher, tokens: tokens, verification: verification, now: now}
 }
 
 // Login 验证租户管理员账号密码并创建绑定固定租户的 refresh 会话。

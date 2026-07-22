@@ -32,14 +32,11 @@ type FileService struct {
 	dataScope   managementbiz.RecordChecker
 }
 
-// NewFileService 创建文件服务。
-func NewFileService(handler FileHandler, checkers ...managementbiz.PermissionChecker) *FileService {
-	service := &FileService{handler: handler}
-	if len(checkers) > 0 {
-		service.permissions = checkers[0]
-		if dataScope, ok := checkers[0].(managementbiz.RecordChecker); ok {
-			service.dataScope = dataScope
-		}
+// NewFileService 创建文件服务，permissions 用于资源动作鉴权与数据范围校验。
+func NewFileService(handler FileHandler, permissions managementbiz.PermissionChecker) *FileService {
+	service := &FileService{handler: handler, permissions: permissions}
+	if dataScope, ok := permissions.(managementbiz.RecordChecker); ok {
+		service.dataScope = dataScope
 	}
 	return service
 }

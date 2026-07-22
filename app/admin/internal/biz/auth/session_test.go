@@ -113,7 +113,7 @@ func newSessionUsecaseFixture(t *testing.T) (*SessionUsecase, *fakeSessionManage
 		tenant: TenantOption{ID: 10, Name: "示例租户", PermissionVersion: 3},
 		permissions: []string{"roles:list"},
 	}
-	return NewSessionUsecase(repository, manager, func() time.Time { return now }), repository, manager, now
+	return NewSessionUsecase(repository, manager, nil, func() time.Time { return now }), repository, manager, now
 }
 
 func TestProfileRestoresUserAndTenantContext(t *testing.T) {

@@ -11,12 +11,45 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
+	auditbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/audit"
+	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
+	filebiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/file"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/logexport"
+	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/setup"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/conf"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/query"
 )
 
 // ProviderSet 是 Admin 数据层的 Wire Provider 集合。
-var ProviderSet = wire.NewSet(NewData)
+var ProviderSet = wire.NewSet(
+	NewData,
+	NewAuthRepository,
+	NewPlatformAdminRepository,
+	NewCaptchaStore,
+	NewFileRepository,
+	NewLogExportRepository,
+	NewTenantSetupRepository,
+	NewManagementRepository,
+	// *AuthRepository 同时实现 biz/auth 与 biz/audit 的 6 个仓储接口。
+	wire.Bind(new(bizauth.UserRepository), new(*AuthRepository)),
+	wire.Bind(new(bizauth.SessionRepository), new(*AuthRepository)),
+	wire.Bind(new(bizauth.SessionManagerRepository), new(*AuthRepository)),
+	wire.Bind(new(bizauth.VerificationRepository), new(*AuthRepository)),
+	wire.Bind(new(auditbiz.AccessLogRecorder), new(*AuthRepository)),
+	wire.Bind(new(auditbiz.LoginLogRecorder), new(*AuthRepository)),
+	wire.Bind(new(bizauth.PlatformAdminRepository), new(*PlatformAdminRepository)),
+	wire.Bind(new(bizauth.CaptchaStore), new(*CaptchaStore)),
+	// *ManagementRepository 同时实现 managementbiz 的 Repository、PermissionChecker 与 RecordChecker。
+	wire.Bind(new(managementbiz.Repository), new(*ManagementRepository)),
+	wire.Bind(new(managementbiz.PermissionChecker), new(*ManagementRepository)),
+	// *FileRepository 实现 filebiz.Repository。
+	wire.Bind(new(filebiz.Repository), new(*FileRepository)),
+	// *LogExportRepository 实现 logexport.Repository。
+	wire.Bind(new(logexport.Repository), new(*LogExportRepository)),
+	// *TenantSetupRepository 实现 setup.TenantRepository。
+	wire.Bind(new(setup.TenantRepository), new(*TenantSetupRepository)),
+)
 
 // Data 汇集 Admin API 与后台任务共用的数据基础设施。
 type Data struct {

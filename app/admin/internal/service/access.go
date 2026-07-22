@@ -40,17 +40,6 @@ var publicOperations = map[string]struct{}{
 	v1.OperationHealthServiceCheck:             {},
 }
 
-// ConfigureAccessSecurity 配置 access token 签名验证和服务端权限版本复核。
-func (s *AuthService) ConfigureAccessSecurity(tokens *bizauth.TokenManager, validator AccessValidator) {
-	s.tokens = tokens
-	s.accessValidator = validator
-}
-
-// ConfigureAccessLog 配置 API 访问与异常日志记录器。
-func (s *AuthService) ConfigureAccessLog(recorder auditbiz.AccessLogRecorder) {
-	s.accessRecorder = recorder
-}
-
 // RequestIDFromContext 返回服务端生成或接收的请求追踪 ID。
 func RequestIDFromContext(ctx context.Context) string {
 	requestID, _ := ctx.Value(requestIDContextKey{}).(string)
