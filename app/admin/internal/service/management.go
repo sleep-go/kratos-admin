@@ -15,7 +15,7 @@ import (
 
 // GetEffectiveSettings 返回按代码默认、平台默认和租户覆盖解析后的有效设置。
 func (s *ManagementService) GetEffectiveSettings(ctx context.Context, request *v1.GetEffectiveSettingsRequest) (*v1.GetEffectiveSettingsResponse, error) {
-	scope, err := managementScope(ctx, "settings", 0)
+	scope, err := s.managementScope(ctx, "settings", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (s *ManagementService) GetEffectiveSettings(ctx context.Context, request *v
 
 // TestProviderConnection 使用已保存的加密配置验证 Provider 连接。
 func (s *ManagementService) TestProviderConnection(ctx context.Context, request *v1.TestProviderConnectionRequest) (*v1.TestProviderConnectionResponse, error) {
-	scope, err := managementScope(ctx, "providers", 0)
+	scope, err := s.managementScope(ctx, "providers", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -57,11 +57,12 @@ func (s *ManagementService) TestProviderConnection(ctx context.Context, request 
 
 // UpdateRoleAuthorization 在单个事务内替换角色资源授权与数据范围。
 func (s *ManagementService) UpdateRoleAuthorization(ctx context.Context, request *v1.UpdateRoleAuthorizationRequest) (*v1.UpdateRoleAuthorizationResponse, error) {
-	scope, err := managementScope(ctx, "roles", request.GetTargetTenantId())
+	resourceKey := roleAuthorizationResourceKey(ctx, request.GetTargetTenantId())
+	scope, err := s.managementScope(ctx, resourceKey, request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
-	if err := s.authorize(ctx, scope, "roles", "update"); err != nil {
+	if err := s.authorize(ctx, scope, resourceKey, "update"); err != nil {
 		return nil, err
 	}
 	if request.GetRoleId() == 0 {
@@ -71,7 +72,7 @@ func (s *ManagementService) UpdateRoleAuthorization(ctx context.Context, request
 	for _, grant := range request.GetGrants() {
 		grants = append(grants, managementbiz.RoleGrant{ResourceCode: grant.GetResourceCode(), Actions: grant.GetActions()})
 	}
-	if err := s.repository.UpdateRoleAuthorization(ctx, scope, request.GetRoleId(), request.GetDataScope(), grants, request.GetDepartmentIds()); err != nil {
+	if err := s.repository.UpdateRoleAuthorization(ctx, scope, request.GetRoleId(), request.GetDataScope(), grants, request.GetDepartmentIds(), request.GetAdminIds()); err != nil {
 		return nil, mapManagementError(err)
 	}
 	return &v1.UpdateRoleAuthorizationResponse{RoleId: request.GetRoleId()}, nil
@@ -79,7 +80,7 @@ func (s *ManagementService) UpdateRoleAuthorization(ctx context.Context, request
 
 // UpdateTenantFeatures 在单个事务内替换目标租户功能授权。
 func (s *ManagementService) UpdateTenantFeatures(ctx context.Context, request *v1.UpdateTenantFeaturesRequest) (*v1.UpdateTenantFeaturesResponse, error) {
-	scope, err := managementScope(ctx, "tenant-resources", 0)
+	scope, err := s.managementScope(ctx, "tenant-resources", 0)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +96,9 @@ func (s *ManagementService) UpdateTenantFeatures(ctx context.Context, request *v
 // ManagementService 实现统一的后台资源管理 API。
 type ManagementService struct {
 	v1.UnimplementedManagementServiceServer
-	repository  managementbiz.Repository
-	permissions managementbiz.PermissionChecker
+	repository     managementbiz.Repository
+	permissions    managementbiz.PermissionChecker
+	platformAdmins bizauth.PlatformAdminRepository
 }
 
 // NewManagementService 创建后台资源管理服务。
@@ -108,9 +110,14 @@ func NewManagementService(repository managementbiz.Repository, checkers ...manag
 	return service
 }
 
+// ConfigurePlatformAdmins 注入平台管理员仓储，用于解析超级管理员标记。
+func (s *ManagementService) ConfigurePlatformAdmins(repo bizauth.PlatformAdminRepository) {
+	s.platformAdmins = repo
+}
+
 // ListResources 按可信租户边界分页查询白名单资源。
 func (s *ManagementService) ListResources(ctx context.Context, request *v1.ListResourcesRequest) (*v1.ListResourcesResponse, error) {
-	scope, err := managementListScope(ctx, request.GetResource(), request.GetTargetTenantId())
+	scope, err := s.managementListScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +150,7 @@ func (s *ManagementService) ListResources(ctx context.Context, request *v1.ListR
 
 // CreateResource 在可信租户边界内创建白名单资源并写入审计 Outbox。
 func (s *ManagementService) CreateResource(ctx context.Context, request *v1.CreateResourceRequest) (*v1.CreateResourceResponse, error) {
-	scope, err := managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
+	scope, err := s.managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +166,7 @@ func (s *ManagementService) CreateResource(ctx context.Context, request *v1.Crea
 
 // UpdateResource 在可信租户边界内更新白名单资源并写入审计 Outbox。
 func (s *ManagementService) UpdateResource(ctx context.Context, request *v1.UpdateResourceRequest) (*v1.UpdateResourceResponse, error) {
-	scope, err := managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
+	scope, err := s.managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +184,7 @@ func (s *ManagementService) UpdateResource(ctx context.Context, request *v1.Upda
 
 // DeleteResource 在可信租户边界内逻辑删除白名单资源并写入审计 Outbox。
 func (s *ManagementService) DeleteResource(ctx context.Context, request *v1.DeleteResourceRequest) (*v1.DeleteResourceResponse, error) {
-	scope, err := managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
+	scope, err := s.managementScope(ctx, request.GetResource(), request.GetTargetTenantId())
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +201,14 @@ func (s *ManagementService) DeleteResource(ctx context.Context, request *v1.Dele
 }
 
 func (s *ManagementService) authorize(ctx context.Context, scope managementbiz.Scope, resource, action string) error {
-	if scope.PlatformAdmin || s.permissions == nil {
+	if scope.PlatformAdmin && scope.IsSuperAdmin {
+		return nil
+	}
+	if s.permissions == nil {
+		// 未配置权限检查器时，平台超级管理员已在上方放行；其余情况拒绝，避免误放行。
+		if scope.PlatformAdmin {
+			return kratoserrors.Forbidden("PERMISSION_DENIED", "没有执行该操作的权限")
+		}
 		return nil
 	}
 	allowed, err := s.permissions.Allowed(ctx, scope, resource, action)
@@ -211,9 +225,9 @@ var tenantSetupResources = map[string]struct{}{
 	"tenant-admins": {}, "roles": {}, "casbin-rules": {},
 }
 
-func managementListScope(ctx context.Context, resource string, targetTenantID uint64) (managementbiz.Scope, error) {
+func (s *ManagementService) managementListScope(ctx context.Context, resource string, targetTenantID uint64) (managementbiz.Scope, error) {
 	if targetTenantID == 0 || resource != "tenant-resources" {
-		return managementScope(ctx, resource, targetTenantID)
+		return s.managementScope(ctx, resource, targetTenantID)
 	}
 	claims, ok := bizauth.ClaimsFromContext(ctx)
 	if !ok {
@@ -222,10 +236,12 @@ func managementListScope(ctx context.Context, resource string, targetTenantID ui
 	if !bizauth.IsPlatformContext(claims) {
 		return managementbiz.Scope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "租户初始化仅限平台管理员")
 	}
-	return managementbiz.Scope{TenantID: targetTenantID, UserID: claims.UserID, PlatformAdmin: true}, nil
+	scope := managementbiz.Scope{TenantID: targetTenantID, UserID: claims.UserID, PlatformAdmin: true, Realm: string(bizauth.RealmPlatform)}
+	scope.IsSuperAdmin = s.resolvePlatformSuperAdmin(ctx, claims.UserID)
+	return scope, nil
 }
 
-func managementScope(ctx context.Context, resource string, targetTenantID uint64) (managementbiz.Scope, error) {
+func (s *ManagementService) managementScope(ctx context.Context, resource string, targetTenantID uint64) (managementbiz.Scope, error) {
 	claims, ok := bizauth.ClaimsFromContext(ctx)
 	if !ok {
 		return managementbiz.Scope{}, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
@@ -238,28 +254,61 @@ func managementScope(ctx context.Context, resource string, targetTenantID uint64
 		if _, allowed := tenantSetupResources[resource]; !allowed {
 			return managementbiz.Scope{}, kratoserrors.BadRequest("TENANT_SETUP_RESOURCE_INVALID", "该资源不能通过租户初始化入口维护")
 		}
-		return managementbiz.Scope{
+		scope := managementbiz.Scope{
 			TenantID: targetTenantID, UserID: claims.UserID, PlatformAdmin: true,
-		}, nil
+			Realm: string(bizauth.RealmPlatform),
+		}
+		scope.IsSuperAdmin = s.resolvePlatformSuperAdmin(ctx, claims.UserID)
+		return scope, nil
 	}
 	if isPlatformResource(resource) && !platformContext {
 		return managementbiz.Scope{}, kratoserrors.Forbidden("PLATFORM_ADMIN_REQUIRED", "该资源仅限平台管理员")
 	}
-	return managementbiz.Scope{
+	scope := managementbiz.Scope{
 		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID,
 		ImpersonatorID: claims.ImpersonatorID,
 		PlatformAdmin:  claims.Realm == bizauth.RealmPlatform,
 		Impersonating:  claims.ImpersonatorID > 0,
-	}, nil
+		Realm:          string(claims.Realm),
+	}
+	if scope.PlatformAdmin {
+		scope.IsSuperAdmin = s.resolvePlatformSuperAdmin(ctx, claims.UserID)
+	}
+	return scope, nil
+}
+
+// resolvePlatformSuperAdmin 解析平台管理员是否为超级管理员。
+// 未注入平台管理员仓储时按超级管理员处理，保持测试与未配置场景的兼容性。
+func (s *ManagementService) resolvePlatformSuperAdmin(ctx context.Context, userID uint64) bool {
+	if s.platformAdmins == nil {
+		return true
+	}
+	admin, err := s.platformAdmins.FindByID(ctx, userID)
+	if err != nil || admin == nil {
+		return false
+	}
+	return admin.IsSuperAdmin
 }
 
 func isPlatformResource(resource string) bool {
 	switch resource {
-	case "app-users", "tenants", "resources", "tenant-resources", "tenant-setup", "platform-admins", "platform-roles", "platform-casbin-rules":
+	case "app-users", "tenants", "resources", "tenant-resources", "tenant-setup",
+		"platform-admins", "platform-roles", "platform-casbin-rules",
+		"platform-login-logs", "platform-audit-logs", "platform-api-logs", "platform-log-exports":
 		return true
 	default:
 		return false
 	}
+}
+
+func roleAuthorizationResourceKey(ctx context.Context, targetTenantID uint64) string {
+	if targetTenantID != 0 {
+		return "roles"
+	}
+	if claims, ok := bizauth.ClaimsFromContext(ctx); ok && bizauth.IsPlatformContext(claims) {
+		return "platform-roles"
+	}
+	return "roles"
 }
 
 func normalizePage(page, pageSize uint32) (uint32, uint32) {

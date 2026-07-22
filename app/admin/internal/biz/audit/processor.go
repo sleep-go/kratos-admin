@@ -6,7 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/google/wire"
 )
+
+// ProviderSet 是审计 biz 层的 Wire Provider 集合。
+var ProviderSet = wire.NewSet(NewProcessor)
 
 // ErrEventNotFound 表示待处理 Outbox 事件不存在。
 var ErrEventNotFound = errors.New("审计Outbox事件不存在")
@@ -25,6 +30,7 @@ type Entry struct {
 	UserID         uint64         `json:"user_id"`
 	MemberID       uint64         `json:"member_id"`
 	ImpersonatorID uint64         `json:"impersonator_id"`
+	Realm          string         `json:"realm"`
 	Action         string         `json:"action"`
 	ResourceType string         `json:"resource_type"`
 	ResourceID   string         `json:"resource_id"`
@@ -60,6 +66,13 @@ func (p *Processor) Process(ctx context.Context, eventID string) error {
 	}
 	if entry.Summary == "" {
 		entry.Summary = fmt.Sprintf("%s %s %s", entry.Action, entry.ResourceType, entry.ResourceID)
+	}
+	// 校验 realm 与 tenant_id 一致性，防止跨域污染。
+	if entry.Realm == "platform" && entry.TenantID != 0 {
+		return errors.New("平台域审计事件 tenant_id 必须为 0")
+	}
+	if entry.Realm == "tenant" && entry.TenantID == 0 {
+		return errors.New("租户域审计事件 tenant_id 必须 >0")
 	}
 	_, err = p.repository.Publish(ctx, event, entry)
 	return err

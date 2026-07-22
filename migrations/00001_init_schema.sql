@@ -190,6 +190,7 @@ CREATE TABLE verification_codes (
 CREATE TABLE login_logs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '登录日志主键',
     tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '登录租户ID，0表示未选择或平台域',
+    realm VARCHAR(16) NOT NULL DEFAULT 'tenant' COMMENT '域：platform平台，tenant租户，app应用',
     user_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID，未识别用户为0',
     identifier VARCHAR(191) NOT NULL COMMENT '脱敏后的登录标识',
     result TINYINT UNSIGNED NOT NULL COMMENT '登录结果：1成功，2失败，3锁定，4需要MFA',
@@ -199,6 +200,7 @@ CREATE TABLE login_logs (
     request_id VARCHAR(64) NOT NULL DEFAULT '' COMMENT '请求追踪ID',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '发生时间',
     PRIMARY KEY (id),
+    KEY idx_login_logs_realm_tenant (realm, tenant_id),
     KEY idx_login_logs_query (tenant_id, created_at),
     KEY idx_login_logs_user (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录安全日志表';
@@ -225,6 +227,7 @@ CREATE TABLE audit_logs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '操作审计日志主键',
     event_id CHAR(36) NOT NULL COMMENT '来源Outbox事件UUID',
     tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属租户ID，0表示平台域',
+    realm VARCHAR(16) NOT NULL DEFAULT 'tenant' COMMENT '域：platform平台，tenant租户，app应用',
     user_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '操作用户ID，系统任务为0',
     member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '兼容字段，阶段1固定为0',
     impersonator_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '代维平台管理员ID，非代维为0',
@@ -240,6 +243,7 @@ CREATE TABLE audit_logs (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '发生时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_audit_logs_event (event_id),
+    KEY idx_audit_logs_realm_tenant (realm, tenant_id),
     KEY idx_audit_logs_query (tenant_id, created_at),
     KEY idx_audit_logs_actor (tenant_id, user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作审计日志表';
@@ -247,6 +251,7 @@ CREATE TABLE audit_logs (
 CREATE TABLE api_access_logs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'API访问日志主键',
     tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属租户ID，0表示未认证或平台域',
+    realm VARCHAR(16) NOT NULL DEFAULT 'tenant' COMMENT '域：platform平台，tenant租户，app应用',
     user_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '用户ID，未认证为0',
     request_id VARCHAR(64) NOT NULL COMMENT '请求追踪ID',
     method VARCHAR(16) NOT NULL COMMENT 'HTTP方法',
@@ -259,6 +264,7 @@ CREATE TABLE api_access_logs (
     error_reason VARCHAR(128) NOT NULL DEFAULT '' COMMENT '业务错误原因',
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '发生时间',
     PRIMARY KEY (id),
+    KEY idx_api_access_logs_realm_tenant (realm, tenant_id),
     KEY idx_api_access_logs_query (tenant_id, created_at),
     KEY idx_api_access_logs_request (request_id),
     KEY idx_api_access_logs_error (tenant_id, status_code, created_at)
@@ -367,6 +373,7 @@ CREATE TABLE file_references (
 CREATE TABLE log_exports (
     id CHAR(36) NOT NULL COMMENT '日志导出任务UUID',
     tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '所属租户ID，0表示平台跨租户导出',
+    realm VARCHAR(16) NOT NULL DEFAULT 'tenant' COMMENT '域：platform平台，tenant租户，app应用',
     user_id BIGINT UNSIGNED NOT NULL COMMENT '发起导出的用户ID',
     member_id BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '兼容字段，阶段1固定为0',
     log_type VARCHAR(16) NOT NULL COMMENT '日志类型：login登录日志，audit操作审计，api接口访问日志',
@@ -387,6 +394,7 @@ CREATE TABLE log_exports (
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_log_exports_idempotency (idempotency_key),
+    KEY idx_log_exports_realm_tenant (realm, tenant_id),
     KEY idx_log_exports_pending (status, next_retry_at, dispatched_at, created_at),
     KEY idx_log_exports_query (tenant_id, user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='异步日志导出任务表';
@@ -415,8 +423,7 @@ VALUES
     (0, 1, 1, 'menu.platform.tenants', '租户运营', '', '', 'OfficeBuilding', 10, 1, 1),
     (0, 1, 1, 'menu.platform.identity', '身份与账号', '', '', 'UserFilled', 20, 1, 1),
     (0, 1, 1, 'menu.platform.system', '系统配置', '', '', 'Setting', 30, 1, 1),
-    (0, 1, 1, 'menu.platform.logs', '日志审计', '', '', 'Document', 40, 1, 1),
-    (0, 1, 1, 'menu.platform', '平台管理', '', '', 'OfficeBuilding', 99, 0, 1);
+    (0, 1, 1, 'menu.platform.logs', '日志审计', '', '', 'Document', 40, 1, 1);
 
 INSERT INTO resources (parent_id, type, scope_mask, code, name, route_path, component_key, icon, sort_order, visible, status)
 VALUES
@@ -428,7 +435,7 @@ VALUES
     ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 2, 1, 'app-users', 'App 用户', '/platform/app-users', 'app-users', 'User', 21, 1, 1),
     ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 2, 1, 'platform-admins', '平台管理员', '/platform/admins', 'platform-admins', 'UserFilled', 22, 1, 1),
     ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 2, 1, 'platform-roles', '平台角色', '/platform/permission/roles', 'platform-roles', 'Lock', 23, 1, 1),
-    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 2, 1, 'platform-casbin-rules', '按钮与 API 授权', '/platform/permission/policies', 'platform-casbin-rules', 'Key', 24, 1, 1),
+    ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.identity') AS p), 3, 1, 'platform-casbin-rules', '按钮与 API 授权', '', 'platform-casbin-rules', 'Key', 24, 0, 1),
 
     ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.system') AS p), 2, 1, 'resources', '菜单与权限资源', '/platform/resources', 'resources', 'Menu', 31, 1, 1),
     ((SELECT id FROM (SELECT id FROM resources WHERE code = 'menu.platform.system') AS p), 2, 1, 'providers', '渠道配置', '/platform/settings/providers', 'providers', 'Connection', 32, 1, 1),

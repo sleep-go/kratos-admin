@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	v1 "github.com/sleep-go/kratos-admin/api/admin/v1"
 	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
@@ -26,7 +27,7 @@ func (r *fakeManagementRepository) UpdateTenantFeatures(_ context.Context, _ man
 	return nil
 }
 
-func (r *fakeManagementRepository) UpdateRoleAuthorization(_ context.Context, _ managementbiz.Scope, roleID uint64, dataScope uint32, _ []managementbiz.RoleGrant, _ []uint64) error {
+func (r *fakeManagementRepository) UpdateRoleAuthorization(_ context.Context, _ managementbiz.Scope, roleID uint64, dataScope uint32, _ []managementbiz.RoleGrant, _ []uint64, _ []uint64) error {
 	r.roleID, r.roleScope = roleID, dataScope
 	return nil
 }
@@ -39,6 +40,31 @@ type fakePermissionChecker struct {
 func (c *fakePermissionChecker) Allowed(_ context.Context, scope managementbiz.Scope, _, _ string) (bool, error) {
 	c.scope = scope
 	return c.allowed, nil
+}
+
+// fakePlatformAdminRepository 用于测试平台管理员超级标记解析。
+type fakePlatformAdminRepository struct {
+	admin *bizauth.PlatformAdmin
+}
+
+func (r *fakePlatformAdminRepository) FindByIdentifier(_ context.Context, _ string) (*bizauth.PlatformAdmin, error) {
+	return r.admin, nil
+}
+
+func (r *fakePlatformAdminRepository) FindByID(_ context.Context, _ uint64) (*bizauth.PlatformAdmin, error) {
+	return r.admin, nil
+}
+
+func (r *fakePlatformAdminRepository) ListPermissions(_ context.Context, _ uint64) ([]string, error) {
+	return nil, nil
+}
+
+func (r *fakePlatformAdminRepository) UpdateLoginFailure(_ context.Context, _ uint64, _ uint32, _ *time.Time) error {
+	return nil
+}
+
+func (r *fakePlatformAdminRepository) ResetLoginFailures(_ context.Context, _ uint64) error {
+	return nil
 }
 
 func (r *fakeManagementRepository) List(_ context.Context, scope managementbiz.Scope, _ string, _ managementbiz.PageQuery) ([]map[string]any, uint64, error) {
@@ -225,5 +251,34 @@ func TestPlatformTenantSetupCanListTargetTenantFeatures(t *testing.T) {
 	}
 	if repository.scope.TenantID != 8 || !repository.scope.PlatformAdmin {
 		t.Fatalf("scope = %+v, want target tenant 8", repository.scope)
+	}
+}
+
+// TestPlatformNonSuperAdminRejectedByCasbin 验证非超级管理员的平台管理员受 Casbin 约束。
+func TestPlatformNonSuperAdminRejectedByCasbin(t *testing.T) {
+	repository := &fakeManagementRepository{}
+	checker := &fakePermissionChecker{allowed: false}
+	service := NewManagementService(repository, checker)
+	service.ConfigurePlatformAdmins(&fakePlatformAdminRepository{admin: &bizauth.PlatformAdmin{ID: 5, IsSuperAdmin: false, Status: bizauth.UserStatusEnabled}})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 0, Realm: bizauth.RealmPlatform})
+
+	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "platform-admins"}); err == nil {
+		t.Fatal("非超级管理员的平台管理员必须接受 Casbin 校验")
+	}
+	if !checker.scope.PlatformAdmin || checker.scope.IsSuperAdmin {
+		t.Fatalf("scope = %+v，应传给 Casbin 校验且 IsSuperAdmin=false", checker.scope)
+	}
+}
+
+// TestPlatformSuperAdminBypassesCasbin 验证超级管理员跳过 Casbin 校验。
+func TestPlatformSuperAdminBypassesCasbin(t *testing.T) {
+	repository := &fakeManagementRepository{}
+	checker := &fakePermissionChecker{allowed: false}
+	service := NewManagementService(repository, checker)
+	service.ConfigurePlatformAdmins(&fakePlatformAdminRepository{admin: &bizauth.PlatformAdmin{ID: 5, IsSuperAdmin: true, Status: bizauth.UserStatusEnabled}})
+	ctx := bizauth.NewClaimsContext(context.Background(), &bizauth.TokenClaims{UserID: 5, TenantID: 0, Realm: bizauth.RealmPlatform})
+
+	if _, err := service.ListResources(ctx, &v1.ListResourcesRequest{Resource: "platform-admins"}); err != nil {
+		t.Fatalf("超级管理员应跳过 Casbin 校验，err = %v", err)
 	}
 }

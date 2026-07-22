@@ -197,8 +197,29 @@ function openEdit(row: ResourceRow) {
   for (const field of resolvedFormFields.value) {
     if (field.key in row) form[field.key] = row[field.key]
   }
+  // 平台管理员编辑时回填已绑定的平台角色 ID（Casbin g: v1=admin_id, v2=role_id）。
+  if (definition.value?.resource === 'platform-admins' && row.id) {
+    form.role_ids = []
+    void loadPlatformAdminRoleIds(String(row.id))
+  }
   drawerOpen.value = true
   void loadFormOptions()
+}
+
+async function loadPlatformAdminRoleIds(adminId: string) {
+  try {
+    const response = await managementApi.listResources('platform-casbin-rules', {
+      page: 1,
+      page_size: 200,
+      filters: { ptype: 'g', v1: adminId }
+    })
+    form.role_ids = (response.items ?? [])
+      .filter((item) => item.ptype === 'g' && String(item.v1) === adminId)
+      .map((item) => Number(item.v2))
+      .filter((id) => Number.isFinite(id) && id > 0)
+  } catch {
+    form.role_ids = []
+  }
 }
 
 function rowIndent(row: ResourceRow) {

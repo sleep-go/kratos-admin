@@ -43,13 +43,13 @@ func newManagementReadQuery(ctx context.Context, q *query.Query, resource string
 		dao = q.TenantResource.WithContext(ctx).As(definition.table)
 	case "casbin-rules", "platform-casbin-rules":
 		dao = q.CasbinRule.WithContext(ctx).As(definition.table)
-	case "login-logs":
+	case "login-logs", "platform-login-logs":
 		dao = q.LoginLog.WithContext(ctx).As(definition.table)
-	case "audit-logs":
+	case "audit-logs", "platform-audit-logs":
 		dao = q.AuditLog.WithContext(ctx).As(definition.table)
-	case "api-logs":
+	case "api-logs", "platform-api-logs":
 		dao = q.APIAccessLog.WithContext(ctx).As(definition.table)
-	case "log-exports":
+	case "log-exports", "platform-log-exports":
 		dao = q.LogExport.WithContext(ctx).As(definition.table)
 	case "settings":
 		dao = q.SystemSetting.WithContext(ctx).As(definition.table)
@@ -86,14 +86,25 @@ func (q managementReadQuery) field(name string) field.Field {
 
 func isLogResource(resource string) bool {
 	switch resource {
-	case "audit-logs", "login-logs", "api-logs", "log-exports":
+	case "audit-logs", "login-logs", "api-logs", "log-exports",
+		"platform-audit-logs", "platform-login-logs", "platform-api-logs", "platform-log-exports":
 		return true
 	default:
 		return false
 	}
 }
 
-// isPlatformLogScope 表示平台域直接上下文，可查询 tenant_id=0 的日志。
+// isPlatformLogResource 判断是否为平台域专属日志资源，强制按 tenant_id=0 过滤。
+func isPlatformLogResource(resource string) bool {
+	switch resource {
+	case "platform-login-logs", "platform-audit-logs", "platform-api-logs", "platform-log-exports":
+		return true
+	default:
+		return false
+	}
+}
+
+// isPlatformLogScope 表示平台域直接上下文，可查询 tenant_id=0 的租户侧日志资源。
 func isPlatformLogScope(scope managementbiz.Scope) bool {
 	return scope.PlatformAdmin && scope.TenantID == 0 && !scope.Impersonating
 }
@@ -107,7 +118,10 @@ func (r *ManagementRepository) scopedManagementRead(ctx context.Context, scope m
 	if err != nil {
 		return managementReadQuery{}, err
 	}
-	if isLogResource(resource) {
+	if isPlatformLogResource(resource) {
+		// 平台域日志资源固定查询 tenant_id=0 的平台日志。
+		read.dao = read.dao.Where(read.field("tenant_id").Eq(managementSQLValue{uint64(0)}))
+	} else if isLogResource(resource) {
 		tenantID := scope.TenantID
 		if isPlatformLogScope(scope) {
 			tenantID = 0

@@ -123,6 +123,8 @@ message UpdateRoleAuthorizationRequest {
   repeated RoleResourceGrant grants = 3;
   repeated uint64 department_ids = 4;
   uint64 target_tenant_id = 5;
+  // 平台域：绑定到该角色的 platform_admin.id 列表（写 Casbin g 策略）
+  repeated uint64 admin_ids = 6;
 }
 
 message UpdateRoleAuthorizationResponse {

@@ -30,6 +30,7 @@ func newLoginLog(db *gorm.DB, opts ...gen.DOOption) loginLog {
 	_loginLog.ALL = field.NewAsterisk(tableName)
 	_loginLog.ID = field.NewUint64(tableName, "id")
 	_loginLog.TenantID = field.NewUint64(tableName, "tenant_id")
+	_loginLog.Realm = field.NewString(tableName, "realm")
 	_loginLog.UserID = field.NewUint64(tableName, "user_id")
 	_loginLog.Identifier = field.NewString(tableName, "identifier")
 	_loginLog.Result = field.NewUint8(tableName, "result")
@@ -51,6 +52,7 @@ type loginLog struct {
 	ALL        field.Asterisk
 	ID         field.Uint64 // 登录日志主键
 	TenantID   field.Uint64 // 登录租户ID，0表示未选择或平台域
+	Realm      field.String // 域：platform平台，tenant租户，app应用
 	UserID     field.Uint64 // 用户ID，未识别用户为0
 	Identifier field.String // 脱敏后的登录标识
 	Result     field.Uint8  // 登录结果：1成功，2失败，3锁定，4需要MFA
@@ -77,6 +79,7 @@ func (l *loginLog) updateTableName(table string) *loginLog {
 	l.ALL = field.NewAsterisk(table)
 	l.ID = field.NewUint64(table, "id")
 	l.TenantID = field.NewUint64(table, "tenant_id")
+	l.Realm = field.NewString(table, "realm")
 	l.UserID = field.NewUint64(table, "user_id")
 	l.Identifier = field.NewString(table, "identifier")
 	l.Result = field.NewUint8(table, "result")
@@ -109,9 +112,10 @@ func (l *loginLog) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (l *loginLog) fillFieldMap() {
-	l.fieldMap = make(map[string]field.Expr, 10)
+	l.fieldMap = make(map[string]field.Expr, 11)
 	l.fieldMap["id"] = l.ID
 	l.fieldMap["tenant_id"] = l.TenantID
+	l.fieldMap["realm"] = l.Realm
 	l.fieldMap["user_id"] = l.UserID
 	l.fieldMap["identifier"] = l.Identifier
 	l.fieldMap["result"] = l.Result

@@ -46,10 +46,11 @@ export interface ResourceField {
     | 'tree'
   required?: boolean
   table?: boolean
-  default?: string | number | boolean
+  default?: string | number | boolean | number[]
   valueLabels?: Record<string, string>
   form?: boolean
   createOnly?: boolean
+  multiple?: boolean
   options?: ResourceOption[]
   lookup?: ResourceLookupDefinition
   lookupBy?: ResourceLookupByDefinition
@@ -199,12 +200,27 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
   'platform-admins': {
     resource: 'platform-admins',
     title: '平台管理员',
-    description: '管理平台级管理员账号及登录安全策略。',
+    description: '管理平台级管理员账号；普通管理员请在「平台角色」页绑定角色。',
     fields: [
       { key: 'username', label: '用户名', required: true, table: true },
       { key: 'email', label: '邮箱', table: true },
       { key: 'phone', label: '手机号', table: true },
       { key: 'display_name', label: '显示名称', required: true, table: true },
+      { key: 'is_super_admin', label: '超级管理员', type: 'boolean', table: true, form: false },
+      {
+        key: 'role_ids',
+        label: '平台角色',
+        type: 'relation',
+        multiple: true,
+        default: [],
+        form: true,
+        table: false,
+        lookup: {
+          resource: 'platform-roles',
+          labelKeys: ['name', 'code'],
+          onlyActive: true
+        }
+      },
       {
         key: 'initial_password',
         label: '初始密码',
@@ -337,7 +353,7 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
   'platform-roles': {
     resource: 'platform-roles',
     title: '平台角色',
-    description: '配置平台域角色与状态。',
+    description: '配置平台角色权限，并在角色页绑定普通平台管理员。',
     fields: [
       { key: 'code', label: '角色编码', required: true, table: true },
       { key: 'name', label: '角色名称', required: true, table: true },
@@ -703,6 +719,174 @@ export const resourceDefinitions: Record<string, ResourceDefinition> = {
     resource: 'log-exports',
     title: '日志导出记录',
     description: '查询异步导出状态并下载已完成的受保护文件。',
+    readOnly: true,
+    filters: [
+      {
+        key: 'log_type',
+        label: '日志类型',
+        type: 'select',
+        options: [
+          { label: '登录日志', value: 'login' },
+          { label: '操作审计', value: 'audit' },
+          { label: 'API 日志', value: 'api' }
+        ]
+      },
+      {
+        key: 'status',
+        label: '任务状态',
+        type: 'select',
+        options: [
+          { label: '等待处理', value: '1' },
+          { label: '处理中', value: '2' },
+          { label: '已完成', value: '3' },
+          { label: '失败', value: '4' }
+        ]
+      }
+    ],
+    fields: [
+      {
+        key: 'log_type',
+        label: '日志类型',
+        table: true,
+        valueLabels: { login: '登录日志', audit: '操作审计', api: 'API 日志' }
+      },
+      {
+        key: 'status',
+        label: '任务状态',
+        table: true,
+        valueLabels: { '1': '等待处理', '2': '处理中', '3': '已完成', '4': '失败' }
+      },
+      { key: 'row_count', label: '导出条数', table: true },
+      { key: 'file_id', label: '文件 ID', table: true },
+      { key: 'retry_count', label: '重试次数', table: true },
+      { key: 'failure_reason', label: '失败原因', table: true },
+      createdAt
+    ]
+  },
+  'platform-login-logs': {
+    resource: 'platform-login-logs',
+    title: '平台登录日志',
+    description: '查看平台管理员登录成功、失败、锁定与 MFA 事件。',
+    readOnly: true,
+    exportLogType: 'login',
+    filters: [
+      {
+        key: 'result',
+        label: '登录结果',
+        type: 'select',
+        options: [
+          { label: '成功', value: '1' },
+          { label: '失败', value: '2' },
+          { label: '账号锁定', value: '3' },
+          { label: '需要 MFA', value: '4' }
+        ]
+      },
+      { key: 'user_id', label: '用户 ID', type: 'text' }
+    ],
+    fields: [
+      { key: 'identifier', label: '登录标识', table: true },
+      {
+        key: 'result',
+        label: '结果',
+        table: true,
+        valueLabels: { '1': '成功', '2': '失败', '3': '账号锁定', '4': '需要 MFA' }
+      },
+      {
+        key: 'reason',
+        label: '原因',
+        table: true,
+        valueLabels: {
+          AUTH_INVALID_ARGUMENT: '账号和密码不能为空',
+          CAPTCHA_INVALID: '图形验证码错误或已过期',
+          AUTH_INVALID_CREDENTIALS: '账号或密码错误',
+          AUTH_ACCOUNT_LOCKED: '账号已被临时锁定',
+          AUTH_ACCOUNT_DISABLED: '账号已被禁用',
+          AUTH_NO_TENANT: '账号没有可用租户',
+          AUTH_INTERNAL: '认证服务暂时不可用',
+          MFA_REQUIRED: '需要 MFA 验证'
+        }
+      },
+      { key: 'ip', label: 'IP', table: true },
+      { key: 'request_id', label: '请求 ID', table: true },
+      createdAt
+    ]
+  },
+  'platform-audit-logs': {
+    resource: 'platform-audit-logs',
+    title: '平台操作审计',
+    description: '查询平台治理操作的可靠审计记录。',
+    readOnly: true,
+    exportLogType: 'audit',
+    filters: [
+      { key: 'action', label: '操作类型', type: 'select', options: auditActionOptions },
+      {
+        key: 'resource_type',
+        label: '资源类型',
+        type: 'select',
+        options: auditResourceOptions
+      },
+      { key: 'user_id', label: '用户 ID', type: 'text' },
+      { key: 'member_id', label: '成员 ID', type: 'text' }
+    ],
+    fields: [
+      {
+        key: 'summary',
+        label: '操作摘要',
+        table: true,
+        format: (value, row) =>
+          auditSummaryLabel(value, row.action, row.resource_type, row.resource_id)
+      },
+      { key: 'action', label: '动作', table: true, format: auditActionLabel },
+      {
+        key: 'resource_type',
+        label: '资源类型',
+        table: true,
+        format: auditResourceLabel
+      },
+      { key: 'resource_id', label: '资源 ID', table: true },
+      { key: 'user_id', label: '用户 ID', table: true },
+      { key: 'request_id', label: '请求 ID', table: true },
+      createdAt
+    ]
+  },
+  'platform-api-logs': {
+    resource: 'platform-api-logs',
+    title: '平台 API 日志',
+    description: '按路由、状态码和请求 ID 排查平台治理接口异常。',
+    readOnly: true,
+    exportLogType: 'api',
+    filters: [
+      {
+        key: 'method',
+        label: 'HTTP 方法',
+        type: 'select',
+        options: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((value) => ({ label: value, value }))
+      },
+      {
+        key: 'status_code',
+        label: '状态码',
+        type: 'select',
+        options: ['200', '400', '401', '403', '404', '409', '500'].map((value) => ({
+          label: value,
+          value
+        }))
+      },
+      { key: 'user_id', label: '用户 ID', type: 'text' }
+    ],
+    fields: [
+      { key: 'method', label: '方法', table: true },
+      { key: 'route', label: '路由', table: true },
+      { key: 'status_code', label: '状态码', table: true },
+      { key: 'duration_ms', label: '耗时(ms)', table: true },
+      { key: 'request_id', label: '请求 ID', table: true },
+      { key: 'error_reason', label: '异常原因', table: true },
+      createdAt
+    ]
+  },
+  'platform-log-exports': {
+    resource: 'platform-log-exports',
+    title: '平台日志导出',
+    description: '查询平台日志异步导出状态并下载已完成的受保护文件。',
     readOnly: true,
     filters: [
       {

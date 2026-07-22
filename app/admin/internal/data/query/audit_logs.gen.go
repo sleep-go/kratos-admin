@@ -31,6 +31,7 @@ func newAuditLog(db *gorm.DB, opts ...gen.DOOption) auditLog {
 	_auditLog.ID = field.NewUint64(tableName, "id")
 	_auditLog.EventID = field.NewString(tableName, "event_id")
 	_auditLog.TenantID = field.NewUint64(tableName, "tenant_id")
+	_auditLog.Realm = field.NewString(tableName, "realm")
 	_auditLog.UserID = field.NewUint64(tableName, "user_id")
 	_auditLog.MemberID = field.NewUint64(tableName, "member_id")
 	_auditLog.ImpersonatorID = field.NewUint64(tableName, "impersonator_id")
@@ -58,6 +59,7 @@ type auditLog struct {
 	ID             field.Uint64 // 操作审计日志主键
 	EventID        field.String // 来源Outbox事件UUID
 	TenantID       field.Uint64 // 所属租户ID，0表示平台域
+	Realm          field.String // 域：platform平台，tenant租户，app应用
 	UserID         field.Uint64 // 操作用户ID，系统任务为0
 	MemberID       field.Uint64 // 兼容字段，阶段1固定为0
 	ImpersonatorID field.Uint64 // 代维平台管理员ID，非代维为0
@@ -90,6 +92,7 @@ func (a *auditLog) updateTableName(table string) *auditLog {
 	a.ID = field.NewUint64(table, "id")
 	a.EventID = field.NewString(table, "event_id")
 	a.TenantID = field.NewUint64(table, "tenant_id")
+	a.Realm = field.NewString(table, "realm")
 	a.UserID = field.NewUint64(table, "user_id")
 	a.MemberID = field.NewUint64(table, "member_id")
 	a.ImpersonatorID = field.NewUint64(table, "impersonator_id")
@@ -127,10 +130,11 @@ func (a *auditLog) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *auditLog) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 16)
+	a.fieldMap = make(map[string]field.Expr, 17)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["event_id"] = a.EventID
 	a.fieldMap["tenant_id"] = a.TenantID
+	a.fieldMap["realm"] = a.Realm
 	a.fieldMap["user_id"] = a.UserID
 	a.fieldMap["member_id"] = a.MemberID
 	a.fieldMap["impersonator_id"] = a.ImpersonatorID

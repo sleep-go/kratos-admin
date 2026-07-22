@@ -14,8 +14,12 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/google/wire"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/storage"
 )
+
+// ProviderSet 是文件 biz 层的 Wire Provider 集合。
+var ProviderSet = wire.NewSet(NewUsecase)
 
 const (
 	sha256HexLength = 64

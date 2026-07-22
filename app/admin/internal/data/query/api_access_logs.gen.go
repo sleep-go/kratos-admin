@@ -30,6 +30,7 @@ func newAPIAccessLog(db *gorm.DB, opts ...gen.DOOption) aPIAccessLog {
 	_aPIAccessLog.ALL = field.NewAsterisk(tableName)
 	_aPIAccessLog.ID = field.NewUint64(tableName, "id")
 	_aPIAccessLog.TenantID = field.NewUint64(tableName, "tenant_id")
+	_aPIAccessLog.Realm = field.NewString(tableName, "realm")
 	_aPIAccessLog.UserID = field.NewUint64(tableName, "user_id")
 	_aPIAccessLog.RequestID = field.NewString(tableName, "request_id")
 	_aPIAccessLog.Method = field.NewString(tableName, "method")
@@ -54,6 +55,7 @@ type aPIAccessLog struct {
 	ALL         field.Asterisk
 	ID          field.Uint64 // API访问日志主键
 	TenantID    field.Uint64 // 所属租户ID，0表示未认证或平台域
+	Realm       field.String // 域：platform平台，tenant租户，app应用
 	UserID      field.Uint64 // 用户ID，未认证为0
 	RequestID   field.String // 请求追踪ID
 	Method      field.String // HTTP方法
@@ -83,6 +85,7 @@ func (a *aPIAccessLog) updateTableName(table string) *aPIAccessLog {
 	a.ALL = field.NewAsterisk(table)
 	a.ID = field.NewUint64(table, "id")
 	a.TenantID = field.NewUint64(table, "tenant_id")
+	a.Realm = field.NewString(table, "realm")
 	a.UserID = field.NewUint64(table, "user_id")
 	a.RequestID = field.NewString(table, "request_id")
 	a.Method = field.NewString(table, "method")
@@ -122,9 +125,10 @@ func (a *aPIAccessLog) GetFieldByName(fieldName string) (field.OrderExpr, bool) 
 }
 
 func (a *aPIAccessLog) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 13)
+	a.fieldMap = make(map[string]field.Expr, 14)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["tenant_id"] = a.TenantID
+	a.fieldMap["realm"] = a.Realm
 	a.fieldMap["user_id"] = a.UserID
 	a.fieldMap["request_id"] = a.RequestID
 	a.fieldMap["method"] = a.Method

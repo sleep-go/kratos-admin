@@ -14,6 +14,7 @@ const TableNameLoginLog = "login_logs"
 type LoginLog struct {
 	ID         uint64    `gorm:"column:id;type:bigint unsigned;primaryKey;autoIncrement:true;comment:登录日志主键" json:"id"`                                                                 // 登录日志主键
 	TenantID   uint64    `gorm:"column:tenant_id;type:bigint unsigned;not null;index:idx_login_logs_query,priority:1;default:0;comment:登录租户ID，0表示未选择或平台域" json:"tenant_id"`             // 登录租户ID，0表示未选择或平台域
+	Realm      string    `gorm:"column:realm;type:varchar(16);not null;default:tenant;comment:域：platform平台，tenant租户，app应用" json:"realm"`                                              // 域：platform平台，tenant租户，app应用
 	UserID     uint64    `gorm:"column:user_id;type:bigint unsigned;not null;index:idx_login_logs_user,priority:1;default:0;comment:用户ID，未识别用户为0" json:"user_id"`                       // 用户ID，未识别用户为0
 	Identifier string    `gorm:"column:identifier;type:varchar(191);not null;comment:脱敏后的登录标识" json:"identifier"`                                                                       // 脱敏后的登录标识
 	Result     uint8     `gorm:"column:result;type:tinyint unsigned;not null;comment:登录结果：1成功，2失败，3锁定，4需要MFA" json:"result"`                                                            // 登录结果：1成功，2失败，3锁定，4需要MFA

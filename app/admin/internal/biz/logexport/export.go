@@ -13,8 +13,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/wire"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/storage"
 )
+
+// ProviderSet 是日志导出 biz 层的 Wire Provider 集合。
+var ProviderSet = wire.NewSet(NewUsecase, NewProcessor)
 
 const (
 	// MaxRows 是单个导出任务允许写入的最大日志条数。
@@ -44,12 +48,14 @@ type Access struct {
 	UserID        uint64
 	MemberID      uint64
 	PlatformAdmin bool
+	Realm         string
 }
 
 // Record 描述日志导出任务及完成文件状态。
 type Record struct {
 	ID             string
 	TenantID       uint64
+	Realm          string
 	UserID         uint64
 	MemberID       uint64
 	LogType        string
@@ -100,7 +106,7 @@ func NewUsecase(repository Repository, provider storage.Provider, now func() tim
 
 // Create 校验白名单筛选条件并创建载荷版本为1的待处理任务。
 func (u *Usecase) Create(ctx context.Context, access Access, logType, keyword string, filters map[string]string) (Record, error) {
-	if access.UserID == 0 || !validLogType(logType) || len(keyword) > 191 || !validFilters(filters) {
+	if access.UserID == 0 || !validLogType(logType) || len(keyword) > 191 || !validFilters(filters, access.Realm) {
 		return Record{}, ErrInvalidRequest
 	}
 	id, err := randomID()
@@ -113,7 +119,7 @@ func (u *Usecase) Create(ctx context.Context, access Access, logType, keyword st
 		tenantID, memberID = 0, 0
 	}
 	record := Record{
-		ID: id, TenantID: tenantID, UserID: access.UserID, MemberID: memberID,
+		ID: id, TenantID: tenantID, Realm: access.Realm, UserID: access.UserID, MemberID: memberID,
 		LogType: logType, Keyword: strings.TrimSpace(keyword), Filters: cloneFilters(filters),
 		PayloadVersion: 1, IdempotencyKey: "log-export:" + id, Status: StatusPending, CreatedAt: now,
 	}
@@ -213,12 +219,17 @@ func validLogType(value string) bool {
 	return value == "login" || value == "audit" || value == "api"
 }
 
-func validFilters(filters map[string]string) bool {
+func validFilters(filters map[string]string, realm string) bool {
 	if len(filters) > 10 {
 		return false
 	}
 	for key, value := range filters {
 		if len(key) > 64 || len(value) > 191 || key == "tenant_id" || key == "user_id" || key == "member_id" {
+			return false
+		}
+	}
+	if realm == "platform" {
+		if filters["created_at_start"] == "" || filters["created_at_end"] == "" {
 			return false
 		}
 	}

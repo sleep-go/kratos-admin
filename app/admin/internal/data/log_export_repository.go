@@ -34,7 +34,7 @@ func (r *LogExportRepository) Create(ctx context.Context, record logexport.Recor
 		return err
 	}
 	return r.q.LogExport.WithContext(ctx).Create(&model.LogExport{
-		ID: record.ID, TenantID: record.TenantID, UserID: record.UserID, MemberID: record.MemberID,
+		ID: record.ID, TenantID: record.TenantID, Realm: record.Realm, UserID: record.UserID, MemberID: record.MemberID,
 		LogType: record.LogType, Keyword: record.Keyword, Filters: datatypes.JSON(filters),
 		PayloadVersion: record.PayloadVersion, IdempotencyKey: record.IdempotencyKey,
 		Status: record.Status, CreatedAt: record.CreatedAt, UpdatedAt: record.CreatedAt,
@@ -150,8 +150,18 @@ func (r *LogExportRepository) Complete(ctx context.Context, record logexport.Rec
 func (r *LogExportRepository) readLoginLogRows(ctx context.Context, record logexport.Record, limit int, rows *[]map[string]any) error {
 	l := r.q.LoginLog
 	read := l.WithContext(ctx)
-	if record.TenantID != 0 {
+	if record.Realm == "tenant" {
 		read = read.Where(l.TenantID.Eq(record.TenantID))
+	}
+	if start, ok := record.Filters["created_at_start"]; ok && start != "" {
+		if parsed, err := time.Parse(time.RFC3339, start); err == nil {
+			read = read.Where(l.CreatedAt.Gte(parsed))
+		}
+	}
+	if end, ok := record.Filters["created_at_end"]; ok && end != "" {
+		if parsed, err := time.Parse(time.RFC3339, end); err == nil {
+			read = read.Where(l.CreatedAt.Lte(parsed))
+		}
 	}
 	if record.Keyword != "" {
 		like := "%" + record.Keyword + "%"
@@ -171,8 +181,18 @@ func (r *LogExportRepository) readLoginLogRows(ctx context.Context, record logex
 func (r *LogExportRepository) readAuditLogRows(ctx context.Context, record logexport.Record, limit int, rows *[]map[string]any) error {
 	a := r.q.AuditLog
 	read := a.WithContext(ctx)
-	if record.TenantID != 0 {
+	if record.Realm == "tenant" {
 		read = read.Where(a.TenantID.Eq(record.TenantID))
+	}
+	if start, ok := record.Filters["created_at_start"]; ok && start != "" {
+		if parsed, err := time.Parse(time.RFC3339, start); err == nil {
+			read = read.Where(a.CreatedAt.Gte(parsed))
+		}
+	}
+	if end, ok := record.Filters["created_at_end"]; ok && end != "" {
+		if parsed, err := time.Parse(time.RFC3339, end); err == nil {
+			read = read.Where(a.CreatedAt.Lte(parsed))
+		}
 	}
 	if record.Keyword != "" {
 		like := "%" + record.Keyword + "%"
@@ -191,8 +211,18 @@ func (r *LogExportRepository) readAuditLogRows(ctx context.Context, record logex
 func (r *LogExportRepository) readAPILogRows(ctx context.Context, record logexport.Record, limit int, rows *[]map[string]any) error {
 	a := r.q.APIAccessLog
 	read := a.WithContext(ctx)
-	if record.TenantID != 0 {
+	if record.Realm == "tenant" {
 		read = read.Where(a.TenantID.Eq(record.TenantID))
+	}
+	if start, ok := record.Filters["created_at_start"]; ok && start != "" {
+		if parsed, err := time.Parse(time.RFC3339, start); err == nil {
+			read = read.Where(a.CreatedAt.Gte(parsed))
+		}
+	}
+	if end, ok := record.Filters["created_at_end"]; ok && end != "" {
+		if parsed, err := time.Parse(time.RFC3339, end); err == nil {
+			read = read.Where(a.CreatedAt.Lte(parsed))
+		}
 	}
 	if record.Keyword != "" {
 		like := "%" + record.Keyword + "%"
@@ -230,7 +260,7 @@ func mapLogExport(row model.LogExport) logexport.Record {
 	filters := map[string]string{}
 	_ = json.Unmarshal(row.Filters, &filters)
 	return logexport.Record{
-		ID: row.ID, TenantID: row.TenantID, UserID: row.UserID, MemberID: row.MemberID,
+		ID: row.ID, TenantID: row.TenantID, Realm: row.Realm, UserID: row.UserID, MemberID: row.MemberID,
 		LogType: row.LogType, Keyword: row.Keyword, Filters: filters, PayloadVersion: row.PayloadVersion,
 		IdempotencyKey: row.IdempotencyKey, Status: row.Status, RowCount: row.RowCount, FileID: row.FileID,
 		RetryCount: row.RetryCount, FailureReason: row.FailureReason, CreatedAt: row.CreatedAt, FinishedAt: row.FinishedAt,

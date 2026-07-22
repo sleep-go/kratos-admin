@@ -98,7 +98,7 @@ func (s *LogService) access(ctx context.Context) (logexport.Access, error) {
 	}
 	return logexport.Access{
 		TenantID: claims.TenantID, UserID: claims.UserID, MemberID: claims.MemberID,
-		PlatformAdmin: bizauth.IsPlatformContext(claims),
+		PlatformAdmin: bizauth.IsPlatformContext(claims), Realm: string(claims.Realm),
 	}, nil
 }
 

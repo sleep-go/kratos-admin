@@ -7,7 +7,11 @@ import (
 
 	"github.com/casbin/casbin/v3"
 	"github.com/casbin/casbin/v3/model"
+	"github.com/google/wire"
 )
+
+// ProviderSet 是权限 biz 层的 Wire Provider 集合。
+var ProviderSet = wire.NewSet(NewAuthorizer)
 
 const casbinModel = `[request_definition]
 r = dom, sub, obj, act

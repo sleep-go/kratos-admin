@@ -270,35 +270,54 @@ func (r *AuthRepository) List(ctx context.Context, userID uint64, realm bizauth.
 	return items, nil
 }
 
+// navigationRow 表示菜单资源的查询行。
+type navigationRow struct {
+	ID           uint64
+	ParentID     uint64
+	Code         string
+	Name         string
+	RoutePath    string
+	ComponentKey string
+	Icon         string
+	SortOrder    uint32
+}
+
 // ListNavigation 仅返回当前认证域可见的目录与菜单资源。
+// 平台超级管理员可见全部 scope_mask&1 资源；非超级管理员的平台管理员按平台域 Casbin(g/p v0=0) 过滤并补齐祖先目录。
+// 租户域按 tenant_resources 授权集合过滤；代维超管（impersonatorID>0）可见全部 scope_mask&2 资源用于排障。
 func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, adminID uint64, realm bizauth.Realm, impersonatorID uint64) ([]bizauth.NavigationItem, error) {
-	type row struct {
-		ID           uint64
-		ParentID     uint64
-		Code         string
-		Name         string
-		RoutePath    string
-		ComponentKey string
-		Icon         string
-		SortOrder    uint32
-	}
 	resource := r.q.Resource.As("res")
 	navigationQuery := resource.WithContext(ctx).Unscoped().
 		Where(resource.Type.In(1, 2), resource.Visible.Is(true), resource.Status.Eq(1), resource.DeletedAt.IsNull())
 	platformContext := realm == bizauth.RealmPlatform && tenantID == 0
 	if platformContext {
 		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(1).Eq(1))
+		if !r.isPlatformSuperAdmin(ctx, adminID) {
+			// 非超级管理员按平台域 Casbin g(v0=0,v1=admin_id)→p(v0=0,v2=code) 过滤可见菜单。
+			p := r.q.CasbinRule.As("p")
+			g := r.q.CasbinRule.As("g")
+			navigationQuery = navigationQuery.
+				Join(p, p.Ptype.Eq("p"), p.V0.Eq("0"), p.V2.EqCol(resource.Code)).
+				Join(g, g.Ptype.Eq("g"), g.V0.Eq("0"), g.V1.Eq(fmt.Sprint(adminID)), g.V2.EqCol(p.V1))
+		}
+	} else if realm == bizauth.RealmTenant && impersonatorID > 0 {
+		// 代维超管可见全部租户菜单用于排障，跳过 tenant_resources 过滤。
+		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(2).Eq(2))
 	} else {
 		navigationQuery = navigationQuery.Where(resource.ScopeMask.BitAnd(2).Eq(2))
 		tr := r.q.TenantResource.As("tr")
 		navigationQuery = navigationQuery.Join(tr, tr.ResourceID.EqCol(resource.ID), tr.TenantID.Eq(tenantID))
 		// 租户管理员与代维会话均可见全部已授权租户菜单，不再按成员角色过滤。
 	}
-	var rows []row
+	var rows []navigationRow
 	if err := navigationQuery.Distinct(resource.ID, resource.ParentID, resource.Code, resource.Name, resource.RoutePath, resource.ComponentKey, resource.Icon, resource.SortOrder).
 		Select(resource.ID, resource.ParentID, resource.Code, resource.Name, resource.RoutePath, resource.ComponentKey, resource.Icon, resource.SortOrder).
 		Order(resource.SortOrder.Asc(), resource.ID.Asc()).Scan(&rows); err != nil {
 		return nil, fmt.Errorf("查询授权菜单失败: %w", err)
+	}
+	// 非超级管理员的平台菜单需补齐祖先目录，保证前端可组装完整菜单树。
+	if platformContext && len(rows) > 0 && !r.isPlatformSuperAdmin(ctx, adminID) {
+		rows = r.appendPlatformAncestors(ctx, rows)
 	}
 	items := make([]bizauth.NavigationItem, 0, len(rows))
 	for _, item := range rows {
@@ -310,17 +329,74 @@ func (r *AuthRepository) ListNavigation(ctx context.Context, tenantID, adminID u
 	return items, nil
 }
 
+// isPlatformSuperAdmin 查询平台管理员是否为超级管理员。
+func (r *AuthRepository) isPlatformSuperAdmin(ctx context.Context, adminID uint64) bool {
+	if adminID == 0 {
+		return false
+	}
+	pa := r.q.PlatformAdmin
+	row, err := pa.WithContext(ctx).Select(pa.IsSuperAdmin).
+		Where(pa.ID.Eq(adminID), pa.DeletedAt.IsNull()).Take()
+	if err != nil {
+		return false
+	}
+	return row.IsSuperAdmin
+}
+
+// appendPlatformAncestors 补齐平台菜单的祖先目录节点，保证菜单树完整。
+func (r *AuthRepository) appendPlatformAncestors(ctx context.Context, rows []navigationRow) []navigationRow {
+	resource := r.q.Resource
+	existing := make(map[uint64]struct{}, len(rows))
+	for _, item := range rows {
+		existing[item.ID] = struct{}{}
+	}
+	needed := make([]uint64, 0)
+	for _, item := range rows {
+		for current := item.ParentID; current != 0; current = r.platformResourceParent(ctx, current) {
+			if _, ok := existing[current]; ok {
+				break
+			}
+			existing[current] = struct{}{}
+			needed = append(needed, current)
+		}
+	}
+	if len(needed) == 0 {
+		return rows
+	}
+	var ancestors []navigationRow
+	_ = resource.WithContext(ctx).Unscoped().
+		Where(resource.ID.In(needed...), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+		Select(resource.ID, resource.ParentID, resource.Code, resource.Name, resource.RoutePath, resource.ComponentKey, resource.Icon, resource.SortOrder).
+		Scan(&ancestors)
+	return append(rows, ancestors...)
+}
+
+// platformResourceParent 返回平台资源的父节点 ID。
+func (r *AuthRepository) platformResourceParent(ctx context.Context, id uint64) uint64 {
+	resource := r.q.Resource
+	row, err := resource.WithContext(ctx).Select(resource.ParentID).
+		Where(resource.ID.Eq(id), resource.DeletedAt.IsNull()).Take()
+	if err != nil {
+		return 0
+	}
+	return row.ParentID
+}
+
 // FindTenant 按 ID 查询租户摘要信息。
 func (r *AuthRepository) FindTenant(ctx context.Context, tenantID uint64) (bizauth.TenantOption, error) {
 	t := r.q.Tenant
 	row, err := t.WithContext(ctx).
-		Where(t.ID.Eq(tenantID), t.Status.Eq(1), t.DeletedAt.IsNull()).
+		Where(t.ID.Eq(tenantID), t.DeletedAt.IsNull()).
 		First()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return bizauth.TenantOption{}, bizauth.ErrNoTenantMembership
 	}
 	if err != nil {
 		return bizauth.TenantOption{}, fmt.Errorf("查询租户失败: %w", err)
+	}
+	// 租户状态：1启用，2冻结；冻结租户在登录密码校验前被拒。
+	if row.Status != 1 {
+		return bizauth.TenantOption{}, bizauth.ErrTenantFrozen
 	}
 	return bizauth.TenantOption{ID: row.ID, Name: row.Name, PermissionVersion: row.PermissionVersion}, nil
 }

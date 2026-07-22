@@ -1549,6 +1549,11 @@ components:
                         type: string
                 targetTenantId:
                     type: string
+                adminIds:
+                    type: array
+                    items:
+                        type: string
+                    description: 平台域：绑定到该角色的 platform_admin.id 列表（写 Casbin g 策略）
         admin.v1.UpdateRoleAuthorizationResponse:
             type: object
             properties:

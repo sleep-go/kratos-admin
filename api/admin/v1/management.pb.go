@@ -746,8 +746,10 @@ type UpdateRoleAuthorizationRequest struct {
 	Grants         []*RoleResourceGrant   `protobuf:"bytes,3,rep,name=grants,proto3" json:"grants,omitempty"`
 	DepartmentIds  []uint64               `protobuf:"varint,4,rep,packed,name=department_ids,json=departmentIds,proto3" json:"department_ids,omitempty"`
 	TargetTenantId uint64                 `protobuf:"varint,5,opt,name=target_tenant_id,json=targetTenantId,proto3" json:"target_tenant_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 平台域：绑定到该角色的 platform_admin.id 列表（写 Casbin g 策略）
+	AdminIds      []uint64 `protobuf:"varint,6,rep,packed,name=admin_ids,json=adminIds,proto3" json:"admin_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateRoleAuthorizationRequest) Reset() {
@@ -813,6 +815,13 @@ func (x *UpdateRoleAuthorizationRequest) GetTargetTenantId() uint64 {
 		return x.TargetTenantId
 	}
 	return 0
+}
+
+func (x *UpdateRoleAuthorizationRequest) GetAdminIds() []uint64 {
+	if x != nil {
+		return x.AdminIds
+	}
+	return nil
 }
 
 type UpdateRoleAuthorizationResponse struct {
@@ -1006,14 +1015,15 @@ const file_admin_v1_management_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"R\n" +
 	"\x11RoleResourceGrant\x12#\n" +
 	"\rresource_code\x18\x01 \x01(\tR\fresourceCode\x12\x18\n" +
-	"\aactions\x18\x02 \x03(\tR\aactions\"\xde\x01\n" +
+	"\aactions\x18\x02 \x03(\tR\aactions\"\xfb\x01\n" +
 	"\x1eUpdateRoleAuthorizationRequest\x12\x17\n" +
 	"\arole_id\x18\x01 \x01(\x04R\x06roleId\x12\x1d\n" +
 	"\n" +
 	"data_scope\x18\x02 \x01(\rR\tdataScope\x123\n" +
 	"\x06grants\x18\x03 \x03(\v2\x1b.admin.v1.RoleResourceGrantR\x06grants\x12%\n" +
 	"\x0edepartment_ids\x18\x04 \x03(\x04R\rdepartmentIds\x12(\n" +
-	"\x10target_tenant_id\x18\x05 \x01(\x04R\x0etargetTenantId\":\n" +
+	"\x10target_tenant_id\x18\x05 \x01(\x04R\x0etargetTenantId\x12\x1b\n" +
+	"\tadmin_ids\x18\x06 \x03(\x04R\badminIds\":\n" +
 	"\x1fUpdateRoleAuthorizationResponse\x12\x17\n" +
 	"\arole_id\x18\x01 \x01(\x04R\x06roleId\"]\n" +
 	"\x1bUpdateTenantFeaturesRequest\x12\x1b\n" +

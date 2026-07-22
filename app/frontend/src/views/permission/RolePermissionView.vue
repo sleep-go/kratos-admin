@@ -31,6 +31,8 @@ const resources = ref<ResourceRow[]>([])
 const policyRows = ref<ResourceRow[]>([])
 const selectedRole = ref<ResourceRow>()
 const selectedPermissions = ref<string[]>([])
+const selectedAdminIDs = ref<string[]>([])
+const platformAdmins = ref<ResourceRow[]>([])
 const roleDialogOpen = ref(false)
 const roleForm = reactive({ code: '', name: '', data_scope: DEFAULT_DATA_SCOPE, status: 1 })
 const roleResourceKey = computed(() => (props.platformMode ? 'platform-roles' : 'roles'))
@@ -42,13 +44,31 @@ const targetScope = computed(() =>
 )
 
 const selectableResources = computed(() =>
-  resources.value.filter((item) => Number(item.type) >= 2 && Number(item.status) === 1)
+  resources.value.filter((item) => {
+    if (Number(item.status) !== 1 || Number(item.type) < 2) return false
+    if (props.platformMode) return (Number(item.scope_mask) & 1) === 1
+    return true
+  })
+)
+
+const selectablePlatformAdmins = computed(() =>
+  platformAdmins.value.filter((admin) => !admin.is_super_admin && Number(admin.status) === 1)
+)
+
+const pageTitle = computed(() => (props.platformMode ? '平台角色' : '角色授权'))
+const pageDescription = computed(() =>
+  props.platformMode
+    ? '配置平台角色权限，并将普通平台管理员绑定到角色。超级管理员无需绑定。'
+    : '统一配置 Casbin 资源动作权限。'
 )
 
 async function load() {
   loading.value = true
   try {
-    const [roleResponse, resourceResponse, grantResponse] = await Promise.all([
+    const adminPromise = props.platformMode
+      ? managementApi.listResources('platform-admins', { page: 1, page_size: 200, sort: 'id:asc' })
+      : Promise.resolve({ items: [], total: 0 })
+    const [roleResponse, resourceResponse, grantResponse, adminResponse] = await Promise.all([
       managementApi.listResources(
         roleResourceKey.value,
         { page: 1, page_size: 200, sort: 'sort_order:asc' },
@@ -61,9 +81,11 @@ async function load() {
             { page: 1, page_size: 200 },
             targetScope.value
           )
-        : Promise.resolve({ items: [], total: 0 })
+        : Promise.resolve({ items: [], total: 0 }),
+      adminPromise
     ])
     roles.value = roleResponse.items ?? []
+    platformAdmins.value = adminResponse.items ?? []
     const enabledResourceIDs = new Set(
       (grantResponse.items ?? [])
         .filter((grant) => String(grant.tenant_id) === props.targetTenantId)
@@ -83,15 +105,27 @@ async function load() {
 async function selectRole(role: ResourceRow) {
   selectedRole.value = role
   const roleId = String(role.id)
-  const policies = await managementApi.listResources(
-    policyResourceKey.value,
-    { page: 1, page_size: 200, filters: { ptype: 'p', v1: roleId } },
-    targetScope.value
-  )
+  const [policies, groupPolicies] = await Promise.all([
+    managementApi.listResources(
+      policyResourceKey.value,
+      { page: 1, page_size: 200, filters: { ptype: 'p', v1: roleId } },
+      targetScope.value
+    ),
+    props.platformMode
+      ? managementApi.listResources(policyResourceKey.value, {
+          page: 1,
+          page_size: 200,
+          filters: { ptype: 'g', v2: roleId }
+        })
+      : Promise.resolve({ items: [], total: 0 })
+  ])
   policyRows.value = (policies.items ?? []).filter(
     (item) => item.ptype === 'p' && String(item.v1) === roleId
   )
   selectedPermissions.value = policyRows.value.map((item) => `${item.v2}:${item.v3}`)
+  selectedAdminIDs.value = (groupPolicies.items ?? [])
+    .filter((item) => item.ptype === 'g' && String(item.v2) === roleId)
+    .map((item) => String(item.v1))
 }
 
 async function save() {
@@ -113,6 +147,7 @@ async function save() {
         actions: resourceActions
       })),
       departmentIds: [],
+      adminIds: props.platformMode ? selectedAdminIDs.value.map((id) => Number(id)) : undefined,
       targetTenantId: props.targetTenantId
     })
     if (!props.targetTenantId) await authStore.renewSession()
@@ -154,11 +189,11 @@ onMounted(load)
     <header v-if="!embedded" class="page-heading">
       <div>
         <p>RBAC POLICY</p>
-        <h1>角色授权</h1>
-        <span>统一配置 Casbin 资源动作权限。</span>
+        <h1>{{ pageTitle }}</h1>
+        <span>{{ pageDescription }}</span>
       </div>
       <el-button
-        v-permission="'roles:update'"
+        v-permission="platformMode ? 'platform-roles:update' : 'roles:update'"
         type="danger"
         :icon="Check"
         :loading="saving"
@@ -171,7 +206,7 @@ onMounted(load)
     <div v-else-if="selectedRole" class="embedded-toolbar">
       <span>为当前租户配置角色权限</span>
       <el-button
-        v-permission="'roles:update'"
+        v-permission="platformMode ? 'platform-roles:update' : 'roles:update'"
         type="danger"
         :icon="Check"
         :loading="saving"
@@ -188,7 +223,7 @@ onMounted(load)
             <strong>角色</strong><span>{{ roles.length }} 个</span>
           </div>
           <el-button
-            v-permission="'roles:create'"
+            v-permission="platformMode ? 'platform-roles:create' : 'roles:create'"
             link
             type="danger"
             :icon="Plus"
@@ -209,7 +244,7 @@ onMounted(load)
           </button>
           <el-button
             v-if="!role.is_builtin"
-            v-permission="'roles:delete'"
+            v-permission="platformMode ? 'platform-roles:delete' : 'roles:delete'"
             link
             type="danger"
             :icon="Delete"
@@ -221,6 +256,26 @@ onMounted(load)
       </aside>
 
       <main v-if="selectedRole" class="editor-panel">
+        <section v-if="platformMode" class="admin-section">
+          <div class="section-title">
+            <div>
+              <small>PLATFORM ADMINS</small>
+              <h2>绑定平台管理员</h2>
+            </div>
+            <span>{{ selectedAdminIDs.length }} 人已选</span>
+          </div>
+          <p class="section-hint">超级管理员拥有全部权限，无需绑定角色。</p>
+          <el-checkbox-group v-model="selectedAdminIDs" class="admin-list">
+            <el-checkbox
+              v-for="admin in selectablePlatformAdmins"
+              :key="String(admin.id)"
+              :value="String(admin.id)"
+            >
+              {{ admin.display_name }}（{{ admin.username }}）
+            </el-checkbox>
+          </el-checkbox-group>
+        </section>
+
         <section class="resource-section">
           <div class="section-title">
             <div>
@@ -386,6 +441,21 @@ onMounted(load)
 }
 .resource-section {
   padding-top: 0;
+}
+.admin-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--ka-border);
+}
+.section-hint {
+  margin: 8px 0 12px;
+  color: var(--ka-muted);
+  font-size: 12px;
+}
+.admin-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 .resource-list {
   margin-top: 14px;

@@ -95,9 +95,7 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'permission/policies',
-        name: 'platform-policy-management',
-        component: () => import('@/views/management/ResourceListView.vue'),
-        props: { resourceKey: 'platform-casbin-rules' }
+        redirect: '/platform/permission/roles'
       },
       ...platformManagementRoutes.map(([path, name, resourceKey]) => ({
         path,
@@ -206,8 +204,7 @@ export function createAppRouter(mode: 'web' | 'memory' = 'web') {
     if (
       authStore.isAuthenticated &&
       !to.meta.guestOnly &&
-      resolved.length > 0 &&
-      !['/console', '/console/account', '/platform/account'].includes(to.path)
+      !['/console', '/console/account', '/platform/account', '/platform/tenants'].includes(to.path)
     ) {
       const allowed = resolved.some((item) => item.to === to.path)
       if (!allowed) return defaultHome(authStore)

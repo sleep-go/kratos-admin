@@ -20,6 +20,9 @@ const resolvedOptions = computed(() => {
 })
 const normalizedModel = computed({
   get() {
+    if (props.field.multiple) {
+      return Array.isArray(model.value) ? model.value : []
+    }
     if (props.field.type === 'boolean') {
       return model.value === true || model.value === 1 || model.value === '1'
     }
@@ -63,6 +66,9 @@ function findOption(options: ResourceOption[], value: unknown): ResourceOption |
     v-model="normalizedModel"
     :filterable="field.type === 'relation'"
     :loading="loading"
+    :multiple="field.multiple === true"
+    :collapse-tags="field.multiple === true"
+    :collapse-tags-tooltip="field.multiple === true"
   >
     <el-option
       v-for="option in resolvedOptions"

@@ -119,6 +119,7 @@ func (s *AuthService) recordAccess(ctx context.Context, startedAt time.Time, cla
 	record := auditbiz.AccessLogRecord{RequestID: RequestIDFromContext(ctx), Route: transporter.Operation(), StatusCode: http.StatusOK, DurationMS: uint32(time.Since(startedAt).Milliseconds())}
 	if claims != nil {
 		record.TenantID, record.UserID = claims.TenantID, claims.UserID
+		record.Realm = string(claims.Realm)
 	}
 	if httpTransport, isHTTP := transporter.(khttp.Transporter); isHTTP {
 		record.Method = httpTransport.Request().Method

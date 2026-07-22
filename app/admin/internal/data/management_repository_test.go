@@ -396,7 +396,7 @@ func TestRoleAuthorizationAndTenantFeaturesAreAtomicInMySQL(t *testing.T) {
 	tenantScope := managementbiz.Scope{TenantID: tenant.ID, UserID: 1, PlatformAdmin: true}
 	if err := repository.UpdateRoleAuthorization(context.Background(), tenantScope, role.ID, 5, []managementbiz.RoleGrant{{
 		ResourceCode: resource.Code, Actions: []string{"list", "download"},
-	}}, nil); err != nil {
+	}}, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	var policyCount int64

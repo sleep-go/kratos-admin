@@ -10,6 +10,8 @@ import (
 var (
 	// ErrImpersonatePlatformOnly 表示仅平台管理员可执行代维操作。
 	ErrImpersonatePlatformOnly = errors.New("仅平台管理员可执行代维操作")
+	// ErrImpersonateSuperAdminOnly 表示仅平台超级管理员可执行代维操作。
+	ErrImpersonateSuperAdminOnly = errors.New("仅平台超级管理员可执行代维操作")
 	// ErrImpersonateTenantRequired 表示代维操作必须指定目标租户。
 	ErrImpersonateTenantRequired = errors.New("代维操作必须指定目标租户")
 )
@@ -59,10 +61,13 @@ func (u *ImpersonateUsecase) Impersonate(ctx context.Context, claims *TokenClaim
 	if input.TenantID == 0 {
 		return ImpersonateResult{}, ErrImpersonateTenantRequired
 	}
-	// 校验平台管理员状态
+	// 校验平台管理员状态与超级管理员权限
 	admin, err := u.admins.FindByID(ctx, claims.UserID)
 	if err != nil || admin.Status != UserStatusEnabled {
 		return ImpersonateResult{}, ErrAccountDisabled
+	}
+	if !admin.IsSuperAdmin {
+		return ImpersonateResult{}, ErrImpersonateSuperAdminOnly
 	}
 	tenant, err := u.users.FindTenant(ctx, input.TenantID)
 	if err != nil {

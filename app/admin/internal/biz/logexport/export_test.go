@@ -106,3 +106,15 @@ func TestProcessorGeneratesCSVAtMostOnce(t *testing.T) {
 		t.Fatalf("completed=%v rows=%d body=%q", repository.completed, repository.completedRows, provider.body)
 	}
 }
+
+func TestValidFiltersRequiresTimeRangeForPlatform(t *testing.T) {
+	if validFilters(nil, "platform") {
+		t.Fatal("platform without time range should be invalid")
+	}
+	if !validFilters(map[string]string{"created_at_start": "2024-01-01T00:00:00Z", "created_at_end": "2024-12-31T23:59:59Z"}, "platform") {
+		t.Fatal("platform with time range should be valid")
+	}
+	if !validFilters(nil, "tenant") {
+		t.Fatal("tenant without time range should be valid")
+	}
+}

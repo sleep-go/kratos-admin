@@ -30,6 +30,7 @@ func newLogExport(db *gorm.DB, opts ...gen.DOOption) logExport {
 	_logExport.ALL = field.NewAsterisk(tableName)
 	_logExport.ID = field.NewString(tableName, "id")
 	_logExport.TenantID = field.NewUint64(tableName, "tenant_id")
+	_logExport.Realm = field.NewString(tableName, "realm")
 	_logExport.UserID = field.NewUint64(tableName, "user_id")
 	_logExport.MemberID = field.NewUint64(tableName, "member_id")
 	_logExport.LogType = field.NewString(tableName, "log_type")
@@ -66,6 +67,7 @@ type logExport struct {
 	ALL            field.Asterisk
 	ID             field.String // 日志导出任务UUID
 	TenantID       field.Uint64 // 所属租户ID，0表示平台跨租户导出
+	Realm          field.String // 域：platform平台，tenant租户，app应用
 	UserID         field.Uint64 // 发起导出的用户ID
 	MemberID       field.Uint64 // 兼容字段，阶段1固定为0
 	LogType        field.String // 日志类型：login登录日志，audit操作审计，api接口访问日志
@@ -103,6 +105,7 @@ func (l *logExport) updateTableName(table string) *logExport {
 	l.ALL = field.NewAsterisk(table)
 	l.ID = field.NewString(table, "id")
 	l.TenantID = field.NewUint64(table, "tenant_id")
+	l.Realm = field.NewString(table, "realm")
 	l.UserID = field.NewUint64(table, "user_id")
 	l.MemberID = field.NewUint64(table, "member_id")
 	l.LogType = field.NewString(table, "log_type")
@@ -147,9 +150,10 @@ func (l *logExport) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (l *logExport) fillFieldMap() {
-	l.fieldMap = make(map[string]field.Expr, 21)
+	l.fieldMap = make(map[string]field.Expr, 22)
 	l.fieldMap["id"] = l.ID
 	l.fieldMap["tenant_id"] = l.TenantID
+	l.fieldMap["realm"] = l.Realm
 	l.fieldMap["user_id"] = l.UserID
 	l.fieldMap["member_id"] = l.MemberID
 	l.fieldMap["log_type"] = l.LogType

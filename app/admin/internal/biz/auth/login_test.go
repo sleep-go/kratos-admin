@@ -12,6 +12,7 @@ import (
 type fakeUserRepository struct {
 	user          *User
 	tenant        TenantOption
+	tenantErr     error
 	failureCount  uint32
 	lockedUntil   *time.Time
 	resetFailures bool
@@ -35,6 +36,9 @@ func (r *fakeUserRepository) FindByID(_ context.Context, _ uint64) (*User, error
 }
 
 func (r *fakeUserRepository) FindTenant(_ context.Context, tenantID uint64) (TenantOption, error) {
+	if r.tenantErr != nil {
+		return TenantOption{}, r.tenantErr
+	}
 	if r.tenant.ID == tenantID {
 		return r.tenant, nil
 	}
@@ -182,4 +186,32 @@ func (r *fakePlatformAdminRepository) UpdateLoginFailure(_ context.Context, _ ui
 
 func (r *fakePlatformAdminRepository) ResetLoginFailures(_ context.Context, _ uint64) error {
 	return nil
+}
+
+func TestLoginRejectsFrozenTenantBeforePasswordVerify(t *testing.T) {
+	now := time.Date(2026, 7, 20, 12, 0, 0, 0, time.UTC)
+	hasher := NewPasswordHasher(PasswordParams{Memory: 1024, Iterations: 1, Parallelism: 1, SaltLength: 8, KeyLength: 16})
+	passwordHash, err := hasher.Hash("StrongPassword!2026")
+	if err != nil {
+		t.Fatalf("Hash() error = %v", err)
+	}
+	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+	users := &fakeUserRepository{
+		user:        &User{ID: 100, TenantID: 200, PasswordHash: passwordHash, Status: UserStatusEnabled},
+		tenantErr:   ErrTenantFrozen,
+		permissions: []string{"roles:list"},
+	}
+	usecase := NewLoginUsecase(users, &fakeSessionRepository{}, hasher, NewTokenManager(privateKey, time.Minute, time.Hour, func() time.Time { return now }), func() time.Time { return now })
+
+	_, err = usecase.Login(context.Background(), LoginInput{Identifier: "admin", Password: "StrongPassword!2026"})
+	if !errors.Is(err, ErrTenantFrozen) {
+		t.Fatalf("Login() error = %v, want ErrTenantFrozen", err)
+	}
+	// 冻结租户不应触发登录失败计数（密码未被校验）
+	if users.failureCount != 0 {
+		t.Fatalf("failure count = %d, want 0 (password should not be verified)", users.failureCount)
+	}
 }

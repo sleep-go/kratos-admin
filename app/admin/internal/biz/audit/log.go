@@ -5,6 +5,7 @@ import "context"
 // AccessLogRecord 描述不会包含请求正文和敏感字段的 API 访问日志。
 type AccessLogRecord struct {
 	TenantID    uint64
+	Realm       string
 	UserID      uint64
 	RequestID   string
 	Method      string
@@ -24,6 +25,7 @@ type AccessLogRecorder interface {
 // LoginLogRecord 描述已脱敏的登录安全事件。
 type LoginLogRecord struct {
 	TenantID   uint64
+	Realm      string
 	UserID     uint64
 	Identifier string
 	Result     uint8

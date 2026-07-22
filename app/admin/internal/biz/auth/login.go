@@ -5,6 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/google/wire"
+)
+
+// ProviderSet 是认证 biz 层的 Wire Provider 集合。
+var ProviderSet = wire.NewSet(
+	NewLoginUsecase,
+	NewSessionUsecase,
+	NewPlatformLoginUsecase,
+	NewImpersonateUsecase,
+	NewTokenManager,
+	NewPasswordHasher,
+	NewCaptchaUsecase,
+	NewVerificationUsecase,
 )
 
 var (
@@ -16,6 +30,8 @@ var (
 	ErrAccountDisabled = errors.New("账号已被禁用")
 	// ErrNoTenantMembership 表示租户管理员账号不可用（保留错误码以兼容 API）。
 	ErrNoTenantMembership = errors.New("没有可用的租户成员身份")
+	// ErrTenantFrozen 表示租户已被冻结，密码校验前直接拒绝登录。
+	ErrTenantFrozen = errors.New("租户已被冻结")
 )
 
 // UserStatus 表示账号状态。
@@ -156,6 +172,13 @@ func (u *LoginUsecase) Login(ctx context.Context, input LoginInput) (LoginResult
 	}
 	if user.LockedUntil != nil && user.LockedUntil.After(now) {
 		return LoginResult{}, ErrAccountLocked
+	}
+	// G11: 先校验租户状态，冻结租户在密码校验前被拒，避免密码试探。
+	if _, err := u.users.FindTenant(ctx, user.TenantID); err != nil {
+		if errors.Is(err, ErrTenantFrozen) {
+			return LoginResult{}, ErrTenantFrozen
+		}
+		return LoginResult{}, err
 	}
 	valid, err := u.hasher.Verify(input.Password, user.PasswordHash)
 	if err != nil {

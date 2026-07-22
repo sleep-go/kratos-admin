@@ -6,7 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/google/wire"
 )
+
+// ProviderSet 是 Provider 配置 biz 层的 Wire Provider 集合。
+var ProviderSet = wire.NewSet(NewCodec)
 
 var sensitiveKeys = map[string]struct{}{
 	"password": {}, "access_key_secret": {}, "security_token": {}, "secret": {}, "token": {},

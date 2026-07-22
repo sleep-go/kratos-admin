@@ -16,6 +16,7 @@ const TableNameAPIAccessLog = "api_access_logs"
 type APIAccessLog struct {
 	ID          uint64         `gorm:"column:id;type:bigint unsigned;primaryKey;autoIncrement:true;comment:API访问日志主键" json:"id"`                                                                                                  // API访问日志主键
 	TenantID    uint64         `gorm:"column:tenant_id;type:bigint unsigned;not null;index:idx_api_access_logs_error,priority:1;index:idx_api_access_logs_query,priority:1;default:0;comment:所属租户ID，0表示未认证或平台域" json:"tenant_id"` // 所属租户ID，0表示未认证或平台域
+	Realm       string         `gorm:"column:realm;type:varchar(16);not null;default:tenant;comment:域：platform平台，tenant租户，app应用" json:"realm"`                                                                               // 域：platform平台，tenant租户，app应用
 	UserID      uint64         `gorm:"column:user_id;type:bigint unsigned;not null;default:0;comment:用户ID，未认证为0" json:"user_id"`                                                                                                  // 用户ID，未认证为0
 	RequestID   string         `gorm:"column:request_id;type:varchar(64);not null;index:idx_api_access_logs_request,priority:1;comment:请求追踪ID" json:"request_id"`                                                                 // 请求追踪ID
 	Method      string         `gorm:"column:method;type:varchar(16);not null;comment:HTTP方法" json:"method"`                                                                                                                      // HTTP方法

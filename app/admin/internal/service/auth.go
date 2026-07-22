@@ -150,7 +150,7 @@ func (s *AuthService) recordLogin(ctx context.Context, request *v1.LoginRequest,
 	if s.loginRecorder == nil {
 		return
 	}
-	record := auditbiz.LoginLogRecord{Identifier: maskIdentifier(request.GetIdentifier()), Result: 1, RequestID: RequestIDFromContext(ctx)}
+	record := auditbiz.LoginLogRecord{Identifier: maskIdentifier(request.GetIdentifier()), Result: 1, Realm: "tenant", RequestID: RequestIDFromContext(ctx)}
 	if transporter, ok := transport.FromServerContext(ctx); ok {
 		record.UserAgent = transporter.RequestHeader().Get("User-Agent")
 		if httpTransport, isHTTP := transporter.(khttp.Transporter); isHTTP {
@@ -493,6 +493,8 @@ func mapAuthError(err error) error {
 		return kratoserrors.Forbidden("AUTH_NO_TENANT", err.Error())
 	case errors.Is(err, bizauth.ErrNotImpersonating):
 		return kratoserrors.Forbidden("AUTH_NOT_IMPERSONATING", err.Error())
+	case errors.Is(err, bizauth.ErrImpersonatePlatformOnly), errors.Is(err, bizauth.ErrImpersonateSuperAdminOnly), errors.Is(err, bizauth.ErrImpersonateTenantRequired):
+		return kratoserrors.Forbidden("AUTH_IMPERSONATE_FORBIDDEN", err.Error())
 	case errors.Is(err, bizauth.ErrInvalidRefresh), errors.Is(err, bizauth.ErrRefreshReused), errors.Is(err, bizauth.ErrSessionRevoked):
 		return kratoserrors.Unauthorized("AUTH_REFRESH_INVALID", err.Error())
 	default:

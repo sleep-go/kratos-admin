@@ -144,7 +144,7 @@ func (s *PlatformAuthService) ListNavigation(ctx context.Context, _ *v1.Platform
 	if !ok || s.sessionHandler == nil {
 		return nil, kratoserrors.Unauthorized("AUTH_REQUIRED", "请先登录")
 	}
-	items, err := s.sessionHandler.Navigation(ctx, claims.TenantID, claims.MemberID, claims.Realm)
+	items, err := s.sessionHandler.Navigation(ctx, claims.TenantID, claims.UserID, claims.Realm)
 	if err != nil {
 		return nil, kratoserrors.InternalServer("NAVIGATION_LIST_FAILED", "加载授权菜单失败")
 	}

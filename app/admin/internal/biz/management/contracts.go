@@ -5,12 +5,17 @@ import "context"
 
 // Scope 是由认证上下文派生的可信数据边界。
 type Scope struct {
-	TenantID        uint64
-	UserID          uint64
-	MemberID        uint64
-	ImpersonatorID  uint64
-	PlatformAdmin   bool
-	Impersonating   bool
+	TenantID       uint64
+	UserID         uint64
+	MemberID       uint64
+	ImpersonatorID uint64
+	PlatformAdmin  bool
+	// IsSuperAdmin 表示平台管理员是否为超级管理员，仅 PlatformAdmin=true 时有意义。
+	// 超级管理员拥有 *:* 权限，跳过 Casbin 校验；非超级管理员走平台域 Casbin 策略。
+	IsSuperAdmin bool
+	Impersonating bool
+	// Realm 标识当前操作所属域（platform/tenant），用于审计与日志写入。
+	Realm string
 }
 
 // PageQuery 描述统一分页、排序、关键词与白名单筛选条件。
@@ -36,7 +41,7 @@ type Repository interface {
 	Delete(context.Context, Scope, string, uint64) error
 	EffectiveSettings(context.Context, Scope, string) ([]map[string]any, error)
 	TestProviderConnection(context.Context, Scope, uint64) error
-	UpdateRoleAuthorization(context.Context, Scope, uint64, uint32, []RoleGrant, []uint64) error
+	UpdateRoleAuthorization(context.Context, Scope, uint64, uint32, []RoleGrant, []uint64, []uint64) error
 	UpdateTenantFeatures(context.Context, Scope, uint64, []uint64) error
 }
 

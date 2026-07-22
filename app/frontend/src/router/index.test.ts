@@ -78,4 +78,18 @@ describe('路由鉴权', () => {
     await router.push('/platform/tenants/9/setup')
     expect(router.currentRoute.value.name).toBe('dashboard')
   })
+
+  it('空菜单时访问非白名单页面被重定向到默认首页', async () => {
+    const authStore = useAuthStore()
+    authStore.accessToken = 'token'
+    authStore.sessionRestored = true
+    authStore.currentUser = { id: '1', displayName: '无权限用户', realm: 'tenant' }
+    authStore.navigationItems = []
+    const router = createAppRouter('memory')
+
+    await router.push('/console/permission/roles')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('dashboard')
+  })
 })

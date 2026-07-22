@@ -184,19 +184,12 @@ describe('动态菜单安全映射', () => {
         routePath: '/platform/permission/roles',
         componentKey: 'platform-roles',
         sortOrder: 23
-      },
-      {
-        name: '按钮与 API 授权',
-        routePath: '/platform/permission/policies',
-        componentKey: 'platform-casbin-rules',
-        sortOrder: 24
       }
     ])
 
     expect(items.map((item) => item.to)).toEqual([
       '/platform/app-users',
-      '/platform/permission/roles',
-      '/platform/permission/policies'
+      '/platform/permission/roles'
     ])
   })
 })

@@ -76,7 +76,7 @@ export type AdminV1CurrentUser = {
     phone?: string;
     mfaEnabled?: boolean;
     mfaChannel?: string;
-    impersonatorId?: number;
+    impersonatorId?: string;
     impersonating?: boolean;
 };
 
@@ -86,6 +86,18 @@ export type AdminV1DeleteFileResponse = {
 
 export type AdminV1DeleteResourceResponse = {
     id?: string;
+};
+
+export type AdminV1ExitImpersonationRequest = {
+    [key: string]: unknown;
+};
+
+export type AdminV1ExitImpersonationResponse = {
+    accessToken?: string;
+    expiresAt?: string;
+    user?: AdminV1CurrentUser;
+    tenants?: Array<AdminV1TenantSummary>;
+    currentTenant?: AdminV1TenantSummary;
 };
 
 export type AdminV1ForgotPasswordRequest = {
@@ -183,6 +195,72 @@ export type AdminV1NavigationItem = {
     componentKey?: string;
     icon?: string;
     sortOrder?: number;
+};
+
+export type AdminV1PlatformAuthServiceImpersonateRequest = {
+    tenantId?: string;
+};
+
+export type AdminV1PlatformAuthServiceImpersonateResponse = {
+    accessToken?: string;
+    expiresAt?: string;
+    currentTenant?: AdminV1TenantSummary;
+    user?: AdminV1CurrentUser;
+    tenants?: Array<AdminV1TenantSummary>;
+};
+
+export type AdminV1PlatformAuthServiceListNavigationResponse = {
+    items?: Array<AdminV1NavigationItem>;
+};
+
+export type AdminV1PlatformAuthServiceListSessionsResponse = {
+    items?: Array<AdminV1Session>;
+};
+
+export type AdminV1PlatformAuthServiceLoginRequest = {
+    identifier?: string;
+    password?: string;
+    captchaId?: string;
+    captchaCode?: string;
+    deviceName?: string;
+};
+
+export type AdminV1PlatformAuthServiceLoginResponse = {
+    accessToken?: string;
+    expiresAt?: string;
+    user?: AdminV1CurrentUser;
+    tenants?: Array<AdminV1TenantSummary>;
+    currentTenant?: AdminV1TenantSummary;
+    mfaChallengeId?: string;
+    mfaRequired?: boolean;
+};
+
+export type AdminV1PlatformAuthServiceLogoutResponse = {
+    [key: string]: unknown;
+};
+
+export type AdminV1PlatformAuthServiceProfileResponse = {
+    accessToken?: string;
+    expiresAt?: string;
+    user?: AdminV1CurrentUser;
+    tenants?: Array<AdminV1TenantSummary>;
+    currentTenant?: AdminV1TenantSummary;
+};
+
+export type AdminV1PlatformAuthServiceRefreshRequest = {
+    [key: string]: unknown;
+};
+
+export type AdminV1PlatformAuthServiceRefreshResponse = {
+    accessToken?: string;
+    expiresAt?: string;
+    user?: AdminV1CurrentUser;
+    tenants?: Array<AdminV1TenantSummary>;
+    currentTenant?: AdminV1TenantSummary;
+};
+
+export type AdminV1PlatformAuthServiceRevokeSessionResponse = {
+    [key: string]: unknown;
 };
 
 export type AdminV1RefreshRequest = {
@@ -283,6 +361,10 @@ export type AdminV1UpdateRoleAuthorizationRequest = {
     grants?: Array<AdminV1RoleResourceGrant>;
     departmentIds?: Array<string>;
     targetTenantId?: string;
+    /**
+     * 平台域：绑定到该角色的 platform_admin.id 列表（写 Casbin g 策略）
+     */
+    adminIds?: Array<string>;
 };
 
 export type AdminV1UpdateRoleAuthorizationResponse = {
@@ -364,6 +446,31 @@ export type AuthServiceGetCaptchaResponses = {
 };
 
 export type AuthServiceGetCaptchaResponse = AuthServiceGetCaptchaResponses[keyof AuthServiceGetCaptchaResponses];
+
+export type AuthServiceExitImpersonationData = {
+    body: AdminV1ExitImpersonationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/exit-impersonation';
+};
+
+export type AuthServiceExitImpersonationErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type AuthServiceExitImpersonationError = AuthServiceExitImpersonationErrors[keyof AuthServiceExitImpersonationErrors];
+
+export type AuthServiceExitImpersonationResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1ExitImpersonationResponse;
+};
+
+export type AuthServiceExitImpersonationResponse = AuthServiceExitImpersonationResponses[keyof AuthServiceExitImpersonationResponses];
 
 export type AuthServiceForgotPasswordData = {
     body: AdminV1ForgotPasswordRequest;
@@ -1114,6 +1221,208 @@ export type ManagementServiceUpdateResourceResponses = {
 };
 
 export type ManagementServiceUpdateResourceResponse = ManagementServiceUpdateResourceResponses[keyof ManagementServiceUpdateResourceResponses];
+
+export type PlatformAuthServiceImpersonateData = {
+    body: AdminV1PlatformAuthServiceImpersonateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/auth/impersonate';
+};
+
+export type PlatformAuthServiceImpersonateErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type PlatformAuthServiceImpersonateError = PlatformAuthServiceImpersonateErrors[keyof PlatformAuthServiceImpersonateErrors];
+
+export type PlatformAuthServiceImpersonateResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1PlatformAuthServiceImpersonateResponse;
+};
+
+export type PlatformAuthServiceImpersonateResponse = PlatformAuthServiceImpersonateResponses[keyof PlatformAuthServiceImpersonateResponses];
+
+export type PlatformAuthServiceLoginData = {
+    body: AdminV1PlatformAuthServiceLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/auth/login';
+};
+
+export type PlatformAuthServiceLoginErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type PlatformAuthServiceLoginError = PlatformAuthServiceLoginErrors[keyof PlatformAuthServiceLoginErrors];
+
+export type PlatformAuthServiceLoginResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1PlatformAuthServiceLoginResponse;
+};
+
+export type PlatformAuthServiceLoginResponse = PlatformAuthServiceLoginResponses[keyof PlatformAuthServiceLoginResponses];
+
+export type PlatformAuthServiceLogoutData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/auth/logout';
+};
+
+export type PlatformAuthServiceLogoutErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type PlatformAuthServiceLogoutError = PlatformAuthServiceLogoutErrors[keyof PlatformAuthServiceLogoutErrors];
+
+export type PlatformAuthServiceLogoutResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1PlatformAuthServiceLogoutResponse;
+};
+
+export type PlatformAuthServiceLogoutResponse = PlatformAuthServiceLogoutResponses[keyof PlatformAuthServiceLogoutResponses];
+
+export type PlatformAuthServiceListNavigationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/auth/navigation';
+};
+
+export type PlatformAuthServiceListNavigationErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type PlatformAuthServiceListNavigationError = PlatformAuthServiceListNavigationErrors[keyof PlatformAuthServiceListNavigationErrors];
+
+export type PlatformAuthServiceListNavigationResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1PlatformAuthServiceListNavigationResponse;
+};
+
+export type PlatformAuthServiceListNavigationResponse = PlatformAuthServiceListNavigationResponses[keyof PlatformAuthServiceListNavigationResponses];
+
+export type PlatformAuthServiceProfileData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/auth/profile';
+};
+
+export type PlatformAuthServiceProfileErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type PlatformAuthServiceProfileError = PlatformAuthServiceProfileErrors[keyof PlatformAuthServiceProfileErrors];
+
+export type PlatformAuthServiceProfileResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1PlatformAuthServiceProfileResponse;
+};
+
+export type PlatformAuthServiceProfileResponse = PlatformAuthServiceProfileResponses[keyof PlatformAuthServiceProfileResponses];
+
+export type PlatformAuthServiceRefreshData = {
+    body: AdminV1PlatformAuthServiceRefreshRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/auth/refresh';
+};
+
+export type PlatformAuthServiceRefreshErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type PlatformAuthServiceRefreshError = PlatformAuthServiceRefreshErrors[keyof PlatformAuthServiceRefreshErrors];
+
+export type PlatformAuthServiceRefreshResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1PlatformAuthServiceRefreshResponse;
+};
+
+export type PlatformAuthServiceRefreshResponse = PlatformAuthServiceRefreshResponses[keyof PlatformAuthServiceRefreshResponses];
+
+export type PlatformAuthServiceListSessionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/platform/auth/sessions';
+};
+
+export type PlatformAuthServiceListSessionsErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type PlatformAuthServiceListSessionsError = PlatformAuthServiceListSessionsErrors[keyof PlatformAuthServiceListSessionsErrors];
+
+export type PlatformAuthServiceListSessionsResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1PlatformAuthServiceListSessionsResponse;
+};
+
+export type PlatformAuthServiceListSessionsResponse = PlatformAuthServiceListSessionsResponses[keyof PlatformAuthServiceListSessionsResponses];
+
+export type PlatformAuthServiceRevokeSessionData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/api/v1/platform/auth/sessions/{sessionId}';
+};
+
+export type PlatformAuthServiceRevokeSessionErrors = {
+    /**
+     * Default error response
+     */
+    default: GoogleRpcStatus;
+};
+
+export type PlatformAuthServiceRevokeSessionError = PlatformAuthServiceRevokeSessionErrors[keyof PlatformAuthServiceRevokeSessionErrors];
+
+export type PlatformAuthServiceRevokeSessionResponses = {
+    /**
+     * OK
+     */
+    200: AdminV1PlatformAuthServiceRevokeSessionResponse;
+};
+
+export type PlatformAuthServiceRevokeSessionResponse = PlatformAuthServiceRevokeSessionResponses[keyof PlatformAuthServiceRevokeSessionResponses];
 
 export type ManagementServiceGetEffectiveSettingsData = {
     body?: never;

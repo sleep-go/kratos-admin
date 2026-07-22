@@ -8,6 +8,7 @@ import (
 	filebiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/file"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/logexport"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/providerconfig"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/setup"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/conf"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider"
@@ -50,6 +51,9 @@ func provideServices(cfg conf.Config, resources *data.Data, providers *provider.
 	authService.ConfigureVerification(verificationUsecase)
 
 	managementRepository := data.NewManagementRepository(resources, providerconfig.NewCodec(providers.ConfigCipher))
+	managementRepository.ConfigureTenantProvisioner(setup.NewTenantProvisioner(data.NewTenantSetupRepository(resources)))
+	managementService := service.NewManagementService(managementRepository, managementRepository)
+	managementService.ConfigurePlatformAdmins(platformAdminRepo)
 	fileUsecase := filebiz.NewUsecase(data.NewFileRepository(resources), providers.Storage, cfg.Storage.MaxFileSize, nil)
 	logUsecase := logexport.NewUsecase(data.NewLogExportRepository(resources), providers.Storage, nil)
 
@@ -57,7 +61,7 @@ func provideServices(cfg conf.Config, resources *data.Data, providers *provider.
 		service.NewHealthService(Name),
 		authService,
 		platformAuthService,
-		service.NewManagementService(managementRepository, managementRepository),
+		managementService,
 		service.NewFileService(fileUsecase, managementRepository),
 		service.NewLogService(logUsecase, managementRepository),
 	), nil

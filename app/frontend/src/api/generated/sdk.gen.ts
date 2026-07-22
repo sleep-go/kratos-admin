@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AuthServiceForgotPasswordData, AuthServiceForgotPasswordErrors, AuthServiceForgotPasswordResponses, AuthServiceGetCaptchaData, AuthServiceGetCaptchaErrors, AuthServiceGetCaptchaResponses, AuthServiceListNavigationData, AuthServiceListNavigationErrors, AuthServiceListNavigationResponses, AuthServiceListSessionsData, AuthServiceListSessionsErrors, AuthServiceListSessionsResponses, AuthServiceLoginData, AuthServiceLoginErrors, AuthServiceLoginResponses, AuthServiceLogoutData, AuthServiceLogoutErrors, AuthServiceLogoutResponses, AuthServiceRefreshData, AuthServiceRefreshErrors, AuthServiceRefreshResponses, AuthServiceResetPasswordData, AuthServiceResetPasswordErrors, AuthServiceResetPasswordResponses, AuthServiceRevokeSessionData, AuthServiceRevokeSessionErrors, AuthServiceRevokeSessionResponses, AuthServiceSwitchTenantData, AuthServiceSwitchTenantErrors, AuthServiceSwitchTenantResponses, AuthServiceUpdateProfileData, AuthServiceUpdateProfileErrors, AuthServiceUpdateProfileResponses, AuthServiceVerifyMfaData, AuthServiceVerifyMfaErrors, AuthServiceVerifyMfaResponses, FileServiceAddReferenceData, FileServiceAddReferenceErrors, FileServiceAddReferenceResponses, FileServiceConfirmUploadData, FileServiceConfirmUploadErrors, FileServiceConfirmUploadResponses, FileServiceCreateUploadData, FileServiceCreateUploadErrors, FileServiceCreateUploadResponses, FileServiceDeleteFileData, FileServiceDeleteFileErrors, FileServiceDeleteFileResponses, FileServiceGetDownloadUrlData, FileServiceGetDownloadUrlErrors, FileServiceGetDownloadUrlResponses, FileServiceRemoveReferenceData, FileServiceRemoveReferenceErrors, FileServiceRemoveReferenceResponses, HealthServiceCheckData, HealthServiceCheckErrors, HealthServiceCheckResponses, LogServiceCreateExportData, LogServiceCreateExportErrors, LogServiceCreateExportResponses, LogServiceGetExportData, LogServiceGetExportDownloadUrlData, LogServiceGetExportDownloadUrlErrors, LogServiceGetExportDownloadUrlResponses, LogServiceGetExportErrors, LogServiceGetExportResponses, ManagementServiceCreateResourceData, ManagementServiceCreateResourceErrors, ManagementServiceCreateResourceResponses, ManagementServiceDeleteResourceData, ManagementServiceDeleteResourceErrors, ManagementServiceDeleteResourceResponses, ManagementServiceGetEffectiveSettingsData, ManagementServiceGetEffectiveSettingsErrors, ManagementServiceGetEffectiveSettingsResponses, ManagementServiceListResourcesData, ManagementServiceListResourcesErrors, ManagementServiceListResourcesResponses, ManagementServiceTestProviderConnectionData, ManagementServiceTestProviderConnectionErrors, ManagementServiceTestProviderConnectionResponses, ManagementServiceUpdateResourceData, ManagementServiceUpdateResourceErrors, ManagementServiceUpdateResourceResponses, ManagementServiceUpdateRoleAuthorizationData, ManagementServiceUpdateRoleAuthorizationErrors, ManagementServiceUpdateRoleAuthorizationResponses, ManagementServiceUpdateTenantFeaturesData, ManagementServiceUpdateTenantFeaturesErrors, ManagementServiceUpdateTenantFeaturesResponses } from './types.gen';
+import type { AuthServiceExitImpersonationData, AuthServiceExitImpersonationErrors, AuthServiceExitImpersonationResponses, AuthServiceForgotPasswordData, AuthServiceForgotPasswordErrors, AuthServiceForgotPasswordResponses, AuthServiceGetCaptchaData, AuthServiceGetCaptchaErrors, AuthServiceGetCaptchaResponses, AuthServiceListNavigationData, AuthServiceListNavigationErrors, AuthServiceListNavigationResponses, AuthServiceListSessionsData, AuthServiceListSessionsErrors, AuthServiceListSessionsResponses, AuthServiceLoginData, AuthServiceLoginErrors, AuthServiceLoginResponses, AuthServiceLogoutData, AuthServiceLogoutErrors, AuthServiceLogoutResponses, AuthServiceRefreshData, AuthServiceRefreshErrors, AuthServiceRefreshResponses, AuthServiceResetPasswordData, AuthServiceResetPasswordErrors, AuthServiceResetPasswordResponses, AuthServiceRevokeSessionData, AuthServiceRevokeSessionErrors, AuthServiceRevokeSessionResponses, AuthServiceSwitchTenantData, AuthServiceSwitchTenantErrors, AuthServiceSwitchTenantResponses, AuthServiceUpdateProfileData, AuthServiceUpdateProfileErrors, AuthServiceUpdateProfileResponses, AuthServiceVerifyMfaData, AuthServiceVerifyMfaErrors, AuthServiceVerifyMfaResponses, FileServiceAddReferenceData, FileServiceAddReferenceErrors, FileServiceAddReferenceResponses, FileServiceConfirmUploadData, FileServiceConfirmUploadErrors, FileServiceConfirmUploadResponses, FileServiceCreateUploadData, FileServiceCreateUploadErrors, FileServiceCreateUploadResponses, FileServiceDeleteFileData, FileServiceDeleteFileErrors, FileServiceDeleteFileResponses, FileServiceGetDownloadUrlData, FileServiceGetDownloadUrlErrors, FileServiceGetDownloadUrlResponses, FileServiceRemoveReferenceData, FileServiceRemoveReferenceErrors, FileServiceRemoveReferenceResponses, HealthServiceCheckData, HealthServiceCheckErrors, HealthServiceCheckResponses, LogServiceCreateExportData, LogServiceCreateExportErrors, LogServiceCreateExportResponses, LogServiceGetExportData, LogServiceGetExportDownloadUrlData, LogServiceGetExportDownloadUrlErrors, LogServiceGetExportDownloadUrlResponses, LogServiceGetExportErrors, LogServiceGetExportResponses, ManagementServiceCreateResourceData, ManagementServiceCreateResourceErrors, ManagementServiceCreateResourceResponses, ManagementServiceDeleteResourceData, ManagementServiceDeleteResourceErrors, ManagementServiceDeleteResourceResponses, ManagementServiceGetEffectiveSettingsData, ManagementServiceGetEffectiveSettingsErrors, ManagementServiceGetEffectiveSettingsResponses, ManagementServiceListResourcesData, ManagementServiceListResourcesErrors, ManagementServiceListResourcesResponses, ManagementServiceTestProviderConnectionData, ManagementServiceTestProviderConnectionErrors, ManagementServiceTestProviderConnectionResponses, ManagementServiceUpdateResourceData, ManagementServiceUpdateResourceErrors, ManagementServiceUpdateResourceResponses, ManagementServiceUpdateRoleAuthorizationData, ManagementServiceUpdateRoleAuthorizationErrors, ManagementServiceUpdateRoleAuthorizationResponses, ManagementServiceUpdateTenantFeaturesData, ManagementServiceUpdateTenantFeaturesErrors, ManagementServiceUpdateTenantFeaturesResponses, PlatformAuthServiceImpersonateData, PlatformAuthServiceImpersonateErrors, PlatformAuthServiceImpersonateResponses, PlatformAuthServiceListNavigationData, PlatformAuthServiceListNavigationErrors, PlatformAuthServiceListNavigationResponses, PlatformAuthServiceListSessionsData, PlatformAuthServiceListSessionsErrors, PlatformAuthServiceListSessionsResponses, PlatformAuthServiceLoginData, PlatformAuthServiceLoginErrors, PlatformAuthServiceLoginResponses, PlatformAuthServiceLogoutData, PlatformAuthServiceLogoutErrors, PlatformAuthServiceLogoutResponses, PlatformAuthServiceProfileData, PlatformAuthServiceProfileErrors, PlatformAuthServiceProfileResponses, PlatformAuthServiceRefreshData, PlatformAuthServiceRefreshErrors, PlatformAuthServiceRefreshResponses, PlatformAuthServiceRevokeSessionData, PlatformAuthServiceRevokeSessionErrors, PlatformAuthServiceRevokeSessionResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -19,6 +19,15 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 export const authServiceGetCaptcha = <ThrowOnError extends boolean = false>(options?: Options<AuthServiceGetCaptchaData, ThrowOnError>): RequestResult<AuthServiceGetCaptchaResponses, AuthServiceGetCaptchaErrors, ThrowOnError> => (options?.client ?? client).get<AuthServiceGetCaptchaResponses, AuthServiceGetCaptchaErrors, ThrowOnError>({ url: '/api/v1/auth/captcha', ...options });
+
+export const authServiceExitImpersonation = <ThrowOnError extends boolean = false>(options: Options<AuthServiceExitImpersonationData, ThrowOnError>): RequestResult<AuthServiceExitImpersonationResponses, AuthServiceExitImpersonationErrors, ThrowOnError> => (options.client ?? client).post<AuthServiceExitImpersonationResponses, AuthServiceExitImpersonationErrors, ThrowOnError>({
+    url: '/api/v1/auth/exit-impersonation',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 export const authServiceForgotPassword = <ThrowOnError extends boolean = false>(options: Options<AuthServiceForgotPasswordData, ThrowOnError>): RequestResult<AuthServiceForgotPasswordResponses, AuthServiceForgotPasswordErrors, ThrowOnError> => (options.client ?? client).post<AuthServiceForgotPasswordResponses, AuthServiceForgotPasswordErrors, ThrowOnError>({
     url: '/api/v1/auth/forgot-password',
@@ -183,5 +192,42 @@ export const managementServiceUpdateResource = <ThrowOnError extends boolean = f
         ...options.headers
     }
 });
+
+export const platformAuthServiceImpersonate = <ThrowOnError extends boolean = false>(options: Options<PlatformAuthServiceImpersonateData, ThrowOnError>): RequestResult<PlatformAuthServiceImpersonateResponses, PlatformAuthServiceImpersonateErrors, ThrowOnError> => (options.client ?? client).post<PlatformAuthServiceImpersonateResponses, PlatformAuthServiceImpersonateErrors, ThrowOnError>({
+    url: '/api/v1/platform/auth/impersonate',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const platformAuthServiceLogin = <ThrowOnError extends boolean = false>(options: Options<PlatformAuthServiceLoginData, ThrowOnError>): RequestResult<PlatformAuthServiceLoginResponses, PlatformAuthServiceLoginErrors, ThrowOnError> => (options.client ?? client).post<PlatformAuthServiceLoginResponses, PlatformAuthServiceLoginErrors, ThrowOnError>({
+    url: '/api/v1/platform/auth/login',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const platformAuthServiceLogout = <ThrowOnError extends boolean = false>(options?: Options<PlatformAuthServiceLogoutData, ThrowOnError>): RequestResult<PlatformAuthServiceLogoutResponses, PlatformAuthServiceLogoutErrors, ThrowOnError> => (options?.client ?? client).post<PlatformAuthServiceLogoutResponses, PlatformAuthServiceLogoutErrors, ThrowOnError>({ url: '/api/v1/platform/auth/logout', ...options });
+
+export const platformAuthServiceListNavigation = <ThrowOnError extends boolean = false>(options?: Options<PlatformAuthServiceListNavigationData, ThrowOnError>): RequestResult<PlatformAuthServiceListNavigationResponses, PlatformAuthServiceListNavigationErrors, ThrowOnError> => (options?.client ?? client).get<PlatformAuthServiceListNavigationResponses, PlatformAuthServiceListNavigationErrors, ThrowOnError>({ url: '/api/v1/platform/auth/navigation', ...options });
+
+export const platformAuthServiceProfile = <ThrowOnError extends boolean = false>(options?: Options<PlatformAuthServiceProfileData, ThrowOnError>): RequestResult<PlatformAuthServiceProfileResponses, PlatformAuthServiceProfileErrors, ThrowOnError> => (options?.client ?? client).get<PlatformAuthServiceProfileResponses, PlatformAuthServiceProfileErrors, ThrowOnError>({ url: '/api/v1/platform/auth/profile', ...options });
+
+export const platformAuthServiceRefresh = <ThrowOnError extends boolean = false>(options: Options<PlatformAuthServiceRefreshData, ThrowOnError>): RequestResult<PlatformAuthServiceRefreshResponses, PlatformAuthServiceRefreshErrors, ThrowOnError> => (options.client ?? client).post<PlatformAuthServiceRefreshResponses, PlatformAuthServiceRefreshErrors, ThrowOnError>({
+    url: '/api/v1/platform/auth/refresh',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const platformAuthServiceListSessions = <ThrowOnError extends boolean = false>(options?: Options<PlatformAuthServiceListSessionsData, ThrowOnError>): RequestResult<PlatformAuthServiceListSessionsResponses, PlatformAuthServiceListSessionsErrors, ThrowOnError> => (options?.client ?? client).get<PlatformAuthServiceListSessionsResponses, PlatformAuthServiceListSessionsErrors, ThrowOnError>({ url: '/api/v1/platform/auth/sessions', ...options });
+
+export const platformAuthServiceRevokeSession = <ThrowOnError extends boolean = false>(options: Options<PlatformAuthServiceRevokeSessionData, ThrowOnError>): RequestResult<PlatformAuthServiceRevokeSessionResponses, PlatformAuthServiceRevokeSessionErrors, ThrowOnError> => (options.client ?? client).delete<PlatformAuthServiceRevokeSessionResponses, PlatformAuthServiceRevokeSessionErrors, ThrowOnError>({ url: '/api/v1/platform/auth/sessions/{sessionId}', ...options });
 
 export const managementServiceGetEffectiveSettings = <ThrowOnError extends boolean = false>(options?: Options<ManagementServiceGetEffectiveSettingsData, ThrowOnError>): RequestResult<ManagementServiceGetEffectiveSettingsResponses, ManagementServiceGetEffectiveSettingsErrors, ThrowOnError> => (options?.client ?? client).get<ManagementServiceGetEffectiveSettingsResponses, ManagementServiceGetEffectiveSettingsErrors, ThrowOnError>({ url: '/api/v1/settings/effective', ...options });

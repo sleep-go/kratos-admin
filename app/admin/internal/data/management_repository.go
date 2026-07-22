@@ -21,6 +21,7 @@ import (
 	managementbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/management"
 	permissionbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/permission"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/providerconfig"
+	"github.com/sleep-go/kratos-admin/app/admin/internal/biz/setup"
 	settingbiz "github.com/sleep-go/kratos-admin/app/admin/internal/biz/setting"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/model"
 	"github.com/sleep-go/kratos-admin/app/admin/internal/data/provider/message"
@@ -70,7 +71,7 @@ func fieldSet(fields ...string) map[string]struct{} {
 
 var managementResources = map[string]resourceDefinition{
 	"app-users":             {table: "app_users", columns: []string{"id", "username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status", "mfa_enabled", "mfa_channel"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
-	"platform-admins":       {table: "platform_admins", columns: []string{"id", "username", "email", "phone", "display_name", "status", "is_super_admin", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
+	"platform-admins":       {table: "platform_admins", columns: []string{"id", "username", "email", "phone", "display_name", "status", "is_super_admin", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "role_ids"), filterFields: fieldSet("status"), keywordFields: []string{"username", "email", "phone", "display_name"}, softDelete: true},
 	"tenant-admins":         {table: "tenant_admins", columns: []string{"id", "tenant_id", "username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel", "created_at", "updated_at"}, writeFields: fieldSet("username", "email", "phone", "display_name", "status", "mfa_enabled", "mfa_channel"), filterFields: fieldSet("status"), keywordFields: []string{"username", "email", "phone", "display_name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"tenants":               {table: "tenants", columns: []string{"id", "code", "name", "status", "permission_version", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("id", "status"), keywordFields: []string{"code", "name"}, softDelete: true},
 	"roles":                 {table: "roles", columns: []string{"id", "tenant_id", "code", "name", "data_scope", "is_builtin", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "data_scope", "status"), filterFields: fieldSet("status", "data_scope"), keywordFields: []string{"name", "code"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
@@ -83,6 +84,10 @@ var managementResources = map[string]resourceDefinition{
 	"audit-logs":             {table: "audit_logs", columns: []string{"id", "event_id", "tenant_id", "user_id", "member_id", "action", "resource_type", "resource_id", "summary", "ip", "user_agent", "request_id", "created_at"}, filterFields: fieldSet("user_id", "member_id", "action", "resource_type"), keywordFields: []string{"summary", "resource_id", "request_id"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
 	"api-logs":               {table: "api_access_logs", columns: []string{"id", "tenant_id", "user_id", "request_id", "method", "route", "status_code", "duration_ms", "ip", "user_agent", "error_reason", "created_at"}, filterFields: fieldSet("user_id", "method", "status_code"), keywordFields: []string{"route", "request_id", "ip", "error_reason"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true},
 	"log-exports":            {table: "log_exports", columns: []string{"id", "tenant_id", "user_id", "log_type", "status", "row_count", "file_id", "retry_count", "failure_reason", "created_at", "finished_at"}, filterFields: fieldSet("log_type", "status"), keywordFields: []string{"id", "file_id", "failure_reason"}, tenantScoped: true, tenantColumn: "tenant_id", readOnly: true, defaultOrder: "created_at DESC"},
+	"platform-login-logs":   {table: "login_logs", columns: []string{"id", "tenant_id", "user_id", "identifier", "result", "reason", "ip", "user_agent", "request_id", "created_at"}, filterFields: fieldSet("user_id", "result"), keywordFields: []string{"identifier", "ip", "request_id"}, readOnly: true},
+	"platform-audit-logs":   {table: "audit_logs", columns: []string{"id", "event_id", "tenant_id", "user_id", "member_id", "action", "resource_type", "resource_id", "summary", "ip", "user_agent", "request_id", "created_at"}, filterFields: fieldSet("user_id", "member_id", "action", "resource_type"), keywordFields: []string{"summary", "resource_id", "request_id"}, readOnly: true},
+	"platform-api-logs":     {table: "api_access_logs", columns: []string{"id", "tenant_id", "user_id", "request_id", "method", "route", "status_code", "duration_ms", "ip", "user_agent", "error_reason", "created_at"}, filterFields: fieldSet("user_id", "method", "status_code"), keywordFields: []string{"route", "request_id", "ip", "error_reason"}, readOnly: true},
+	"platform-log-exports":  {table: "log_exports", columns: []string{"id", "tenant_id", "user_id", "log_type", "status", "row_count", "file_id", "retry_count", "failure_reason", "created_at", "finished_at"}, filterFields: fieldSet("log_type", "status"), keywordFields: []string{"id", "file_id", "failure_reason"}, readOnly: true, defaultOrder: "created_at DESC"},
 	"settings":               {table: "system_settings", columns: []string{"id", "tenant_id", "category", "setting_key", "value_type", "setting_value", "allow_tenant_override", "is_secret", "version", "updated_by", "created_at", "updated_at"}, writeFields: fieldSet("category", "setting_key", "value_type", "setting_value", "allow_tenant_override", "is_secret"), filterFields: fieldSet("category", "value_type"), keywordFields: []string{"category", "setting_key"}, tenantScoped: true, tenantColumn: "tenant_id"},
 	"dictionary-types":       {table: "dictionary_types", columns: []string{"id", "tenant_id", "code", "name", "status", "created_at", "updated_at"}, writeFields: fieldSet("code", "name", "status"), filterFields: fieldSet("status"), keywordFields: []string{"code", "name"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
 	"dictionary-items":       {table: "dictionary_items", columns: []string{"id", "tenant_id", "type_id", "item_value", "label", "sort_order", "status", "created_at", "updated_at"}, writeFields: fieldSet("type_id", "item_value", "label", "sort_order", "status"), filterFields: fieldSet("type_id", "status"), keywordFields: []string{"item_value", "label"}, tenantScoped: true, tenantColumn: "tenant_id", softDelete: true},
@@ -94,6 +99,7 @@ var managementResources = map[string]resourceDefinition{
 var platformGovernanceResources = map[string]struct{}{
 	"app-users": {}, "tenants": {}, "resources": {}, "tenant-resources": {}, "platform-admins": {},
 	"platform-roles": {}, "platform-casbin-rules": {},
+	"platform-login-logs": {}, "platform-audit-logs": {}, "platform-api-logs": {}, "platform-log-exports": {},
 }
 
 func isPlatformGovernanceResource(resource string) bool {
@@ -130,8 +136,9 @@ func managementAssociation(resource, field string) (associationDefinition, bool)
 
 // ManagementRepository 使用编译期白名单访问后台资源。
 type ManagementRepository struct {
-	q             *query.Query
-	providerCodec *providerconfig.Codec
+	q                 *query.Query
+	providerCodec     *providerconfig.Codec
+	tenantProvisioner *setup.TenantProvisioner
 }
 
 // NewManagementRepository 创建统一后台资源仓储。
@@ -143,14 +150,32 @@ func NewManagementRepository(data *Data, codecs ...*providerconfig.Codec) *Manag
 	return repository
 }
 
+// ConfigureTenantProvisioner 注入租户开户初始化器，用于创建租户后自动初始化默认角色。
+func (r *ManagementRepository) ConfigureTenantProvisioner(provisioner *setup.TenantProvisioner) {
+	r.tenantProvisioner = provisioner
+}
+
 func (r *ManagementRepository) gen() *query.Query {
 	return r.q
 }
 
 // Allowed 按 Casbin 关系校验资源动作，并限制在租户功能授权集合内。
+// 平台超级管理员拥有 *:* 权限直接放行；非超级管理员的平台管理员走平台域 Casbin(v0=0) 校验。
 func (r *ManagementRepository) Allowed(ctx context.Context, scope managementbiz.Scope, resource, action string) (bool, error) {
 	if scope.PlatformAdmin {
-		return true, nil
+		if scope.IsSuperAdmin {
+			return true, nil
+		}
+		// 非超级管理员的平台管理员按平台域 Casbin g/p 规则校验。
+		p := r.gen().CasbinRule.As("p")
+		g := r.gen().CasbinRule.As("g")
+		res := r.gen().Resource.As("res")
+		count, err := res.WithContext(ctx).
+			Where(res.Code.Eq(resource), res.ScopeMask.BitAnd(1).Eq(1), res.Status.Eq(1), res.DeletedAt.IsNull()).
+			Join(p, p.Ptype.Eq("p"), p.V0.Eq("0"), p.V2.EqCol(res.Code), field.Or(p.V3.Eq(action), p.V3.Eq("*"))).
+			Join(g, g.Ptype.Eq("g"), g.V0.Eq("0"), g.V1.Eq(fmt.Sprint(scope.UserID)), g.V2.EqCol(p.V1)).
+			Count()
+		return count > 0, err
 	}
 	tr := r.gen().TenantResource.As("tr")
 	res := r.gen().Resource.As("res")
@@ -312,7 +337,63 @@ func nonEmptyDatabaseValue(value any) bool {
 	}
 }
 
-// Create 在业务写入事务中同步写入审计 Outbox。
+// syncPlatformAdminRoles 在事务内按「先删后建」同步平台管理员的 Casbin g 绑定。
+// roleIDs 为空表示清除该管理员的所有角色绑定。
+func syncPlatformAdminRoles(ctx context.Context, tx *query.Query, adminID uint64, roleIDs []uint64) error {
+	casbin := tx.CasbinRule
+	if _, err := casbin.WithContext(ctx).Where(casbin.Ptype.Eq("g"), casbin.V0.Eq("0"), casbin.V1.Eq(fmt.Sprint(adminID))).Delete(); err != nil {
+		return err
+	}
+	uniqueRoles := uniqueUint64(roleIDs)
+	if len(uniqueRoles) == 0 {
+		return nil
+	}
+	// 校验角色存在且为平台角色（tenant_id=0）。
+	role := tx.Role
+	count, err := role.WithContext(ctx).
+		Where(role.ID.In(uniqueRoles...), role.TenantID.Eq(0), role.Status.Eq(1), role.DeletedAt.IsNull()).
+		Count()
+	if err != nil {
+		return err
+	}
+	if count != int64(len(uniqueRoles)) {
+		return errors.New("所选平台角色不存在或已禁用")
+	}
+	rows := make([]*model.CasbinRule, 0, len(uniqueRoles))
+	for _, roleID := range uniqueRoles {
+		rows = append(rows, &model.CasbinRule{
+			Ptype: "g", V0: "0", V1: fmt.Sprint(adminID), V2: fmt.Sprint(roleID),
+		})
+	}
+	return casbin.WithContext(ctx).Create(rows...)
+}
+
+// extractRoleIDs 从原始输入中解析 role_ids 虚拟字段。
+func extractRoleIDs(data map[string]any) []uint64 {
+	raw, ok := data["role_ids"]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch value := raw.(type) {
+	case []uint64:
+		return value
+	case []any:
+		result := make([]uint64, 0, len(value))
+		for _, item := range value {
+			result = append(result, numericID(item))
+		}
+		return result
+	}
+	return nil
+}
+
+// hasRoleIDs 判断原始输入是否显式携带 role_ids 字段。
+// 用于区分「未提交该字段（保留现有绑定）」与「提交空数组（清空绑定）」。
+func hasRoleIDs(data map[string]any) bool {
+	_, ok := data["role_ids"]
+	return ok
+}
+
 func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.Scope, resource string, data map[string]any) (uint64, error) {
 	definition, ok := managementResources[resource]
 	if !ok {
@@ -377,12 +458,28 @@ func (r *ManagementRepository) Create(ctx context.Context, scope managementbiz.S
 			return err
 		}
 		id = createdID
+		// 平台管理员创建后同步 Casbin g 角色绑定；未提交 role_ids 时跳过。
+		if resource == "platform-admins" && hasRoleIDs(data) {
+			if err := syncPlatformAdminRoles(ctx, tx, id, extractRoleIDs(data)); err != nil {
+				return err
+			}
+		}
 		if err := incrementPermissionVersionGen(ctx, tx, scope, resource, values, id); err != nil {
 			return err
 		}
 		return writeAuditOutboxGen(ctx, tx, scope, "create", resource, fmt.Sprint(id), values)
 	})
-	return id, err
+	if err != nil {
+		return id, err
+	}
+	// 租户开户后置初始化默认角色；失败不回滚租户创建，默认角色可手动补建。
+	if resource == "tenants" && r.tenantProvisioner != nil {
+		if provisionErr := r.tenantProvisioner.EnsureDefaults(ctx, id); provisionErr != nil {
+			// TODO(sleep): 失败时记录审计日志便于运维补建
+			fmt.Printf("WARN: 租户 %d 默认角色初始化失败: %v\n", id, provisionErr)
+		}
+	}
+	return id, nil
 }
 
 func (r *ManagementRepository) validateCreateDataScope(_ context.Context, _ managementbiz.Scope, _ string, _ map[string]any) error {
@@ -431,6 +528,12 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 		if result.RowsAffected != 1 {
 			return errors.New("资源不存在或无权访问")
 		}
+		// 平台管理员更新后同步 Casbin g 角色绑定；未提交 role_ids 时保留现有绑定。
+		if resource == "platform-admins" && hasRoleIDs(data) {
+			if err := syncPlatformAdminRoles(ctx, tx, id, extractRoleIDs(data)); err != nil {
+				return err
+			}
+		}
 		if err := incrementPermissionVersionGen(ctx, tx, scope, resource, values, id); err != nil {
 			return err
 		}
@@ -439,7 +542,11 @@ func (r *ManagementRepository) Update(ctx context.Context, scope managementbiz.S
 }
 
 // UpdateRoleAuthorization 在单个事务内替换角色授权、数据范围并递增权限版本。
-func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scope managementbiz.Scope, roleID uint64, dataScope uint32, grants []managementbiz.RoleGrant, departmentIDs []uint64) error {
+// 平台域（scope.PlatformAdmin && scope.TenantID==0）时同步管理员绑定（Casbin g）。
+func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scope managementbiz.Scope, roleID uint64, dataScope uint32, grants []managementbiz.RoleGrant, departmentIDs, adminIDs []uint64) error {
+	if scope.PlatformAdmin && scope.TenantID == 0 {
+		return r.updatePlatformRoleAuthorization(ctx, scope, roleID, grants, adminIDs)
+	}
 	if scope.TenantID == 0 {
 		return errors.New("角色授权必须在租户上下文执行")
 	}
@@ -526,6 +633,107 @@ func (r *ManagementRepository) UpdateRoleAuthorization(ctx context.Context, scop
 		}
 		return writeAuditOutboxGen(ctx, tx, scope, "update_authorization", "roles", fmt.Sprint(roleID), map[string]any{
 			"data_scope": dataScope, "grant_count": len(policies), "department_count": len(departmentIDs),
+		})
+	})
+}
+
+// updatePlatformRoleAuthorization 替换平台角色资源策略（p）与管理员绑定（g）。
+func (r *ManagementRepository) updatePlatformRoleAuthorization(ctx context.Context, scope managementbiz.Scope, roleID uint64, grants []managementbiz.RoleGrant, adminIDs []uint64) error {
+	if !scope.PlatformAdmin {
+		return errors.New("仅平台管理员可配置平台角色")
+	}
+	allowedActions := map[string]struct{}{
+		"list": {}, "create": {}, "update": {}, "delete": {}, "export": {}, "download": {},
+	}
+	policies := make([]model.CasbinRule, 0)
+	seenPolicies := make(map[string]struct{})
+	for _, grant := range grants {
+		code := strings.TrimSpace(grant.ResourceCode)
+		if code == "" {
+			return errors.New("授权资源编码不能为空")
+		}
+		for _, action := range grant.Actions {
+			if _, allowed := allowedActions[action]; !allowed {
+				return fmt.Errorf("资源动作 %s 不受支持", action)
+			}
+			key := code + ":" + action
+			if _, exists := seenPolicies[key]; exists {
+				continue
+			}
+			seenPolicies[key] = struct{}{}
+			policies = append(policies, model.CasbinRule{
+				Ptype: "p", V0: "0", V1: fmt.Sprint(roleID), V2: code, V3: action,
+			})
+		}
+	}
+	uniqueAdmins := uniqueUint64(adminIDs)
+	return r.gen().Transaction(func(tx *query.Query) error {
+		role := tx.Role
+		if _, err := role.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where(role.ID.Eq(roleID), role.TenantID.Eq(0), role.Status.Eq(1), role.DeletedAt.IsNull()).Take(); err != nil {
+			return errors.New("平台角色不存在或已禁用")
+		}
+		if len(seenPolicies) > 0 {
+			codes := make([]string, 0, len(seenPolicies))
+			codeSet := make(map[string]struct{})
+			for _, policy := range policies {
+				if _, exists := codeSet[policy.V2]; !exists {
+					codeSet[policy.V2] = struct{}{}
+					codes = append(codes, policy.V2)
+				}
+			}
+			resource := tx.Resource
+			count, err := resource.WithContext(ctx).
+				Where(resource.Code.In(codes...), resource.ScopeMask.BitAnd(1).Eq(1), resource.Status.Eq(1), resource.DeletedAt.IsNull()).
+				Count()
+			if err != nil {
+				return err
+			}
+			if count != int64(len(codes)) {
+				return errors.New("角色授权包含无效或非平台资源")
+			}
+		}
+		if len(uniqueAdmins) > 0 {
+			pa := tx.PlatformAdmin
+			count, err := pa.WithContext(ctx).
+				Where(pa.ID.In(uniqueAdmins...), pa.IsSuperAdmin.Is(false), pa.Status.Eq(1), pa.DeletedAt.IsNull()).
+				Count()
+			if err != nil {
+				return err
+			}
+			if count != int64(len(uniqueAdmins)) {
+				return errors.New("所选平台管理员不存在、已禁用或为超级管理员")
+			}
+		}
+		casbin := tx.CasbinRule
+		if _, err := casbin.WithContext(ctx).Where(casbin.Ptype.Eq("p"), casbin.V0.Eq("0"), casbin.V1.Eq(fmt.Sprint(roleID))).Delete(); err != nil {
+			return err
+		}
+		if len(policies) > 0 {
+			policyRows := make([]*model.CasbinRule, 0, len(policies))
+			for index := range policies {
+				policyRows = append(policyRows, &policies[index])
+			}
+			if err := casbin.WithContext(ctx).Create(policyRows...); err != nil {
+				return err
+			}
+		}
+		if _, err := casbin.WithContext(ctx).Where(casbin.Ptype.Eq("g"), casbin.V0.Eq("0"), casbin.V2.Eq(fmt.Sprint(roleID))).Delete(); err != nil {
+			return err
+		}
+		if len(uniqueAdmins) > 0 {
+			groupRows := make([]*model.CasbinRule, 0, len(uniqueAdmins))
+			for _, adminID := range uniqueAdmins {
+				groupRows = append(groupRows, &model.CasbinRule{
+					Ptype: "g", V0: "0", V1: fmt.Sprint(adminID), V2: fmt.Sprint(roleID),
+				})
+			}
+			if err := casbin.WithContext(ctx).Create(groupRows...); err != nil {
+				return err
+			}
+		}
+		return writeAuditOutboxGen(ctx, tx, scope, "update_authorization", "platform-roles", fmt.Sprint(roleID), map[string]any{
+			"grant_count": len(policies), "admin_count": len(uniqueAdmins),
 		})
 	})
 }
@@ -735,6 +943,26 @@ func (r *ManagementRepository) Delete(ctx context.Context, scope managementbiz.S
 			}
 			permissionValues["tenant_id"] = row.TenantID
 		}
+		// 平台管理员删除保护：禁止删除最后一个超级管理员。
+		if resource == "platform-admins" {
+			pa := tx.PlatformAdmin
+			target, err := pa.WithContext(ctx).Select(pa.IsSuperAdmin).
+				Where(pa.ID.Eq(id), pa.DeletedAt.IsNull()).Take()
+			if err != nil {
+				return errors.New("资源不存在或无权访问")
+			}
+			if target.IsSuperAdmin {
+				count, err := pa.WithContext(ctx).
+					Where(pa.IsSuperAdmin.Is(true), pa.Status.Eq(1), pa.DeletedAt.IsNull()).
+					Count()
+				if err != nil {
+					return err
+				}
+				if count <= 1 {
+					return errors.New("不能删除最后一个超级管理员")
+				}
+			}
+		}
 		result, err := deleteManagementResource(ctx, tx, resource, id, scope.TenantID, definition.softDelete)
 		if err != nil {
 			return err
@@ -861,7 +1089,7 @@ func resourceParentChainContains(currentID uint64, chain []uint64) bool {
 
 func writeAuditOutboxGen(ctx context.Context, tx *query.Query, scope managementbiz.Scope, action, resource, resourceID string, after map[string]any) error {
 	payload, err := json.Marshal(map[string]any{
-		"user_id": scope.UserID, "member_id": scope.MemberID, "impersonator_id": scope.ImpersonatorID,
+		"realm": scope.Realm, "user_id": scope.UserID, "member_id": scope.MemberID, "impersonator_id": scope.ImpersonatorID,
 		"action": action, "resource_type": resource, "resource_id": resourceID, "after": after,
 	})
 	if err != nil {

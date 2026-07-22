@@ -14,7 +14,6 @@ const componentRouteRegistry: Readonly<Record<string, string>> = {
   tenants: '/platform/tenants',
   'platform-admins': '/platform/admins',
   'platform-roles': '/platform/permission/roles',
-  'platform-casbin-rules': '/platform/permission/policies',
   members: '/console/organization/users',
   departments: '/console/organization/departments',
   positions: '/console/organization/positions',

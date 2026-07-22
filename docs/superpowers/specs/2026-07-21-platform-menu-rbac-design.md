@@ -218,3 +218,4 @@ scope.PlatformAdmin && scope.TenantID==0:
 | 平台角色 | 需要，放在「身份与账号」 |
 | 平台权限模型 | A：super admin `*:*` + 普通管理员绑角色 |
 | 开通配置 | 不入平台顶栏菜单 |
+| platform-casbin-rules | 保持 `type=3 visible=0`，作为 RolePermissionView 内部 API 资源，不恢复独立菜单入口 |

@@ -7,8 +7,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/wire"
 	bizauth "github.com/sleep-go/kratos-admin/app/admin/internal/biz/auth"
 )
+
+// ProviderSet 是初始化 biz 层的 Wire Provider 集合。
+var ProviderSet = wire.NewSet(NewAdminInitializer, NewTenantProvisioner)
 
 var (
 	// ErrAdminNotFound 表示指定用户名尚不存在。
