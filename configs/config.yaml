@@ -1,65 +1,15 @@
-environment: development
-
 server:
   http:
-    network: tcp
     addr: 0.0.0.0:8000
-    timeout: 15s
+    timeout: 1s
   grpc:
-    network: tcp
     addr: 0.0.0.0:9000
-    timeout: 15s
-
+    timeout: 1s
 data:
   database:
     driver: mysql
-    source: kratos:kratos@tcp(127.0.0.1:3306)/kratos_admin?charset=utf8mb4&parseTime=True&loc=Local
+    source: root:root@tcp(127.0.0.1:3306)/test?timeout=5s&parseTime=True&loc=Local&charset=utf8mb4
   redis:
-    network: tcp
     addr: 127.0.0.1:6379
-    db: 0
-    read_timeout: 2s
-    write_timeout: 2s
-  rabbitmq:
-    url: amqp://kratos:kratos@127.0.0.1:5672/kratos_admin
-    prefetch: 10
-    concurrency: 10
-
-auth:
-  access_ttl: 900s
-  refresh_ttl: 604800s
-  jwt_private_key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-  secret_key: 0123456789abcdef0123456789abcdef
-
-storage:
-  provider: local
-  local_path: ./data/files
-  max_file_size: 104857600
-  oss_region: ""
-  oss_endpoint: ""
-  oss_bucket: ""
-  oss_access_key_id: ""
-  oss_access_key_secret: ""
-  oss_security_token: ""
-
-messaging:
-  smtp_address: 127.0.0.1:1025
-  smtp_host: 127.0.0.1
-  smtp_username: ""
-  smtp_password: ""
-  smtp_from: kratos-admin@example.local
-  smtp_use_tls: false
-  aliyun_sms_region: cn-hangzhou
-  aliyun_sms_endpoint: dysmsapi.aliyuncs.com
-  aliyun_sms_access_key_id: ""
-  aliyun_sms_access_key_secret: ""
-  aliyun_sms_sign_name: ""
-  aliyun_sms_template_code: ""
-
-setup:
-  admin:
-    username: admin
-    display_name: 超级管理员
-    email: admin@example.local
-    phone: ""
-    initial_password: ChangeMe!2026
+    read_timeout: 0.2s
+    write_timeout: 0.2s

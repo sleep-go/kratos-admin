@@ -1,9 +1,0 @@
-.git
-.env
-data
-app/frontend/node_modules
-app/frontend/dist
-app/frontend/playwright-report
-app/frontend/test-results
-app/frontend/*.tsbuildinfo
-**/.DS_Store

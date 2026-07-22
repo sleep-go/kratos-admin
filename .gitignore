@@ -1,24 +1,21 @@
-.DS_Store
+# Binaries
+bin/
+*.exe
+
+# IDE
 .idea/
 .vscode/
-.superpowers/
-.worktrees/
-.env
-*.local
+
+# OS
+.DS_Store
 
 # Go
-/bin/
+vendor/
 
-# Frontend
-app/frontend/node_modules/
-app/frontend/.node_modules-incomplete/
-app/frontend/.node_modules-tmp/
-app/frontend/dist/
-app/frontend/coverage/
-app/frontend/*.tsbuildinfo
-app/frontend/playwright-report/
-app/frontend/test-results/
+# Node
+web/node_modules/
+web/dist/
 
-# Runtime data
-/data/
-deploy/data/
+# Env
+.env
+*.local

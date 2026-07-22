@@ -1,129 +1,62 @@
-GOHOSTOS := $(shell go env GOHOSTOS)
-GOPATH := $(shell go env GOPATH)
-VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo unknown)
-GOCACHE ?= /tmp/go-build
-GO_APP_PACKAGES := ./app/admin/...
-GO_PACKAGES := $(GO_APP_PACKAGES)
-
-ifeq ($(GOHOSTOS),windows)
-	GIT_BASH := $(subst \,/,$(subst cmd\git.exe,bin\bash.exe,$(shell where git)))
-	SHELL := $(GIT_BASH)
-endif
+GOHOSTOS:=$(shell go env GOHOSTOS)
+GOPATH:=$(shell go env GOPATH)
+VERSION=$(shell git describe --tags --always)
 
 .PHONY: init
-init: ## 安装 Proto 与 Wire 工具
-	go install github.com/bufbuild/buf/cmd/buf@v1.66.0
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
-	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
-	go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@v2.9.2
-	go install github.com/go-kratos/kratos/cmd/protoc-gen-openapi/v2@v2.9.2
-	go install github.com/google/wire/cmd/wire@v0.7.0
+# init env
+init:
+	go install github.com/google/wire/cmd/wire@latest
+	go install github.com/bufbuild/buf/cmd/buf@latest
 
 .PHONY: config
-config: ## 生成 app/admin/internal/conf 配置代码
+# generate internal proto
+config:
 	buf generate --template buf.gen.config.yaml
 
 .PHONY: api
-api: ## 检查并生成业务 API、gRPC、HTTP 与 OpenAPI 代码
-	buf lint
-	buf generate
+# generate api proto
+api:
+	buf generate --template buf.gen.yaml
+
+.PHONY: gen
+# generate GORM Gen type-safe query code
+gen:
+	go run ./cmd/gorm-gen
 
 .PHONY: build
-build: ## 构建 Admin 服务和运维工具到 bin
-	mkdir -p bin
-	GOCACHE=$(GOCACHE) go build -trimpath -ldflags "-X main.Version=$(VERSION)" -o bin/kratos-admin ./app/admin/cmd/server
-	GOCACHE=$(GOCACHE) go build -trimpath -o bin/kratos-admin-tools ./app/admin/cmd/tools
+# build
+build:
+	mkdir -p bin/ && go build -ldflags "-X main.Version=$(VERSION)" -o ./bin/ ./...
 
 .PHONY: generate
-generate: ## 执行 Go Generate、GORM Gen 并校验模块依赖
-	GOCACHE=$(GOCACHE) go generate $(GO_PACKAGES)
-	$(MAKE) gorm-gen
-	go mod verify
+# generate
+generate:
+	go generate ./...
+	go mod tidy
 
 .PHONY: all
-all: ## 生成 API、配置及依赖注入代码
-	$(MAKE) api
-	$(MAKE) config
-	$(MAKE) generate
+# generate all
+all:
+	make api
+	make config
+	make gen
+	make generate
 
-.PHONY: wire
-wire: ## 生成 Admin Server 的 Wire 依赖注入代码
-	GOCACHE=$(GOCACHE) go tool wire ./app/admin/cmd/server
-
-.PHONY: gorm-gen
-gorm-gen: ## 从 Goose 临时数据库反向生成 GORM Model 与 Query
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/tools gorm-gen --conf ./configs/config.yaml
-
-.PHONY: gorm-gen-check
-gorm-gen-check: gorm-gen ## 验证反向生成的 GORM Model 与 Query 无未提交差异
-	git diff --exit-code -- app/admin/internal/data/model app/admin/internal/data/query
-
-.PHONY: migrate
-migrate: ## 使用 Goose 执行数据库迁移
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/tools migrate --conf ./configs/config.yaml
-
-.PHONY: init-admin
-init-admin: ## 幂等初始化平台超级管理员
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/tools init-admin --conf ./configs/config.yaml
-
-.PHONY: run-admin
-run-admin: ## 启动 Admin HTTP/gRPC 服务
-	GOCACHE=$(GOCACHE) go run ./app/admin/cmd/server -conf ./configs/config.yaml
-
-.PHONY: test
-test: ## 运行后端测试
-	GOCACHE=$(GOCACHE) go test -race $(GO_PACKAGES)
-
-.PHONY: vet
-vet: ## 运行后端静态检查
-	GOCACHE=$(GOCACHE) go vet $(GO_PACKAGES)
-
-.PHONY: frontend-install
-frontend-install: ## 安装前端依赖
-	cd app/frontend && pnpm install
-
-.PHONY: frontend-test
-frontend-test: ## 运行前端组件测试
-	cd app/frontend && pnpm test:run
-
-.PHONY: frontend-build
-frontend-build: ## 检查并构建前端
-	cd app/frontend && pnpm build
-
-.PHONY: frontend-e2e
-frontend-e2e: ## 运行前端端到端测试
-	cd app/frontend && pnpm e2e
-
-.PHONY: compose-config
-compose-config: ## 校验 Docker Compose 配置
-	docker compose config --quiet
-
-.PHONY: compose-deps-up
-compose-deps-up: ## 仅启动本地 MySQL、Redis、RabbitMQ 与 Mailpit 依赖
-	docker compose up -d mysql redis rabbitmq mailpit
-
-.PHONY: compose-up
-compose-up: ## 构建并启动完整 Docker Compose 环境
-	docker compose up --build
-
-.PHONY: compose-down
-compose-down: ## 停止 Docker Compose 环境
-	docker compose down
-
-# 兼容原有命令名称。
-.PHONY: backend-test backend-vet backend-build
-backend-test: test
-backend-vet: vet
-backend-build: build
-
-.PHONY: help
-help: ## 显示帮助
-	@echo "Kratos Admin $(VERSION)"
-	@echo ""
-	@echo "Usage:"
-	@echo "  make [target]"
-	@echo ""
-	@echo "Targets:"
-	@awk 'BEGIN {FS = ":.*##"; printf ""} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  %-20s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
+# show help
+help:
+	@echo ''
+	@echo 'Usage:'
+	@echo ' make [target]'
+	@echo ''
+	@echo 'Targets:'
+	@awk '/^[a-zA-Z\-\_0-9]+:/ { \
+	helpMessage = match(lastLine, /^# (.*)/); \
+		if (helpMessage) { \
+			helpCommand = substr($$1, 0, index($$1, ":")); \
+			helpMessage = substr(lastLine, RSTART + 2, RLENGTH); \
+			printf "\033[36m%-22s\033[0m %s\n", helpCommand,helpMessage; \
+		} \
+	} \
+	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
 .DEFAULT_GOAL := help
